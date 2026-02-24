@@ -1,0 +1,1 @@
+This folder contains maps for the program that are in .shp file type.
