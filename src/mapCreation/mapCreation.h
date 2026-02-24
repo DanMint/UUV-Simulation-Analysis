@@ -1,12 +1,11 @@
-#ifndef MAPCREATION_H
-#define MAPCREATION_H
+#pragma once
 
 #include <string>
 #include <vector>
 #include <utility>  // std::pair
 #include <iostream>
 
-// Forward declaration so the header doesn't need GDAL includes
+// Forward declaration so the header doesn't need GDAL includes. This reduces compile-time and dependecy spreading
 class OGRPolygon;
 
 /**
@@ -72,7 +71,6 @@ public:
     int getLandCount() const;
     double getMinDepth() const;
     double getMaxDepth() const;
-    std::vector<std::vector<int>> getMgrid() const;
 
     // ─── Cache I/O ──────────────────────────────────────────────────
 
@@ -147,5 +145,3 @@ private:
                         double depth1, double depth2,
                         double minX, double maxY, double scale);
 };
-
-#endif // MAPCREATION_H

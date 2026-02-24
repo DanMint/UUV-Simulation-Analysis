@@ -334,7 +334,6 @@ int MapCreation::getCanvasHeight() const { return m_canvasHeight; }
 int MapCreation::getCellSize() const     { return m_cellSize; }
 double MapCreation::getMinDepth() const  { return m_minDepth; }
 double MapCreation::getMaxDepth() const  { return m_maxDepth; }
-std::vector<std::vector<int>> MapCreation::getMgrid() const {return m_grid; }
 
 int MapCreation::getWaterCount() const {
     int count = 0;
