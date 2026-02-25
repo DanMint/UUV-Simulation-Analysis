@@ -69,7 +69,19 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        // ── Step 3: Attach map data to the config ────────────────────
+        // ── Step 3: Stamp units onto the grid ──────────────────────
+
+        for (const auto& unit : config.getUnits()) {
+            int unitType = MapCreation::WATER;
+            if (unit.type == "seeker")  unitType = MapCreation::SEEKER;
+            if (unit.type == "target")  unitType = MapCreation::TARGET;
+            map.placeUnit(unit.row, unit.col, unitType);
+        }
+
+        // Print grid with units visible
+        map.printGrid();
+
+        // ── Step 4: Attach map data to the config ────────────────────
 
         MapInfo info;
         info.shpPath      = shpPath;
@@ -83,7 +95,7 @@ int main(int argc, char* argv[]) {
 
         config.setMapData(info, map.getGrid());
 
-        // ── Step 4: Save the complete scenario ───────────────────────
+        // ── Step 5: Save the complete scenario ───────────────────────
 
         std::string savePath = "scenario.json";
         config.saveJSON(savePath);

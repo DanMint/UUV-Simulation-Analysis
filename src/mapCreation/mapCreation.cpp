@@ -309,19 +309,75 @@ bool MapCreation::isValid(int row, int col) const {
 }
 
 bool MapCreation::isWater(int row, int col) const {
-    return isValid(row, col) && m_grid[row][col] == 0;
+    return isValid(row, col) && m_grid[row][col] == WATER;
+}
+
+bool MapCreation::isPassable(int row, int col) const {
+    // Water, seekers, and targets are passable — only land blocks
+    return isValid(row, col) && m_grid[row][col] != LAND;
 }
 
 std::vector<std::pair<int, int>> MapCreation::getAllWaterCells() const {
     std::vector<std::pair<int, int>> waterCells;
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
-            if (m_grid[row][col] == 0) {
-                waterCells.push_back({col, row});  // (col, row) to match Python convention
+            if (m_grid[row][col] == WATER) {
+                waterCells.push_back({col, row});
             }
         }
     }
     return waterCells;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  UNIT PLACEMENT ON GRID
+// ════════════════════════════════════════════════════════════════════════════════
+
+bool MapCreation::placeUnit(int row, int col, int unitType) {
+    if (!isValid(row, col)) return false;
+    // Only place on water cells
+    if (m_grid[row][col] != WATER) return false;
+    m_grid[row][col] = unitType;
+    return true;
+}
+
+bool MapCreation::removeUnit(int row, int col) {
+    if (!isValid(row, col)) return false;
+    // Only remove actual units (2 or 3), not terrain
+    if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET) {
+        m_grid[row][col] = WATER;
+        return true;
+    }
+    return false;
+}
+
+void MapCreation::clearAllUnits() {
+    for (int row = 0; row < m_cellsN; row++) {
+        for (int col = 0; col < m_cellsN; col++) {
+            if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET) {
+                m_grid[row][col] = WATER;
+            }
+        }
+    }
+}
+
+int MapCreation::placeUnitsFromConfig(
+    const std::vector<std::pair<std::string, std::pair<int,int>>>& units)
+{
+    int placed = 0;
+    for (const auto& [type, pos] : units) {
+        int unitType = WATER; // fallback
+        if (type == "seeker")  unitType = SEEKER;
+        else if (type == "target") unitType = TARGET;
+        else continue;
+
+        if (placeUnit(pos.first, pos.second, unitType)) {
+            placed++;
+        }
+    }
+    std::cout << "Placed " << placed << " / " << units.size()
+              << " units on grid\n";
+    return placed;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -410,10 +466,16 @@ void MapCreation::loadCache(const std::string& cachePath) {
 
 void MapCreation::printGrid() const {
     std::cout << "\nGrid (" << m_cellsN << "x" << m_cellsN
-              << ", . = water, # = land):\n\n";
+              << ", . = water, # = land, S = seeker, T = target):\n\n";
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
-            std::cout << (m_grid[row][col] == 0 ? '.' : '#');
+            switch (m_grid[row][col]) {
+                case WATER:  std::cout << '.'; break;
+                case LAND:   std::cout << '#'; break;
+                case SEEKER: std::cout << 'S'; break;
+                case TARGET: std::cout << 'T'; break;
+                default:     std::cout << '?'; break;
+            }
         }
         std::cout << '\n';
     }
