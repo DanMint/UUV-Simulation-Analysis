@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include <utility>  // std::pair
+#include <utility>
 #include <iostream>
 
 // Forward declaration so the header doesn't need GDAL includes
@@ -14,53 +14,70 @@ class OGRPolygon;
  *
  * Reads a nautical .shp file containing depth polygons,
  * scales the geometry to fit a virtual canvas, and builds
- * a 2D grid classifying each cell as water (0) or land (1).
+ * a 2D grid classifying each cell as water or land.
  *
- * Dependencies: GDAL/OGR (for reading .shp files)
- *
- * The shapefile is expected to have columns:
- *   - geometry : Polygon / MultiPolygon
- *   - DRVAL1   : shallow depth bound
- *   - DRVAL2   : deeper depth bound
+ * Grid cell values:
+ *   0 = water
+ *   1 = land
+ *   2 = seeker (attacker)
+ *   3 = target (defender)
  */
 class MapCreation {
 public:
-    // ─── Constructor / Destructor ───────────────────────────────────
+    // ─── Cell ID constants ──────────────────────────────────────────
+    static constexpr int WATER  = 0;
+    static constexpr int LAND   = 1;
+    static constexpr int SEEKER = 2;
+    static constexpr int TARGET = 3;
 
-    /**
-     * Build grid from a shapefile.
-     * @param shpPath      Path to the .shp file
-     * @param cellsN       Number of cells per row/column (default 100 = 100x100 grid)
-     * @param canvasWidth   Virtual canvas width in pixels (default 700)
-     * @param canvasHeight  Virtual canvas height in pixels (default 700)
-     */
+    // ─── Constructor / Factory ──────────────────────────────────────
+
     MapCreation(const std::string& shpPath, int cellsN = 100,
                 int canvasWidth = 700, int canvasHeight = 700);
 
-    /**
-     * Build grid from a previously saved cache file (no .shp needed).
-     * Use the static factory method to make intent clear.
-     */
     static MapCreation fromCache(const std::string& cachePath);
 
     ~MapCreation() = default;
 
     // ─── Grid Access ────────────────────────────────────────────────
 
-    /** Get the full grid (0 = water, 1 = land). */
     const std::vector<std::vector<int>>& getGrid() const;
-
-    /** Get cell value at (row, col). Returns -1 if out of bounds. */
     int getCell(int row, int col) const;
-
-    /** Check if (row, col) is within grid bounds. */
     bool isValid(int row, int col) const;
 
-    /** Check if cell at (row, col) is water. */
+    /** Check if cell is water (0) — empty, no unit. */
     bool isWater(int row, int col) const;
 
-    /** Get all water cell coordinates as (col, row) pairs. */
+    /** Check if cell is passable (anything except land). */
+    bool isPassable(int row, int col) const;
+
+    /** Get all empty water cell coordinates as (col, row) pairs. */
     std::vector<std::pair<int, int>> getAllWaterCells() const;
+
+    // ─── Unit Placement ─────────────────────────────────────────────
+
+    /**
+     * Place a unit onto the grid. Only succeeds on water cells (0).
+     * @param unitType  Use SEEKER (2) or TARGET (3)
+     * @return true if placed, false if cell is land, occupied, or out of bounds.
+     */
+    bool placeUnit(int row, int col, int unitType);
+
+    /**
+     * Remove a unit from the grid (resets cell back to water).
+     * @return true if a unit was actually removed.
+     */
+    bool removeUnit(int row, int col);
+
+    /** Clear ALL units from the grid (reset every 2/3 back to 0). */
+    void clearAllUnits();
+
+    /**
+     * Place units from a list of (type_string, (row, col)) pairs.
+     * @return number of units successfully placed.
+     */
+    int placeUnitsFromConfig(
+        const std::vector<std::pair<std::string, std::pair<int,int>>>& units);
 
     // ─── Grid Info ──────────────────────────────────────────────────
 
@@ -72,19 +89,14 @@ public:
     int getLandCount() const;
     double getMinDepth() const;
     double getMaxDepth() const;
-    std::vector<std::vector<int>> getMgrid() const;
 
     // ─── Cache I/O ──────────────────────────────────────────────────
 
-    /** Save the grid to a simple text file for fast reloading. */
     void saveCache(const std::string& filepath) const;
 
     // ─── Debug / Display ────────────────────────────────────────────
 
-    /** Print an ASCII representation of the grid (. = water, # = land). */
     void printGrid() const;
-
-    /** Print summary statistics. */
     void printStats() const;
 
 private:
@@ -92,57 +104,36 @@ private:
     int m_cellsN;
     int m_canvasWidth;
     int m_canvasHeight;
-    double m_colSpace;   // pixel width of one cell
-    double m_rowSpace;   // pixel height of one cell
-    int m_cellSize;      // integer cell size (canvasWidth / cellsN)
+    double m_colSpace;
+    double m_rowSpace;
+    int m_cellSize;
 
     // ─── The grid itself ────────────────────────────────────────────
-    std::vector<std::vector<int>> m_grid;  // [row][col], 0 = water, 1 = land
+    std::vector<std::vector<int>> m_grid;
 
     // ─── Map data ───────────────────────────────────────────────────
     double m_minDepth;
     double m_maxDepth;
 
-    /**
-     * A single scaled polygon stored as a list of (x, y) vertex pairs
-     * in pixel-space coordinates, plus its depth values.
-     */
     struct ScaledPolygon {
         std::vector<std::pair<double, double>> vertices;
         double depth1;
         double depth2;
     };
 
-    /** All water polygons from the shapefile, scaled to pixel space. */
     std::vector<ScaledPolygon> m_polygons;
 
     // ─── Private methods ────────────────────────────────────────────
 
-    /** Read the .shp file and populate m_polygons with scaled geometry. */
     void loadShapefile(const std::string& shpPath);
-
-    /** Walk the grid and classify each cell using 5-point sampling. */
     void classifyCells();
-
-    /** Load grid from a cache file. */
     void loadCache(const std::string& cachePath);
 
-    /**
-     * Ray-casting point-in-polygon test.
-     * Returns true if point (px, py) is inside the polygon.
-     */
     static bool pointInPolygon(double px, double py,
                                const std::vector<std::pair<double, double>>& vertices);
 
-    /**
-     * Check if a pixel-space point is inside ANY water polygon.
-     */
     bool isPointInWater(double px, double py) const;
 
-    /**
-     * Helper: extract exterior ring from an OGR polygon, scale it,
-     * and push it onto m_polygons.
-     */
     void extractPolygon(OGRPolygon* ogrPoly,
                         double depth1, double depth2,
                         double minX, double maxY, double scale);

@@ -1,0 +1,11 @@
+{
+  "units": [
+    { "type": "seeker", "row": 25, "col": 83 },
+    { "type": "seeker", "row": 31, "col": 80 },
+    { "type": "seeker", "row": 33, "col": 69 },
+    { "type": "seeker", "row": 28, "col": 74 },
+    { "type": "target", "row": 12, "col": 17 },
+    { "type": "target", "row": 16, "col": 14 },
+    { "type": "target", "row": 16, "col": 20 }
+  ]
+}
