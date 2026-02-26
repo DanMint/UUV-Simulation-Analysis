@@ -142,6 +142,7 @@ int main(int argc, char* argv[]) {
         Simulation sim(map, config, 2000);
         SimResult result = sim.run();
         result.print();
+        result.saveJSON("results.json");
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
