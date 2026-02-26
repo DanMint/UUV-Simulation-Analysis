@@ -1,6 +1,7 @@
 #include "mapCreation.h"
 #include "spawnConfig.h"
 #include "mapVisualizer.h"
+#include "simulation.h"
 #include <iostream>
 #include <string>
 
@@ -8,13 +9,14 @@ void printUsage(const char* progName) {
     std::cout << "Usage:\n"
               << "  " << progName << " <shapefile.shp> [cells_n]\n"
               << "  " << progName << " --cache <cache_file.txt>\n"
+              << "  " << progName << " --scenario <scenario.json>\n"
               << "\nSpawn Tool Controls:\n"
               << "  Left click   - Place unit on water cell\n"
               << "  Right click  - Remove unit\n"
               << "  S key        - Switch to Seeker mode (attacker, red triangle)\n"
               << "  T key        - Switch to Target mode (defender, blue square)\n"
               << "  C key        - Clear all units\n"
-              << "  Enter        - Save scenario and close\n"
+              << "  Enter        - Save scenario and run simulation\n"
               << "  Escape       - Close without saving\n";
 }
 
@@ -25,13 +27,36 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // ── Step 1: Load the map ─────────────────────────────────────
-
         MapCreation* mapPtr = nullptr;
+        SpawnConfig config;
         std::string shpPath = "";
         std::string firstArg = argv[1];
+        bool needSpawnTool = true;
 
-        if (firstArg == "--cache") {
+        // ── Load map ─────────────────────────────────────────────────
+
+        if (firstArg == "--scenario") {
+            // Load a complete scenario (map + grid + units)
+            if (argc < 3) {
+                std::cerr << "Error: --scenario requires a file path\n";
+                return 1;
+            }
+            std::cout << "Loading scenario from " << argv[2] << "...\n";
+            config = SpawnConfig::loadJSON(argv[2]);
+
+            if (!config.hasMapData()) {
+                std::cerr << "Error: scenario file has no map data\n";
+                return 1;
+            }
+
+            // Build a MapCreation from the cached grid in the config
+            const MapInfo& info = config.getMapInfo();
+            static MapCreation scenarioMap = MapCreation::fromCache("grid_cache.txt");
+            mapPtr = &scenarioMap;
+            shpPath = info.shpPath;
+            needSpawnTool = false;
+        }
+        else if (firstArg == "--cache") {
             if (argc < 3) {
                 std::cerr << "Error: --cache requires a file path\n";
                 return 1;
@@ -39,7 +64,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Loading grid from cache...\n";
             static MapCreation cachedMap = MapCreation::fromCache(argv[2]);
             mapPtr = &cachedMap;
-            shpPath = "(from cache: " + std::string(argv[2]) + ")";
+            shpPath = "(from cache)";
         }
         else {
             int cellsN = (argc >= 3) ? std::stoi(argv[2]) : 100;
@@ -49,61 +74,74 @@ int main(int argc, char* argv[]) {
 
             static MapCreation shpMap(firstArg, cellsN);
             mapPtr = &shpMap;
-
             shpMap.saveCache("grid_cache.txt");
         }
 
         MapCreation& map = *mapPtr;
         map.printStats();
 
-        // ── Step 2: Open the spawn tool ──────────────────────────────
+        // ── Spawn tool (if not loading a scenario) ───────────────────
 
-        std::cout << "Opening spawn tool...\n";
-        std::cout << "Place your units, then press Enter to save.\n\n";
+        if (needSpawnTool) {
+            std::cout << "Opening spawn tool...\n";
+            std::cout << "Place your units, then press Enter to run simulation.\n\n";
 
-        MapVisualizer visualizer(map);
-        SpawnConfig config = visualizer.run(""); // don't save inside visualizer
+            MapVisualizer visualizer(map);
+            config = visualizer.run("");
 
-        if (config.totalUnits() == 0) {
-            std::cout << "No units placed. Exiting.\n";
+            if (config.totalUnits() == 0) {
+                std::cout << "No units placed. Exiting.\n";
+                return 0;
+            }
+
+            // Stamp units onto grid
+            for (const auto& unit : config.getUnits()) {
+                int unitType = MapCreation::WATER;
+                if (unit.type == "seeker")  unitType = MapCreation::SEEKER;
+                if (unit.type == "target")  unitType = MapCreation::TARGET;
+                map.placeUnit(unit.row, unit.col, unitType);
+            }
+
+            // Attach map data and save scenario
+            MapInfo info;
+            info.shpPath      = shpPath;
+            info.cellsN       = map.getCellsN();
+            info.canvasWidth   = map.getCanvasWidth();
+            info.canvasHeight  = map.getCanvasHeight();
+            info.minDepth     = map.getMinDepth();
+            info.maxDepth     = map.getMaxDepth();
+            info.waterCount   = map.getWaterCount();
+            info.landCount    = map.getLandCount();
+            config.setMapData(info, map.getGrid());
+            config.saveJSON("scenario.json");
+        }
+        else {
+            // Stamp units from loaded scenario onto grid
+            for (const auto& unit : config.getUnits()) {
+                int unitType = MapCreation::WATER;
+                if (unit.type == "seeker")  unitType = MapCreation::SEEKER;
+                if (unit.type == "target")  unitType = MapCreation::TARGET;
+                map.placeUnit(unit.row, unit.col, unitType);
+            }
+        }
+
+        config.printSummary();
+        map.printGrid();
+
+        // ── Run simulation ───────────────────────────────────────────
+
+        if (config.countType("seeker") == 0) {
+            std::cout << "No seekers placed. Cannot run simulation.\n";
+            return 0;
+        }
+        if (config.countType("target") == 0) {
+            std::cout << "No targets placed. Cannot run simulation.\n";
             return 0;
         }
 
-        // ── Step 3: Stamp units onto the grid ──────────────────────
-
-        for (const auto& unit : config.getUnits()) {
-            int unitType = MapCreation::WATER;
-            if (unit.type == "seeker")  unitType = MapCreation::SEEKER;
-            if (unit.type == "target")  unitType = MapCreation::TARGET;
-            map.placeUnit(unit.row, unit.col, unitType);
-        }
-
-        // Print grid with units visible
-        map.printGrid();
-
-        // ── Step 4: Attach map data to the config ────────────────────
-
-        MapInfo info;
-        info.shpPath      = shpPath;
-        info.cellsN       = map.getCellsN();
-        info.canvasWidth   = map.getCanvasWidth();
-        info.canvasHeight  = map.getCanvasHeight();
-        info.minDepth     = map.getMinDepth();
-        info.maxDepth     = map.getMaxDepth();
-        info.waterCount   = map.getWaterCount();
-        info.landCount    = map.getLandCount();
-
-        config.setMapData(info, map.getGrid());
-
-        // ── Step 5: Save the complete scenario ───────────────────────
-
-        std::string savePath = "scenario.json";
-        config.saveJSON(savePath);
-        config.printSummary();
-
-        std::cout << "Ready for simulation with "
-                  << config.countType("seeker") << " seekers and "
-                  << config.countType("target") << " targets.\n";
+        Simulation sim(map, config, 2000);
+        SimResult result = sim.run();
+        result.print();
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
