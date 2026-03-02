@@ -34,7 +34,7 @@ jobs:
             -o test_sim \
             -Isrc/mapCreation -Isrc/spawnConfig -Isrc/pathfinding \
             -Isrc/simulation -Isrc/agents \
-            $(gdal-config --cflags --libs)
+            $(gdal-config --cflags) -L$(gdal-config --prefix)/lib -lgdal
 
       - name: Run simulation test
         run: ./test_sim
