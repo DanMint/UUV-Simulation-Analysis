@@ -1,0 +1,40 @@
+# This workflow checks if the A* algorithm works correctly.
+# The basic test consists of running the simulation with a fixed scenario
+# and comparing the output against stored expected results.
+name: A* algorithm check
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install GDAL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev
+
+      - name: Build test binary
+        run: |
+          g++ -std=c++17 -O2 \
+            tests/test_simulation.cpp \
+            src/mapCreation/mapCreation.cpp \
+            src/spawnConfig/spawnConfig.cpp \
+            src/pathfinding/pathfinding.cpp \
+            src/simulation/simulation.cpp \
+            src/simulation/simResult.cpp \
+            -o test_sim \
+            -Isrc/mapCreation -Isrc/spawnConfig -Isrc/pathfinding \
+            -Isrc/simulation -Isrc/agents \
+            $(gdal-config --cflags) -L$(gdal-config --prefix)/lib -lgdal
+
+      - name: Run simulation test
+        run: ./test_sim
