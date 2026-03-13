@@ -38,7 +38,7 @@ MapCreation MapCreation::fromCache(const std::string& cachePath) {
     // Create a "blank" object then fill it from cache
     // We use a private helper, so we construct with dummy values
     // and immediately overwrite from cache
-    MapCreation obj("", 0, 0, 0);  // won't actually load anything since cellsN=0
+    MapCreation obj("", 1, 1, 1);  // safe dummy values (avoid division by zero)
     // Clear the failed state from the dummy constructor
     obj.m_grid.clear();
     obj.m_polygons.clear();
@@ -251,32 +251,13 @@ void MapCreation::classifyCells() {
     int waterCount = 0;
     int landCount  = 0;
 
+    // ── Step 1: Center-point classification ─────────────────────────
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
-            // Calculate the top-left pixel position of this cell
-            double posX = col * m_colSpace;
-            double posY = row * m_rowSpace;
+            double cx = (col + 0.5) * m_colSpace;
+            double cy = (row + 0.5) * m_rowSpace;
 
-            // 5-point sampling: four corners + center
-            // Same logic as the Python Grid.draw_test_grid()
-            double checkPoints[5][2] = {
-                {posX,                     posY},                       // top-left
-                {posX + m_colSpace,        posY},                       // top-right
-                {posX,                     posY + m_rowSpace},          // bottom-left
-                {posX + m_colSpace,        posY + m_rowSpace},          // bottom-right
-                {posX + m_colSpace / 2.0,  posY + m_rowSpace / 2.0},   // center
-            };
-
-            // Count how many of the 5 points are in water
-            int waterHits = 0;
-            for (int p = 0; p < 5; p++) {
-                if (isPointInWater(checkPoints[p][0], checkPoints[p][1])) {
-                    waterHits++;
-                }
-            }
-
-            // If 3 or more points are water → cell is water (0)
-            if (waterHits >= 3) {
+            if (isPointInWater(cx, cy)) {
                 m_grid[row][col] = 0;
                 waterCount++;
             } else {
@@ -289,6 +270,105 @@ void MapCreation::classifyCells() {
     std::cout << "Grid classified: " << m_cellsN << "x" << m_cellsN
               << " = " << waterCount << " water, " << landCount << " land"
               << std::endl;
+
+    // ── Step 2: Fill thin land gaps (polygon seams) ─────────────────
+    int totalFilled = 0;
+    bool changed = true;
+
+    while (changed) {
+        changed = false;
+        std::vector<std::vector<int>> snap = m_grid;
+
+        for (int row = 1; row < m_cellsN - 1; row++) {
+            for (int col = 1; col < m_cellsN - 1; col++) {
+                if (snap[row][col] != 1) continue;
+
+                bool gapH = (snap[row][col-1] == 0 && snap[row][col+1] == 0);
+                bool gapV = (snap[row-1][col] == 0 && snap[row+1][col] == 0);
+
+                if (gapH || gapV) {
+                    m_grid[row][col] = 0;
+                    changed = true;
+                    totalFilled++;
+                }
+            }
+        }
+    }
+
+    if (totalFilled > 0) {
+        std::cout << "Gap fill: converted " << totalFilled
+                  << " land cells in polygon seams to water" << std::endl;
+    }
+
+    // ── Step 3: Remove small isolated land patches ──────────────────
+    // Flood-fill to find connected land regions. Any land region
+    // smaller than the threshold is a polygon gap artifact (not a
+    // real island) and gets converted to water.
+
+    int minIslandSize = std::max(5, (m_cellsN * m_cellsN) / 500);
+
+    // visited[row][col] = true if already processed
+    std::vector<std::vector<bool>> visited(m_cellsN,
+        std::vector<bool>(m_cellsN, false));
+
+    int patchesRemoved = 0;
+    int cellsConverted = 0;
+
+    for (int row = 0; row < m_cellsN; row++) {
+        for (int col = 0; col < m_cellsN; col++) {
+            if (visited[row][col] || m_grid[row][col] != 1) continue;
+
+            // BFS flood fill to find this connected land region
+            std::vector<std::pair<int,int>> region;
+            std::vector<std::pair<int,int>> queue;
+            bool touchesEdge = false;
+
+            queue.push_back({row, col});
+            visited[row][col] = true;
+
+            while (!queue.empty()) {
+                auto [r, c] = queue.back();
+                queue.pop_back();
+                region.push_back({r, c});
+
+                // Check if this land region touches the grid edge
+                if (r == 0 || r == m_cellsN - 1 ||
+                    c == 0 || c == m_cellsN - 1) {
+                    touchesEdge = true;
+                }
+
+                // Check 4 cardinal neighbors
+                const int dr[] = {-1, 1, 0, 0};
+                const int dc[] = {0, 0, -1, 1};
+                for (int d = 0; d < 4; d++) {
+                    int nr = r + dr[d];
+                    int nc = c + dc[d];
+                    if (nr >= 0 && nr < m_cellsN &&
+                        nc >= 0 && nc < m_cellsN &&
+                        !visited[nr][nc] && m_grid[nr][nc] == 1) {
+                        visited[nr][nc] = true;
+                        queue.push_back({nr, nc});
+                    }
+                }
+            }
+
+            // Small land patches that don't touch the edge → artifact
+            if (!touchesEdge &&
+                static_cast<int>(region.size()) < minIslandSize) {
+                for (auto [r, c] : region) {
+                    m_grid[r][c] = 0;
+                }
+                patchesRemoved++;
+                cellsConverted += static_cast<int>(region.size());
+            }
+        }
+    }
+
+    if (patchesRemoved > 0) {
+        std::cout << "Island cleanup: removed " << patchesRemoved
+                  << " small land patches (" << cellsConverted
+                  << " cells) as polygon artifacts" << std::endl;
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
