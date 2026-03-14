@@ -32,13 +32,16 @@ MapCreation::MapCreation(const std::string& shpPath, int cellsN,
 
     // Step 2: Walk the grid and classify each cell as water or land
     classifyCells();
+
+    // Step 3: Fix polygon seam gaps (thin land lines through water)
+    cleanupSeamGaps();
 }
 
 MapCreation MapCreation::fromCache(const std::string& cachePath) {
     // Create a "blank" object then fill it from cache
     // We use a private helper, so we construct with dummy values
     // and immediately overwrite from cache
-    MapCreation obj("", 1, 1, 1);  // safe dummy values (avoid division by zero)
+    MapCreation obj("", 0, 0, 0);  // won't actually load anything since cellsN=0
     // Clear the failed state from the dummy constructor
     obj.m_grid.clear();
     obj.m_polygons.clear();
@@ -251,13 +254,43 @@ void MapCreation::classifyCells() {
     int waterCount = 0;
     int landCount  = 0;
 
-    // ── Step 1: Center-point classification ─────────────────────────
+    // Small inset to avoid testing exactly on polygon edges where
+    // floating-point ray casting is unreliable
+    double inset = 0.05;
+
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
-            double cx = (col + 0.5) * m_colSpace;
-            double cy = (row + 0.5) * m_rowSpace;
+            // Calculate the top-left pixel position of this cell
+            double posX = col * m_colSpace;
+            double posY = row * m_rowSpace;
 
-            if (isPointInWater(cx, cy)) {
+            // 9-point sampling: 3x3 grid with inset from cell edges
+            // This catches seam gaps much better than 5-point corner sampling
+            // because interior points are less likely to land exactly on a
+            // polygon boundary where ray casting is ambiguous.
+            double x0 = posX + m_colSpace * inset;
+            double x1 = posX + m_colSpace * 0.5;
+            double x2 = posX + m_colSpace * (1.0 - inset);
+            double y0 = posY + m_rowSpace * inset;
+            double y1 = posY + m_rowSpace * 0.5;
+            double y2 = posY + m_rowSpace * (1.0 - inset);
+
+            double checkPoints[9][2] = {
+                {x0, y0}, {x1, y0}, {x2, y0},   // top row
+                {x0, y1}, {x1, y1}, {x2, y1},   // middle row
+                {x0, y2}, {x1, y2}, {x2, y2},   // bottom row
+            };
+
+            // Count how many of the 9 points are in water
+            int waterHits = 0;
+            for (int p = 0; p < 9; p++) {
+                if (isPointInWater(checkPoints[p][0], checkPoints[p][1])) {
+                    waterHits++;
+                }
+            }
+
+            // If 5 or more points (majority) are water → cell is water
+            if (waterHits >= 5) {
                 m_grid[row][col] = 0;
                 waterCount++;
             } else {
@@ -270,104 +303,122 @@ void MapCreation::classifyCells() {
     std::cout << "Grid classified: " << m_cellsN << "x" << m_cellsN
               << " = " << waterCount << " water, " << landCount << " land"
               << std::endl;
+}
 
-    // ── Step 2: Fill thin land gaps (polygon seams) ─────────────────
-    int totalFilled = 0;
-    bool changed = true;
+// ════════════════════════════════════════════════════════════════════════════════
+//  SEAM GAP CLEANUP
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  After initial classification, thin lines of land can appear where
+//  adjacent polygons in the shapefile don't perfectly overlap (seam gaps).
+//
+//  Two strategies:
+//
+//  1. Neighbor threshold: land cell with 6+ water neighbors out of 8
+//     → flip unconditionally. Safe — these are isolated dots.
+//
+//  2. Dense polygon re-check: for any land cell with 3+ water neighbors,
+//     re-test with a 5×5 grid of 25 sample points that extend 20% beyond
+//     the cell boundary on each side. If ANY point hits a water polygon
+//     → flip. The overshoot lets sample points reach into adjacent water
+//     polygons even when the seam gap is wider than one cell.
+//
+//     This is safe for real land because: on a genuine land cell,
+//     none of the 25 points will be inside any water polygon — the
+//     polygons simply don't cover that area. Only seam cells (which
+//     are geometrically surrounded by water polygons with a thin gap)
+//     will have points that clip into a polygon edge.
+//
+//  Runs iteratively until convergence (max 5 passes).
+//
+// ════════════════════════════════════════════════════════════════════════════════
 
-    while (changed) {
-        changed = false;
+void MapCreation::cleanupSeamGaps() {
+    const int maxPasses = 5;
+    int totalFixed = 0;
+
+    // 8-directional neighbor offsets
+    const int dr[8] = { -1, -1, -1,  0, 0,  1, 1, 1 };
+    const int dc[8] = { -1,  0,  1, -1, 1, -1, 0, 1 };
+
+    for (int pass = 0; pass < maxPasses; pass++) {
+        int fixedThisPass = 0;
+
+        // Snapshot so reads and writes don't interfere within a pass
         std::vector<std::vector<int>> snap = m_grid;
 
-        for (int row = 1; row < m_cellsN - 1; row++) {
-            for (int col = 1; col < m_cellsN - 1; col++) {
-                if (snap[row][col] != 1) continue;
+        for (int row = 0; row < m_cellsN; row++) {
+            for (int col = 0; col < m_cellsN; col++) {
+                if (snap[row][col] != LAND) continue;
 
-                bool gapH = (snap[row][col-1] == 0 && snap[row][col+1] == 0);
-                bool gapV = (snap[row-1][col] == 0 && snap[row+1][col] == 0);
-
-                if (gapH || gapV) {
-                    m_grid[row][col] = 0;
-                    changed = true;
-                    totalFilled++;
-                }
-            }
-        }
-    }
-
-    if (totalFilled > 0) {
-        std::cout << "Gap fill: converted " << totalFilled
-                  << " land cells in polygon seams to water" << std::endl;
-    }
-
-    // ── Step 3: Remove small isolated land patches ──────────────────
-    // Flood-fill to find connected land regions. Any land region
-    // smaller than the threshold is a polygon gap artifact (not a
-    // real island) and gets converted to water.
-
-    int minIslandSize = std::max(5, (m_cellsN * m_cellsN) / 500);
-
-    // visited[row][col] = true if already processed
-    std::vector<std::vector<bool>> visited(m_cellsN,
-        std::vector<bool>(m_cellsN, false));
-
-    int patchesRemoved = 0;
-    int cellsConverted = 0;
-
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
-            if (visited[row][col] || m_grid[row][col] != 1) continue;
-
-            // BFS flood fill to find this connected land region
-            std::vector<std::pair<int,int>> region;
-            std::vector<std::pair<int,int>> queue;
-            bool touchesEdge = false;
-
-            queue.push_back({row, col});
-            visited[row][col] = true;
-
-            while (!queue.empty()) {
-                auto [r, c] = queue.back();
-                queue.pop_back();
-                region.push_back({r, c});
-
-                // Check if this land region touches the grid edge
-                if (r == 0 || r == m_cellsN - 1 ||
-                    c == 0 || c == m_cellsN - 1) {
-                    touchesEdge = true;
+                // Count water neighbors
+                int waterNeighbors = 0;
+                int totalNeighbors = 0;
+                for (int d = 0; d < 8; d++) {
+                    int nr = row + dr[d];
+                    int nc = col + dc[d];
+                    if (nr < 0 || nr >= m_cellsN || nc < 0 || nc >= m_cellsN)
+                        continue;
+                    totalNeighbors++;
+                    if (snap[nr][nc] == WATER)
+                        waterNeighbors++;
                 }
 
-                // Check 4 cardinal neighbors
-                const int dr[] = {-1, 1, 0, 0};
-                const int dc[] = {0, 0, -1, 1};
-                for (int d = 0; d < 4; d++) {
-                    int nr = r + dr[d];
-                    int nc = c + dc[d];
-                    if (nr >= 0 && nr < m_cellsN &&
-                        nc >= 0 && nc < m_cellsN &&
-                        !visited[nr][nc] && m_grid[nr][nc] == 1) {
-                        visited[nr][nc] = true;
-                        queue.push_back({nr, nc});
+                // ── Strategy 1: obvious isolated land cells ──
+                if (totalNeighbors >= 3 && waterNeighbors >= 6) {
+                    m_grid[row][col] = WATER;
+                    fixedThisPass++;
+                    continue;
+                }
+
+                // ── Strategy 2: dense polygon re-check ──
+                // For borderline cells (3+ water neighbors), test a 5×5
+                // grid of 25 points that extends 20% beyond the cell
+                // boundary. The overshoot lets sample points reach into
+                // adjacent water polygons even when the seam gap is
+                // wider than the cell itself.
+                if (waterNeighbors >= 3) {
+                    double posX = col * m_colSpace;
+                    double posY = row * m_rowSpace;
+
+                    // Extend 20% beyond cell boundary on each side
+                    double overshoot = 0.2;
+                    double x0 = posX - m_colSpace * overshoot;
+                    double y0 = posY - m_rowSpace * overshoot;
+                    double spanX = m_colSpace * (1.0 + 2.0 * overshoot);
+                    double spanY = m_rowSpace * (1.0 + 2.0 * overshoot);
+
+                    bool foundWater = false;
+                    // 5×5 grid across the extended area
+                    for (int sy = 0; sy < 5 && !foundWater; sy++) {
+                        for (int sx = 0; sx < 5 && !foundWater; sx++) {
+                            double px = x0 + spanX * (0.1 + 0.2 * sx);
+                            double py = y0 + spanY * (0.1 + 0.2 * sy);
+                            if (isPointInWater(px, py)) {
+                                foundWater = true;
+                            }
+                        }
+                    }
+
+                    if (foundWater) {
+                        m_grid[row][col] = WATER;
+                        fixedThisPass++;
                     }
                 }
             }
-
-            // Small land patches that don't touch the edge → artifact
-            if (!touchesEdge &&
-                static_cast<int>(region.size()) < minIslandSize) {
-                for (auto [r, c] : region) {
-                    m_grid[r][c] = 0;
-                }
-                patchesRemoved++;
-                cellsConverted += static_cast<int>(region.size());
-            }
         }
+
+        totalFixed += fixedThisPass;
+
+        if (fixedThisPass == 0) break;  // converged
+
+        std::cout << "  Seam cleanup pass " << (pass + 1)
+                  << ": fixed " << fixedThisPass << " cells\n";
     }
 
-    if (patchesRemoved > 0) {
-        std::cout << "Island cleanup: removed " << patchesRemoved
-                  << " small land patches (" << cellsConverted
-                  << " cells) as polygon artifacts" << std::endl;
+    if (totalFixed > 0) {
+        std::cout << "Seam cleanup: reclassified " << totalFixed
+                  << " land cells as water\n";
     }
 }
 
@@ -423,8 +474,8 @@ bool MapCreation::placeUnit(int row, int col, int unitType) {
 
 bool MapCreation::removeUnit(int row, int col) {
     if (!isValid(row, col)) return false;
-    // Only remove actual units (2 or 3), not terrain
-    if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET) {
+    // Only remove actual units (2, 3, or 4), not terrain
+    if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET || m_grid[row][col] == DETECTOR) {
         m_grid[row][col] = WATER;
         return true;
     }
@@ -434,7 +485,7 @@ bool MapCreation::removeUnit(int row, int col) {
 void MapCreation::clearAllUnits() {
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
-            if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET) {
+            if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET || m_grid[row][col] == DETECTOR) {
                 m_grid[row][col] = WATER;
             }
         }
@@ -449,6 +500,7 @@ int MapCreation::placeUnitsFromConfig(
         int unitType = WATER; // fallback
         if (type == "seeker")  unitType = SEEKER;
         else if (type == "target") unitType = TARGET;
+        else if (type == "detector") unitType = DETECTOR;
         else continue;
 
         if (placeUnit(pos.first, pos.second, unitType)) {
@@ -546,15 +598,16 @@ void MapCreation::loadCache(const std::string& cachePath) {
 
 void MapCreation::printGrid() const {
     std::cout << "\nGrid (" << m_cellsN << "x" << m_cellsN
-              << ", . = water, # = land, S = seeker, T = target):\n\n";
+              << ", . = water, # = land, S = seeker, T = target, D = detector):\n\n";
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
             switch (m_grid[row][col]) {
-                case WATER:  std::cout << '.'; break;
-                case LAND:   std::cout << '#'; break;
-                case SEEKER: std::cout << 'S'; break;
-                case TARGET: std::cout << 'T'; break;
-                default:     std::cout << '?'; break;
+                case WATER:    std::cout << '.'; break;
+                case LAND:     std::cout << '#'; break;
+                case SEEKER:   std::cout << 'S'; break;
+                case TARGET:   std::cout << 'T'; break;
+                case DETECTOR: std::cout << 'D'; break;
+                default:       std::cout << '?'; break;
             }
         }
         std::cout << '\n';

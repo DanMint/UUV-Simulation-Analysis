@@ -12,7 +12,7 @@
  * A single unit placement on the grid.
  */
 struct UnitSpawn {
-    std::string type;  // "seeker" or "target"
+    std::string type;  // "seeker", "target", or "detector"
     int row;
     int col;
 };
@@ -37,7 +37,8 @@ struct MapInfo {
  * A complete scenario file containing:
  *   1. Map metadata (source file, dimensions, depth range)
  *   2. The full grid (2D water/land matrix)
- *   3. Unit placements (seekers, targets, etc.)
+ *   3. Unit placements (seekers, targets, detectors)
+ *   4. Detector radius (single value for all detectors)
  *
  * One JSON file = one complete, self-contained scenario.
  */
@@ -56,6 +57,14 @@ public:
     int totalUnits() const;
     void clear();
 
+    // ─── Detector radius ────────────────────────────────────────────
+
+    /** Set the detection radius (in grid cells) for all detectors. */
+    void setDetectorRadius(double radius);
+
+    /** Get the current detector radius. Default is 3.0. */
+    double getDetectorRadius() const;
+
     // ─── Map data ───────────────────────────────────────────────────
 
     /** Attach map info and grid data to this config. */
@@ -73,13 +82,13 @@ public:
     // ─── JSON I/O ───────────────────────────────────────────────────
 
     /**
-     * Save everything (map info + grid + units) to a single JSON file.
+     * Save everything (map info + grid + units + detector radius) to a single JSON file.
      */
     void saveJSON(const std::string& filepath) const;
 
     /**
      * Load a complete scenario from JSON.
-     * Contains map info, grid, and unit placements.
+     * Contains map info, grid, unit placements, and detector radius.
      */
     static SpawnConfig loadJSON(const std::string& filepath);
 
@@ -92,6 +101,7 @@ private:
     MapInfo m_mapInfo = {};
     std::vector<std::vector<int>> m_grid;
     bool m_hasMapData = false;
+    double m_detectorRadius = 3.0;  // default radius in grid cells
 };
 
 #endif // SPAWNCONFIG_H
