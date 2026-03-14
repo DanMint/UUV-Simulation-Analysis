@@ -15,6 +15,8 @@ void printUsage(const char* progName) {
               << "  Right click  - Remove unit\n"
               << "  S key        - Switch to Seeker mode (attacker, red triangle)\n"
               << "  T key        - Switch to Target mode (defender, blue square)\n"
+              << "  D key        - Switch to Detector mode (interceptor, orange diamond)\n"
+              << "  + / - keys   - Adjust detector radius\n"
               << "  C key        - Clear all units\n"
               << "  Enter        - Save scenario and run simulation\n"
               << "  Escape       - Close without saving\n";
@@ -97,8 +99,9 @@ int main(int argc, char* argv[]) {
             // Stamp units onto grid
             for (const auto& unit : config.getUnits()) {
                 int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")  unitType = MapCreation::SEEKER;
-                if (unit.type == "target")  unitType = MapCreation::TARGET;
+                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
+                if (unit.type == "target")   unitType = MapCreation::TARGET;
+                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 
@@ -119,8 +122,9 @@ int main(int argc, char* argv[]) {
             // Stamp units from loaded scenario onto grid
             for (const auto& unit : config.getUnits()) {
                 int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")  unitType = MapCreation::SEEKER;
-                if (unit.type == "target")  unitType = MapCreation::TARGET;
+                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
+                if (unit.type == "target")   unitType = MapCreation::TARGET;
+                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
         }

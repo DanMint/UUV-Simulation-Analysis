@@ -21,14 +21,16 @@ class OGRPolygon;
  *   1 = land
  *   2 = seeker (attacker)
  *   3 = target (defender)
+ *   4 = detector (interceptor — defender side)
  */
 class MapCreation {
 public:
     // ─── Cell ID constants ──────────────────────────────────────────
-    static constexpr int WATER  = 0;
-    static constexpr int LAND   = 1;
-    static constexpr int SEEKER = 2;
-    static constexpr int TARGET = 3;
+    static constexpr int WATER    = 0;
+    static constexpr int LAND     = 1;
+    static constexpr int SEEKER   = 2;
+    static constexpr int TARGET   = 3;
+    static constexpr int DETECTOR = 4;
 
     // ─── Constructor / Factory ──────────────────────────────────────
 
@@ -58,7 +60,7 @@ public:
 
     /**
      * Place a unit onto the grid. Only succeeds on water cells (0).
-     * @param unitType  Use SEEKER (2) or TARGET (3)
+     * @param unitType  Use SEEKER (2), TARGET (3), or DETECTOR (4)
      * @return true if placed, false if cell is land, occupied, or out of bounds.
      */
     bool placeUnit(int row, int col, int unitType);
@@ -69,7 +71,7 @@ public:
      */
     bool removeUnit(int row, int col);
 
-    /** Clear ALL units from the grid (reset every 2/3 back to 0). */
+    /** Clear ALL units from the grid (reset every 2/3/4 back to 0). */
     void clearAllUnits();
 
     /**
@@ -127,6 +129,7 @@ private:
 
     void loadShapefile(const std::string& shpPath);
     void classifyCells();
+    void cleanupSeamGaps();
     void loadCache(const std::string& cachePath);
 
     static bool pointInPolygon(double px, double py,

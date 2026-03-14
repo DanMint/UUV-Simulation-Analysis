@@ -13,17 +13,23 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
     // Build agent lists from the spawn config
     int seekerId = 0;
     int targetId = 0;
+    int detectorId = 0;
+    double detectorRadius = config.getDetectorRadius();
 
     for (const auto& unit : config.getUnits()) {
         if (unit.type == "seeker") {
             m_seekers.emplace_back(seekerId++, unit.row, unit.col);
         } else if (unit.type == "target") {
             m_targets.emplace_back(targetId++, unit.row, unit.col);
+        } else if (unit.type == "detector") {
+            m_detectors.emplace_back(detectorId++, unit.row, unit.col, detectorRadius);
         }
     }
 
     std::cout << "Simulation created: " << m_seekers.size() << " seekers, "
-              << m_targets.size() << " targets, max " << m_maxSteps << " steps\n";
+              << m_targets.size() << " targets, "
+              << m_detectors.size() << " detectors (radius=" << detectorRadius << "), "
+              << "max " << m_maxSteps << " steps\n";
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -57,6 +63,38 @@ int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
 bool Simulation::checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const {
     // Seeker reaches target when it's on the same cell
     return seeker.row == target.row && seeker.col == target.col;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  DETECTOR INTERCEPTION
+// ════════════════════════════════════════════════════════════════════════════════
+
+void Simulation::checkDetectorIntercepts(int currentStep) {
+    for (auto& seeker : m_seekers) {
+        if (!seeker.alive || seeker.reachedTarget) continue;
+
+        for (auto& detector : m_detectors) {
+            if (!detector.alive) continue;
+
+            if (detector.isInRange(seeker.row, seeker.col)) {
+                std::cout << "  Step " << currentStep << ": Detector " << detector.id
+                          << " intercepted Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")\n";
+
+                // Kill the seeker
+                seeker.alive = false;
+                seeker.intercepted = true;
+                seeker.interceptedByDetector = detector.id;
+                seeker.interceptedAtStep = currentStep;
+
+                // Log on the detector side
+                detector.interceptCount++;
+                detector.intercepts.push_back({seeker.id, currentStep});
+
+                break;  // seeker is dead, no need to check more detectors
+            }
+        }
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -103,6 +141,9 @@ SimResult Simulation::buildResult(int totalSteps) const {
         sr.reachedTarget = s.reachedTarget;
         sr.targetId = s.targetId;
         sr.moveHistory = s.moveHistory;
+        sr.intercepted = s.intercepted;
+        sr.interceptedByDetector = s.interceptedByDetector;
+        sr.interceptedAtStep = s.interceptedAtStep;
         result.seekerResults.push_back(sr);
 
         if (s.alive) result.allSeekersDead = false;
@@ -120,6 +161,20 @@ SimResult Simulation::buildResult(int totalSteps) const {
         result.targetResults.push_back(tr);
 
         if (t.alive) result.allTargetsDestroyed = false;
+    }
+
+    // Detector results
+    for (const auto& d : m_detectors) {
+        SimResult::DetectorResult dr;
+        dr.id = d.id;
+        dr.row = d.row;
+        dr.col = d.col;
+        dr.radius = d.radius;
+        dr.interceptCount = d.interceptCount;
+        for (const auto& ic : d.intercepts) {
+            dr.intercepts.push_back({ic.seekerId, ic.step});
+        }
+        result.detectorResults.push_back(dr);
     }
 
     result.computeSummary();
@@ -152,6 +207,11 @@ SimResult Simulation::run() {
             seeker.moveStep();
         }
 
+        // ── Check detector interceptions FIRST ──
+        // Seekers that enter a detector's radius are destroyed
+        // before they can reach a target on the same step
+        checkDetectorIntercepts(step);
+
         // ── Check collisions: did any seeker reach its target? ──
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
@@ -166,16 +226,12 @@ SimResult Simulation::run() {
 
                     target.alive = false;
                     seeker.reachedTarget = true;
-
-                    // Store destruction info (find the target result later)
-                    // We track it directly on the target for now
                     break;
                 }
             }
         }
 
         // ── Check if we need to retarget ──
-        // If a target was just destroyed, remaining seekers may need new paths
         bool needsRetarget = false;
         for (const auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
@@ -219,7 +275,6 @@ SimResult Simulation::run() {
     // Patch in destruction step info
     for (auto& tr : result.targetResults) {
         if (tr.destroyed) {
-            // Find which seeker destroyed this target
             for (const auto& sr : result.seekerResults) {
                 if (sr.reachedTarget && sr.targetId == tr.id) {
                     tr.destroyedBySeeker = sr.id;

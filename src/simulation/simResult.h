@@ -13,7 +13,7 @@
  *
  * Holds all output data from one simulation run.
  * Responsible for:
- *   - Storing per-seeker and per-target results
+ *   - Storing per-seeker, per-target, and per-detector results
  *   - Computing summary statistics
  *   - Printing results to console
  *   - Saving results to JSON
@@ -33,6 +33,11 @@ struct SimResult {
         bool reachedTarget;
         int targetId;
         std::vector<std::pair<int,int>> moveHistory;
+
+        // Interception info
+        bool intercepted;           // was destroyed by a detector?
+        int interceptedByDetector;  // which detector (-1 if none)
+        int interceptedAtStep;      // at which step (-1 if none)
     };
 
     // ─── Per-target output ──────────────────────────────────────────
@@ -46,6 +51,22 @@ struct SimResult {
         int destroyedBySeeker;
     };
 
+    // ─── Per-detector output ────────────────────────────────────────
+
+    struct DetectorResult {
+        int id;
+        int row;
+        int col;
+        double radius;
+        int interceptCount;           // how many seekers destroyed
+
+        struct Intercept {
+            int seekerId;
+            int step;
+        };
+        std::vector<Intercept> intercepts;  // detailed log
+    };
+
     // ─── Run-level data ─────────────────────────────────────────────
 
     int totalSteps;
@@ -54,11 +75,13 @@ struct SimResult {
 
     std::vector<SeekerResult> seekerResults;
     std::vector<TargetResult> targetResults;
+    std::vector<DetectorResult> detectorResults;
 
     // ─── Summary statistics (computed from above) ───────────────────
 
     int targetsDestroyed;
     int seekersThatReached;
+    int seekersIntercepted;
     double avgStepsToTarget;
 
     // ─── Methods ────────────────────────────────────────────────────

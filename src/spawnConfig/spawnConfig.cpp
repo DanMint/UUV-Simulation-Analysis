@@ -67,6 +67,16 @@ const std::vector<std::vector<int>>& SpawnConfig::getGrid() const { return m_gri
 bool SpawnConfig::hasMapData() const { return m_hasMapData; }
 
 // ════════════════════════════════════════════════════════════════════════════════
+//  DETECTOR RADIUS
+// ════════════════════════════════════════════════════════════════════════════════
+
+void SpawnConfig::setDetectorRadius(double radius) {
+    m_detectorRadius = (radius > 0.0) ? radius : 1.0;
+}
+
+double SpawnConfig::getDetectorRadius() const { return m_detectorRadius; }
+
+// ════════════════════════════════════════════════════════════════════════════════
 //  JSON SAVE
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -105,6 +115,9 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         }
         file << "  ],\n";
     }
+
+    // ── Detector settings ──
+    file << "  \"detector_radius\": " << m_detectorRadius << ",\n";
 
     // ── Units section ──
     file << "  \"units\": [\n";
@@ -215,6 +228,11 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
                   << info.landCount << " land)\n";
     }
 
+    // ── Load detector radius if present ──
+    if (content.find("\"detector_radius\"") != std::string::npos) {
+        config.m_detectorRadius = extractNumber(content, "detector_radius");
+    }
+
     // ── Load units ──
     size_t unitsPos = content.find("\"units\"");
     if (unitsPos != std::string::npos) {
@@ -260,6 +278,10 @@ void SpawnConfig::printSummary() const {
     std::cout << "  Total units:  " << totalUnits() << std::endl;
     std::cout << "  Seekers:      " << countType("seeker") << std::endl;
     std::cout << "  Targets:      " << countType("target") << std::endl;
+    std::cout << "  Detectors:    " << countType("detector") << std::endl;
+    if (countType("detector") > 0) {
+        std::cout << "  Det. radius:  " << m_detectorRadius << " cells" << std::endl;
+    }
 
     for (const auto& u : m_units) {
         std::cout << "    " << u.type << " at (" << u.row << ", " << u.col << ")\n";

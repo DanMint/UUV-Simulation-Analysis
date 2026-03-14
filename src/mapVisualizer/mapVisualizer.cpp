@@ -1,18 +1,21 @@
 #include "mapVisualizer.h"
 #include <iostream>
 #include <sstream>
+#include <cmath>
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  COLORS
 // ════════════════════════════════════════════════════════════════════════════════
 
-const sf::Color MapVisualizer::WATER_COLOR     = sf::Color(20,  50, 120);
-const sf::Color MapVisualizer::LAND_COLOR      = sf::Color(50,  110, 50);
-const sf::Color MapVisualizer::SEEKER_COLOR    = sf::Color(220, 30,  30);
-const sf::Color MapVisualizer::TARGET_COLOR    = sf::Color(30,  100, 220);
-const sf::Color MapVisualizer::HOVER_COLOR     = sf::Color(255, 255, 255, 80);
-const sf::Color MapVisualizer::GRID_LINE_COLOR = sf::Color(40,  40,  40, 60);
-const sf::Color MapVisualizer::PANEL_COLOR     = sf::Color(30,  30,  30);
+const sf::Color MapVisualizer::WATER_COLOR            = sf::Color(20,  50, 120);
+const sf::Color MapVisualizer::LAND_COLOR             = sf::Color(50,  110, 50);
+const sf::Color MapVisualizer::SEEKER_COLOR           = sf::Color(220, 30,  30);
+const sf::Color MapVisualizer::TARGET_COLOR           = sf::Color(30,  100, 220);
+const sf::Color MapVisualizer::DETECTOR_COLOR         = sf::Color(255, 180, 0);
+const sf::Color MapVisualizer::DETECTOR_RADIUS_COLOR  = sf::Color(255, 180, 0, 40);
+const sf::Color MapVisualizer::HOVER_COLOR            = sf::Color(255, 255, 255, 80);
+const sf::Color MapVisualizer::GRID_LINE_COLOR        = sf::Color(40,  40,  40, 60);
+const sf::Color MapVisualizer::PANEL_COLOR            = sf::Color(30,  30,  30);
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  CONSTRUCTOR
@@ -71,6 +74,28 @@ void MapVisualizer::drawGrid(sf::RenderWindow& window) const {
     }
 }
 
+void MapVisualizer::drawDetectorRadii(sf::RenderWindow& window) const {
+    double radius = m_config.getDetectorRadius();
+
+    for (const auto& unit : m_config.getUnits()) {
+        if (unit.type != "detector") continue;
+
+        float cx = (unit.col + 0.5f) * m_cellSize;
+        float cy = (unit.row + 0.5f) * m_cellSize;
+        float pixelRadius = static_cast<float>(radius) * m_cellSize;
+
+        // Draw filled radius circle
+        sf::CircleShape circle(pixelRadius);
+        circle.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
+        circle.setPosition(sf::Vector2f(cx, cy));
+        circle.setFillColor(DETECTOR_RADIUS_COLOR);
+        circle.setOutlineColor(sf::Color(255, 180, 0, 100));
+        circle.setOutlineThickness(1.5f);
+        circle.setPointCount(48);  // smooth circle
+        window.draw(circle);
+    }
+}
+
 void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
     float half = m_cellSize * 0.45f;
     if (half < 2.5f) half = 2.5f;
@@ -88,7 +113,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             tri.setOutlineColor(sf::Color::White);
             tri.setOutlineThickness(1.5f);
             window.draw(tri);
-        } else {
+        } else if (unit.type == "target") {
             // ── Targets: blue square ──
             float side = half * 1.6f;
             sf::RectangleShape sq(sf::Vector2f(side, side));
@@ -98,11 +123,26 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             sq.setOutlineColor(sf::Color::White);
             sq.setOutlineThickness(1.5f);
             window.draw(sq);
+        } else if (unit.type == "detector") {
+            // ── Detectors: orange diamond (rotated square) ──
+            float side = half * 1.4f;
+            sf::RectangleShape diamond(sf::Vector2f(side, side));
+            diamond.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
+            diamond.setPosition(sf::Vector2f(cx, cy));
+            diamond.setRotation(sf::degrees(45.f));
+            diamond.setFillColor(DETECTOR_COLOR);
+            diamond.setOutlineColor(sf::Color::White);
+            diamond.setOutlineThickness(1.5f);
+            window.draw(diamond);
         }
 
         // ── Draw label letter if font available and cells are big enough ──
         if (font != nullptr && m_cellSize >= 10.0f) {
-            std::string label = (unit.type == "seeker") ? "S" : "T";
+            std::string label;
+            if (unit.type == "seeker")        label = "S";
+            else if (unit.type == "target")   label = "T";
+            else if (unit.type == "detector") label = "D";
+
             unsigned int fontSize = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fontSize < 8) fontSize = 8;
 
@@ -130,6 +170,22 @@ void MapVisualizer::drawHover(sf::RenderWindow& window, int hoverRow, int hoverC
     highlight.setOutlineColor(sf::Color::White);
     highlight.setOutlineThickness(1.0f);
     window.draw(highlight);
+
+    // If in detector mode, also show the radius preview on hover
+    if (m_currentType == "detector" && hoverRow >= 0) {
+        float cx = (hoverCol + 0.5f) * m_cellSize;
+        float cy = (hoverRow + 0.5f) * m_cellSize;
+        float pixelRadius = static_cast<float>(m_config.getDetectorRadius()) * m_cellSize;
+
+        sf::CircleShape preview(pixelRadius);
+        preview.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
+        preview.setPosition(sf::Vector2f(cx, cy));
+        preview.setFillColor(sf::Color(255, 180, 0, 20));
+        preview.setOutlineColor(sf::Color(255, 180, 0, 120));
+        preview.setOutlineThickness(1.0f);
+        preview.setPointCount(48);
+        window.draw(preview);
+    }
 }
 
 void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) const {
@@ -145,10 +201,17 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
 
     // Status text
     std::ostringstream ss;
-    ss << "Mode: " << (m_currentType == "seeker" ? "SEEKER (S)" : "TARGET (T)")
-       << "  |  Seekers: " << m_config.countType("seeker")
-       << "  Targets: " << m_config.countType("target")
-       << "  |  LClick=Place  RClick=Remove  Enter=Save  Esc=Quit  C=Clear";
+    std::string modeLabel;
+    if (m_currentType == "seeker")        modeLabel = "SEEKER (S)";
+    else if (m_currentType == "target")   modeLabel = "TARGET (T)";
+    else if (m_currentType == "detector") modeLabel = "DETECTOR (D)";
+
+    ss << "Mode: " << modeLabel
+       << "  |  S:" << m_config.countType("seeker")
+       << "  T:" << m_config.countType("target")
+       << "  D:" << m_config.countType("detector")
+       << "  R:" << m_config.getDetectorRadius()
+       << "  |  LClick=Place  RClick=Remove  +/-=Radius  Enter=Save  Esc=Quit";
 
     // SFML 3: Text constructor is (font, string, characterSize)
     sf::Text text(*font, ss.str(), 13);
@@ -156,8 +219,10 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
 
     if (m_currentType == "seeker") {
         text.setFillColor(sf::Color(255, 120, 120));
-    } else {
+    } else if (m_currentType == "target") {
         text.setFillColor(sf::Color(120, 160, 255));
+    } else {
+        text.setFillColor(sf::Color(255, 200, 80));
     }
     window.draw(text);
 }
@@ -165,8 +230,10 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
 void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
     std::ostringstream ss;
     ss << "UUV Spawn Tool  |  Mode: " << m_currentType
-       << "  |  Seekers: " << m_config.countType("seeker")
-       << "  Targets: " << m_config.countType("target");
+       << "  |  S:" << m_config.countType("seeker")
+       << "  T:" << m_config.countType("target")
+       << "  D:" << m_config.countType("detector")
+       << "  R:" << m_config.getDetectorRadius();
     window.setTitle(ss.str());
 }
 
@@ -208,8 +275,8 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
     if (fontPtr == nullptr) {
         std::cout << "Warning: Could not load any system font.\n"
                   << "Status bar text will not appear.\n"
-                  << "Controls: S=Seeker, T=Target, "
-                  << "LClick=Place, RClick=Remove, Enter=Save, Esc=Quit\n";
+                  << "Controls: S=Seeker, T=Target, D=Detector, "
+                  << "+/-=Radius, LClick=Place, RClick=Remove, Enter=Save, Esc=Quit\n";
     }
 
     // ── Hover tracking ──
@@ -235,8 +302,29 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     m_currentType = "target";
                     updateTitle(window);
                 }
+                else if (keyEvt->code == sf::Keyboard::Key::D) {
+                    m_currentType = "detector";
+                    updateTitle(window);
+                }
                 else if (keyEvt->code == sf::Keyboard::Key::C) {
                     m_config.clear();
+                    updateTitle(window);
+                }
+                // ── Radius adjustment: + to increase, - to decrease ──
+                else if (keyEvt->code == sf::Keyboard::Key::Equal ||    // + / =
+                         keyEvt->code == sf::Keyboard::Key::Add) {      // numpad +
+                    double r = m_config.getDetectorRadius();
+                    m_config.setDetectorRadius(r + 0.5);
+                    std::cout << "Detector radius: " << m_config.getDetectorRadius() << "\n";
+                    updateTitle(window);
+                }
+                else if (keyEvt->code == sf::Keyboard::Key::Hyphen ||   // -
+                         keyEvt->code == sf::Keyboard::Key::Subtract) {  // numpad -
+                    double r = m_config.getDetectorRadius();
+                    if (r > 0.5) {
+                        m_config.setDetectorRadius(r - 0.5);
+                    }
+                    std::cout << "Detector radius: " << m_config.getDetectorRadius() << "\n";
                     updateTitle(window);
                 }
                 else if (keyEvt->code == sf::Keyboard::Key::Enter) {
@@ -290,6 +378,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
         // ── Draw ──
         window.clear(sf::Color::Black);
         drawGrid(window);
+        drawDetectorRadii(window);   // draw radius circles under units
         drawUnits(window, fontPtr);
         drawHover(window, hoverRow, hoverCol);
         drawStatusBar(window, fontPtr);
