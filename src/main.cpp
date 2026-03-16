@@ -17,6 +17,7 @@ void printUsage(const char* progName) {
               << "  T key        - Switch to Target mode (defender, blue square)\n"
               << "  D key        - Switch to Detector mode (interceptor, orange diamond)\n"
               << "  + / - keys   - Adjust detector radius\n"
+              << "  [ / ] keys   - Adjust noise level (wave/wind)\n"
               << "  C key        - Clear all units\n"
               << "  Enter        - Save scenario and run simulation\n"
               << "  Escape       - Close without saving\n";

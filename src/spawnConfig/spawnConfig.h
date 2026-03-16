@@ -65,6 +65,19 @@ public:
     /** Get the current detector radius. Default is 3.0. */
     double getDetectorRadius() const;
 
+    // ─── Noise level ─────────────────────────────────────────────────
+
+    /**
+     * Set the max noise level N for pathfinding noise.
+     * At each step, seeker position is displaced by (rx, ry)
+     * where rx, ry are random integers in [-N, N].
+     * Simulates environmental factors like waves and wind.
+     */
+    void setMaxNoiseLevel(int noise);
+
+    /** Get the current max noise level. Default is 0 (no noise). */
+    int getMaxNoiseLevel() const;
+
     // ─── Map data ───────────────────────────────────────────────────
 
     /** Attach map info and grid data to this config. */
@@ -102,6 +115,7 @@ private:
     std::vector<std::vector<int>> m_grid;
     bool m_hasMapData = false;
     double m_detectorRadius = 3.0;  // default radius in grid cells
+    int m_maxNoiseLevel = 0;        // default: no noise
 };
 
 #endif // SPAWNCONFIG_H

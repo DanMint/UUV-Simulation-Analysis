@@ -34,6 +34,7 @@ void SimResult::computeSummary() {
 void SimResult::print() const {
     std::cout << "\n=== Simulation Result ===" << std::endl;
     std::cout << "  Total steps:         " << totalSteps << std::endl;
+    std::cout << "  Noise level:         " << maxNoiseLevel << std::endl;
     std::cout << "  Targets destroyed:   " << targetsDestroyed
               << " / " << targetResults.size() << std::endl;
     std::cout << "  Seekers reached:     " << seekersThatReached
@@ -108,6 +109,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
     // ── Summary ──────────────────────────────────────────────────────
     file << "  \"summary\": {\n";
     file << "    \"total_steps\": " << totalSteps << ",\n";
+    file << "    \"max_noise_level\": " << maxNoiseLevel << ",\n";
     file << "    \"all_targets_destroyed\": "
          << (allTargetsDestroyed ? "true" : "false") << ",\n";
     file << "    \"targets_destroyed\": " << targetsDestroyed << ",\n";
