@@ -77,6 +77,16 @@ void SpawnConfig::setDetectorRadius(double radius) {
 double SpawnConfig::getDetectorRadius() const { return m_detectorRadius; }
 
 // ════════════════════════════════════════════════════════════════════════════════
+//  NOISE LEVEL
+// ════════════════════════════════════════════════════════════════════════════════
+
+void SpawnConfig::setMaxNoiseLevel(double noise) {
+    m_maxNoiseLevel = (noise >= 0.0) ? noise : 0.0;
+}
+
+double SpawnConfig::getMaxNoiseLevel() const { return m_maxNoiseLevel; }
+
+// ════════════════════════════════════════════════════════════════════════════════
 //  JSON SAVE
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -118,6 +128,9 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
 
     // ── Detector settings ──
     file << "  \"detector_radius\": " << m_detectorRadius << ",\n";
+
+    // ── Noise settings ──
+    file << "  \"max_noise_level\": " << m_maxNoiseLevel << ",\n";
 
     // ── Units section ──
     file << "  \"units\": [\n";
@@ -233,6 +246,11 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
         config.m_detectorRadius = extractNumber(content, "detector_radius");
     }
 
+    // ── Load noise level if present ──
+    if (content.find("\"max_noise_level\"") != std::string::npos) {
+        config.m_maxNoiseLevel = extractNumber(content, "max_noise_level");
+    }
+
     // ── Load units ──
     size_t unitsPos = content.find("\"units\"");
     if (unitsPos != std::string::npos) {
@@ -282,6 +300,9 @@ void SpawnConfig::printSummary() const {
     if (countType("detector") > 0) {
         std::cout << "  Det. radius:  " << m_detectorRadius << " cells" << std::endl;
     }
+    std::cout << "  Noise level:  " << m_maxNoiseLevel
+              << (m_maxNoiseLevel > 0 ? " (wave/wind noise enabled)" : " (no noise)")
+              << std::endl;
 
     for (const auto& u : m_units) {
         std::cout << "    " << u.type << " at (" << u.row << ", " << u.col << ")\n";

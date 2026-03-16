@@ -211,7 +211,8 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
        << "  T:" << m_config.countType("target")
        << "  D:" << m_config.countType("detector")
        << "  R:" << m_config.getDetectorRadius()
-       << "  |  LClick=Place  RClick=Remove  +/-=Radius  Enter=Save  Esc=Quit";
+       << "  N:" << m_config.getMaxNoiseLevel()
+       << "  |  +/-=Radius  [/]=Noise  Enter=Save";
 
     // SFML 3: Text constructor is (font, string, characterSize)
     sf::Text text(*font, ss.str(), 13);
@@ -233,7 +234,8 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
        << "  |  S:" << m_config.countType("seeker")
        << "  T:" << m_config.countType("target")
        << "  D:" << m_config.countType("detector")
-       << "  R:" << m_config.getDetectorRadius();
+       << "  R:" << m_config.getDetectorRadius()
+       << "  N:" << m_config.getMaxNoiseLevel();
     window.setTitle(ss.str());
 }
 
@@ -276,7 +278,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
         std::cout << "Warning: Could not load any system font.\n"
                   << "Status bar text will not appear.\n"
                   << "Controls: S=Seeker, T=Target, D=Detector, "
-                  << "+/-=Radius, LClick=Place, RClick=Remove, Enter=Save, Esc=Quit\n";
+                  << "+/-=Radius, [/]=Noise, LClick=Place, RClick=Remove, Enter=Save, Esc=Quit\n";
     }
 
     // ── Hover tracking ──
@@ -325,6 +327,21 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         m_config.setDetectorRadius(r - 0.5);
                     }
                     std::cout << "Detector radius: " << m_config.getDetectorRadius() << "\n";
+                    updateTitle(window);
+                }
+                // ── Noise adjustment: ] to increase, [ to decrease ──
+                else if (keyEvt->code == sf::Keyboard::Key::RBracket) {  // ]
+                    double n = m_config.getMaxNoiseLevel();
+                    m_config.setMaxNoiseLevel(n + 0.1);
+                    std::cout << "Max noise level: " << m_config.getMaxNoiseLevel() << "\n";
+                    updateTitle(window);
+                }
+                else if (keyEvt->code == sf::Keyboard::Key::LBracket) {  // [
+                    double n = m_config.getMaxNoiseLevel();
+                    if (n > 0.0) {
+                        m_config.setMaxNoiseLevel(n - 0.1);
+                    }
+                    std::cout << "Max noise level: " << m_config.getMaxNoiseLevel() << "\n";
                     updateTitle(window);
                 }
                 else if (keyEvt->code == sf::Keyboard::Key::Enter) {

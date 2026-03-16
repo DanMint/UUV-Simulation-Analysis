@@ -8,7 +8,9 @@
 // ════════════════════════════════════════════════════════════════════════════════
 
 Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps)
-    : m_map(map), m_maxSteps(maxSteps)
+    : m_map(map), m_maxSteps(maxSteps),
+      m_maxNoiseLevel(config.getMaxNoiseLevel()),
+      m_rng(std::random_device{}())
 {
     // Build agent lists from the spawn config
     int seekerId = 0;
@@ -29,6 +31,7 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
     std::cout << "Simulation created: " << m_seekers.size() << " seekers, "
               << m_targets.size() << " targets, "
               << m_detectors.size() << " detectors (radius=" << detectorRadius << "), "
+              << "noise=" << m_maxNoiseLevel << ", "
               << "max " << m_maxSteps << " steps\n";
 }
 
@@ -98,6 +101,83 @@ void Simulation::checkDetectorIntercepts(int currentStep) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+//  APPLY NOISE
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  After A* computes next position (x2, y2), the actual position becomes
+//  (x2 + rx, y2 + ry) where rx, ry ∈ [-N, N] (uniform random integers).
+//  This simulates environmental noise like waves and wind.
+//
+//  If the noisy position is out of bounds or blocked (land), the seeker
+//  stays at the A* position — the noise is "absorbed" by the obstacle.
+//  A line-of-sight check (Bresenham's line) ensures the displacement
+//  doesn't cross any land cells, preventing seekers from teleporting
+//  over land masses to disconnected water bodies.
+//
+//  After displacement, the seeker's pre-computed A* path is invalidated
+//  and must be recomputed from the new position.
+//
+// ════════════════════════════════════════════════════════════════════════════════
+
+bool Simulation::applyNoise(SeekerAgent& seeker) {
+    if (m_maxNoiseLevel <= 0.0) return false;
+    if (!seeker.alive || seeker.reachedTarget) return false;
+
+    // Generate random displacement in [-N, N] as real numbers, then round
+    std::uniform_real_distribution<double> dist(-m_maxNoiseLevel, m_maxNoiseLevel);
+    int rx = static_cast<int>(std::round(dist(m_rng)));
+    int ry = static_cast<int>(std::round(dist(m_rng)));
+
+    if (rx == 0 && ry == 0) return false;  // no displacement
+
+    int newRow = seeker.row + ry;
+    int newCol = seeker.col + rx;
+
+    // Check if noisy position is valid and passable
+    if (!m_map.isValid(newRow, newCol)) return false;
+    if (!m_map.isPassable(newRow, newCol)) return false;
+
+    // ── Line-of-sight check ──
+    // Walk from current position to noisy position using Bresenham's line.
+    // Reject the displacement if ANY intermediate cell is blocked (land).
+    // This prevents seekers from "teleporting" over land masses.
+    {
+        int r0 = seeker.row, c0 = seeker.col;
+        int r1 = newRow, c1 = newCol;
+        int dr = std::abs(r1 - r0);
+        int dc = std::abs(c1 - c0);
+        int sr = (r0 < r1) ? 1 : -1;
+        int sc = (c0 < c1) ? 1 : -1;
+        int err = dc - dr;
+
+        int r = r0, c = c0;
+        while (r != r1 || c != c1) {
+            int e2 = 2 * err;
+            if (e2 > -dr) { err -= dr; c += sc; }
+            if (e2 <  dc) { err += dc; r += sr; }
+
+            // Check every cell along the line (except start, which we're on)
+            if (!m_map.isValid(r, c) || !m_map.isPassable(r, c)) {
+                return false;  // path crosses land — reject displacement
+            }
+        }
+    }
+
+    // Apply the displacement
+    seeker.row = newRow;
+    seeker.col = newCol;
+
+    // Record the noisy position in move history
+    seeker.moveHistory.push_back({newRow, newCol});
+
+    // Invalidate current path — must be recomputed from new position
+    seeker.path.clear();
+    seeker.pathIndex = 0;
+
+    return true;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 //  ASSIGN TARGETS
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -130,6 +210,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
     result.totalSteps = totalSteps;
     result.allTargetsDestroyed = true;
     result.allSeekersDead = true;
+    result.maxNoiseLevel = m_maxNoiseLevel;
 
     // Seeker results
     for (const auto& s : m_seekers) {
@@ -205,6 +286,15 @@ SimResult Simulation::run() {
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
             seeker.moveStep();
+        }
+
+        // ── Apply environmental noise (wave/wind displacement) ──
+        // After A* gives the next position, displace by random (rx, ry).
+        // This invalidates the pre-computed path, forcing recomputation.
+        if (m_maxNoiseLevel > 0.0) {
+            for (auto& seeker : m_seekers) {
+                applyNoise(seeker);
+            }
         }
 
         // ── Check detector interceptions FIRST ──

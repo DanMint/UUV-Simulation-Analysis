@@ -72,6 +72,7 @@ struct SimResult {
     int totalSteps;
     bool allTargetsDestroyed;
     bool allSeekersDead;
+    double maxNoiseLevel;
 
     std::vector<SeekerResult> seekerResults;
     std::vector<TargetResult> targetResults;
