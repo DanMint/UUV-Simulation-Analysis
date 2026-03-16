@@ -110,6 +110,9 @@ void Simulation::checkDetectorIntercepts(int currentStep) {
 //
 //  If the noisy position is out of bounds or blocked (land), the seeker
 //  stays at the A* position — the noise is "absorbed" by the obstacle.
+//  A line-of-sight check (Bresenham's line) ensures the displacement
+//  doesn't cross any land cells, preventing seekers from teleporting
+//  over land masses to disconnected water bodies.
 //
 //  After displacement, the seeker's pre-computed A* path is invalidated
 //  and must be recomputed from the new position.
@@ -133,6 +136,32 @@ bool Simulation::applyNoise(SeekerAgent& seeker) {
     // Check if noisy position is valid and passable
     if (!m_map.isValid(newRow, newCol)) return false;
     if (!m_map.isPassable(newRow, newCol)) return false;
+
+    // ── Line-of-sight check ──
+    // Walk from current position to noisy position using Bresenham's line.
+    // Reject the displacement if ANY intermediate cell is blocked (land).
+    // This prevents seekers from "teleporting" over land masses.
+    {
+        int r0 = seeker.row, c0 = seeker.col;
+        int r1 = newRow, c1 = newCol;
+        int dr = std::abs(r1 - r0);
+        int dc = std::abs(c1 - c0);
+        int sr = (r0 < r1) ? 1 : -1;
+        int sc = (c0 < c1) ? 1 : -1;
+        int err = dc - dr;
+
+        int r = r0, c = c0;
+        while (r != r1 || c != c1) {
+            int e2 = 2 * err;
+            if (e2 > -dr) { err -= dr; c += sc; }
+            if (e2 <  dc) { err += dc; r += sr; }
+
+            // Check every cell along the line (except start, which we're on)
+            if (!m_map.isValid(r, c) || !m_map.isPassable(r, c)) {
+                return false;  // path crosses land — reject displacement
+            }
+        }
+    }
 
     // Apply the displacement
     seeker.row = newRow;
