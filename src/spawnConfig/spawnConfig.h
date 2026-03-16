@@ -73,10 +73,10 @@ public:
      * where rx, ry are random integers in [-N, N].
      * Simulates environmental factors like waves and wind.
      */
-    void setMaxNoiseLevel(int noise);
+    void setMaxNoiseLevel(double noise);
 
-    /** Get the current max noise level. Default is 0 (no noise). */
-    int getMaxNoiseLevel() const;
+    /** Get the current max noise level. Default is 0.0 (no noise). */
+    double getMaxNoiseLevel() const;
 
     // ─── Map data ───────────────────────────────────────────────────
 
@@ -115,7 +115,7 @@ private:
     std::vector<std::vector<int>> m_grid;
     bool m_hasMapData = false;
     double m_detectorRadius = 3.0;  // default radius in grid cells
-    int m_maxNoiseLevel = 0;        // default: no noise
+    double m_maxNoiseLevel = 0.0;    // default: no noise
 };
 
 #endif // SPAWNCONFIG_H

@@ -120,13 +120,13 @@ void Simulation::checkDetectorIntercepts(int currentStep) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 bool Simulation::applyNoise(SeekerAgent& seeker) {
-    if (m_maxNoiseLevel <= 0) return false;
+    if (m_maxNoiseLevel <= 0.0) return false;
     if (!seeker.alive || seeker.reachedTarget) return false;
 
-    // Generate random displacement in [-N, N]
-    std::uniform_int_distribution<int> dist(-m_maxNoiseLevel, m_maxNoiseLevel);
-    int rx = dist(m_rng);
-    int ry = dist(m_rng);
+    // Generate random displacement in [-N, N] as real numbers, then round
+    std::uniform_real_distribution<double> dist(-m_maxNoiseLevel, m_maxNoiseLevel);
+    int rx = static_cast<int>(std::round(dist(m_rng)));
+    int ry = static_cast<int>(std::round(dist(m_rng)));
 
     if (rx == 0 && ry == 0) return false;  // no displacement
 
@@ -291,7 +291,7 @@ SimResult Simulation::run() {
         // ── Apply environmental noise (wave/wind displacement) ──
         // After A* gives the next position, displace by random (rx, ry).
         // This invalidates the pre-computed path, forcing recomputation.
-        if (m_maxNoiseLevel > 0) {
+        if (m_maxNoiseLevel > 0.0) {
             for (auto& seeker : m_seekers) {
                 applyNoise(seeker);
             }

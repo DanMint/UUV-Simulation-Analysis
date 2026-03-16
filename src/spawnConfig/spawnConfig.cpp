@@ -80,11 +80,11 @@ double SpawnConfig::getDetectorRadius() const { return m_detectorRadius; }
 //  NOISE LEVEL
 // ════════════════════════════════════════════════════════════════════════════════
 
-void SpawnConfig::setMaxNoiseLevel(int noise) {
-    m_maxNoiseLevel = (noise >= 0) ? noise : 0;
+void SpawnConfig::setMaxNoiseLevel(double noise) {
+    m_maxNoiseLevel = (noise >= 0.0) ? noise : 0.0;
 }
 
-int SpawnConfig::getMaxNoiseLevel() const { return m_maxNoiseLevel; }
+double SpawnConfig::getMaxNoiseLevel() const { return m_maxNoiseLevel; }
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  JSON SAVE
@@ -248,7 +248,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
 
     // ── Load noise level if present ──
     if (content.find("\"max_noise_level\"") != std::string::npos) {
-        config.m_maxNoiseLevel = static_cast<int>(extractNumber(content, "max_noise_level"));
+        config.m_maxNoiseLevel = extractNumber(content, "max_noise_level");
     }
 
     // ── Load units ──

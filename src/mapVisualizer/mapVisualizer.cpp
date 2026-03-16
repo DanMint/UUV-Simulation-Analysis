@@ -331,15 +331,15 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 }
                 // ── Noise adjustment: ] to increase, [ to decrease ──
                 else if (keyEvt->code == sf::Keyboard::Key::RBracket) {  // ]
-                    int n = m_config.getMaxNoiseLevel();
-                    m_config.setMaxNoiseLevel(n + 1);
+                    double n = m_config.getMaxNoiseLevel();
+                    m_config.setMaxNoiseLevel(n + 0.1);
                     std::cout << "Max noise level: " << m_config.getMaxNoiseLevel() << "\n";
                     updateTitle(window);
                 }
                 else if (keyEvt->code == sf::Keyboard::Key::LBracket) {  // [
-                    int n = m_config.getMaxNoiseLevel();
-                    if (n > 0) {
-                        m_config.setMaxNoiseLevel(n - 1);
+                    double n = m_config.getMaxNoiseLevel();
+                    if (n > 0.0) {
+                        m_config.setMaxNoiseLevel(n - 0.1);
                     }
                     std::cout << "Max noise level: " << m_config.getMaxNoiseLevel() << "\n";
                     updateTitle(window);

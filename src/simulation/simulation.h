@@ -40,7 +40,7 @@ public:
 private:
     MapCreation& m_map;
     int m_maxSteps;
-    int m_maxNoiseLevel;
+    double m_maxNoiseLevel;
 
     std::vector<SeekerAgent> m_seekers;
     std::vector<TargetAgent> m_targets;
