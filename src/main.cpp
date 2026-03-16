@@ -4,6 +4,8 @@
 #include "simulation.h"
 #include <iostream>
 #include <string>
+#include <sstream>
+#include <cstdlib>
 
 void printUsage(const char* progName) {
     std::cout << "Usage:\n"
@@ -144,10 +146,85 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        Simulation sim(map, config, 2000);
-        SimResult result = sim.run();
-        result.print();
-        result.saveJSON("results.json");
+        // ── Iteration setup ──────────────────────────────────────────
+
+        int numIterations = 1;
+        double noiseIncrement = 0.0;
+        double startingNoise = config.getMaxNoiseLevel();
+
+        std::cout << "\n── Iteration Configuration ──\n";
+        std::cout << "Starting noise level: " << startingNoise << "\n";
+        std::cout << "Number of iterations (1 = single run): ";
+        std::cin >> numIterations;
+        if (numIterations < 1) numIterations = 1;
+
+        if (numIterations > 1) {
+            std::cout << "Noise increment per iteration: ";
+            std::cin >> noiseIncrement;
+            if (noiseIncrement < 0.0) noiseIncrement = 0.0;
+        }
+
+        // Create runs/ directory
+        std::string runsDir = "runs";
+        std::system(("mkdir -p " + runsDir).c_str());
+
+        std::cout << "\n── Running " << numIterations << " iteration(s) ──\n";
+        if (numIterations > 1) {
+            std::cout << "  Noise range: " << startingNoise
+                      << " → " << (startingNoise + noiseIncrement * (numIterations - 1))
+                      << " (step " << noiseIncrement << ")\n";
+        }
+        std::cout << "  Results will be saved to " << runsDir << "/\n\n";
+
+        // ── Iteration loop ───────────────────────────────────────────
+
+        for (int iter = 0; iter < numIterations; iter++) {
+            double currentNoise = startingNoise + noiseIncrement * iter;
+            config.setMaxNoiseLevel(currentNoise);
+
+            std::cout << "\n════════════════════════════════════════════\n";
+            std::cout << "  Iteration " << (iter + 1) << " / " << numIterations
+                      << "  |  Noise: " << currentNoise << "\n";
+            std::cout << "════════════════════════════════════════════\n";
+
+            // Reset the grid: clear all units, then re-stamp them
+            // This ensures each iteration starts from the same state
+            map.clearAllUnits();
+            for (const auto& unit : config.getUnits()) {
+                int unitType = MapCreation::WATER;
+                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
+                if (unit.type == "target")   unitType = MapCreation::TARGET;
+                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
+                map.placeUnit(unit.row, unit.col, unitType);
+            }
+
+            // Run the simulation
+            Simulation sim(map, config, 2000);
+            SimResult result = sim.run();
+            result.print();
+
+            // Build filename from noise level: e.g. "runs/0.5.json"
+            // Use a consistent format to avoid floating point weirdness
+            std::ostringstream filename;
+            filename << runsDir << "/";
+
+            // Format noise level: remove trailing zeros for clean filenames
+            std::ostringstream noiseStr;
+            noiseStr << currentNoise;
+            std::string noiseLabel = noiseStr.str();
+
+            filename << noiseLabel << ".json";
+            result.saveJSON(filename.str());
+        }
+
+        // ── Summary ──────────────────────────────────────────────────
+
+        if (numIterations > 1) {
+            std::cout << "\n════════════════════════════════════════════\n";
+            std::cout << "  All " << numIterations << " iterations complete.\n";
+            std::cout << "  Results saved to " << runsDir << "/\n";
+            std::cout << "════════════════════════════════════════════\n\n";
+        }
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
