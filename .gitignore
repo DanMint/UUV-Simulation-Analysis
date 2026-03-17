@@ -2,3 +2,7 @@
 .DS_Store
 uuv_sim
 build/
+runs/
+paths/
+scenario.json
+grid_cache.txt
