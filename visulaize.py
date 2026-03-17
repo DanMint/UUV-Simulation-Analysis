@@ -6,25 +6,21 @@ import numpy as np
 
 def plot_runs():
 
-    # Get directory where this script lives
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
     runs_folder = os.path.join(base_dir, "runs")
     scenario_path = os.path.join(base_dir, "scenario.json")
     output_folder = os.path.join(base_dir, "paths")
 
-    # Create output directory
     os.makedirs(output_folder, exist_ok=True)
 
     print(f"Saving plots to: {output_folder}")
 
-    # Load scenario grid
     with open(scenario_path, "r") as f:
         scenario = json.load(f)
 
     grid = np.array(scenario["grid"])
 
-    # Get all JSON files in runs folder
     run_files = [f for f in os.listdir(runs_folder) if f.endswith(".json")]
 
     if not run_files:
@@ -51,7 +47,6 @@ def plot_runs():
 
         fig, ax = plt.subplots(figsize=(10, 10))
 
-        # Background grid
         ax.imshow(grid, cmap="Blues_r", origin="upper")
 
         # Plot seeker paths
@@ -97,7 +92,6 @@ def plot_runs():
 
         plt.tight_layout()
 
-        # Save image
         output_file = os.path.join(
             output_folder,
             os.path.splitext(filename)[0] + ".png"
