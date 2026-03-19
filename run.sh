@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
 
-# Clean stale CMake cache (only needed once after CMakeLists changes)
+# Clean stale CMake cache
 rm -rf build
 
-# Build
+# Building 
 cmake -S . -B build
 cmake --build build -j
 
-# Run simulation (creates runs/ folder with results)
+# Run sim (creates Runs folder with json)
 ./build/uuv_sim Maps/pearlHarbour/Harbour_Depth_Area.shp 200
 
-# Run visualizer using the venv's Python directly
+# Run visualizer (creates Paths winh PNGs)
 ./myEnv/bin/python3 visulaize.py
