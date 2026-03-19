@@ -11,12 +11,18 @@ add_executable(uuv_sim
     src/mapCreation/mapCreation.cpp
     src/spawnConfig/spawnConfig.cpp
     src/mapVisualizer/mapVisualizer.cpp
+    src/pathfinding/pathfinding.cpp
+    src/simulation/simulation.cpp
+    src/simulation/simResult.cpp
 )
 
 target_include_directories(uuv_sim PRIVATE
+    src/agents
     src/mapCreation
     src/spawnConfig
     src/mapVisualizer
+    src/pathfinding
+    src/simulation
 )
 
 # ------------------------------------------------------------
