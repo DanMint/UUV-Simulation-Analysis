@@ -73,6 +73,10 @@ bool Simulation::checkCollision(const SeekerAgent& seeker, const TargetAgent& ta
 // ════════════════════════════════════════════════════════════════════════════════
 
 void Simulation::checkDetectorIntercepts(int currentStep) {
+    // Random engine — static so it persists across calls
+    static std::mt19937 rng(std::random_device{}());
+    static std::uniform_real_distribution<double> dist(0.0, 1.0);
+
     for (auto& seeker : m_seekers) {
         if (!seeker.alive || seeker.reachedTarget) continue;
 
@@ -80,21 +84,46 @@ void Simulation::checkDetectorIntercepts(int currentStep) {
             if (!detector.alive) continue;
 
             if (detector.isInRange(seeker.row, seeker.col)) {
-                std::cout << "  Step " << currentStep << ": Detector " << detector.id
-                          << " intercepted Seeker " << seeker.id
-                          << " at (" << seeker.row << "," << seeker.col << ")\n";
+                // Calculate how far into the radius the seeker is (0.0 = on top, 1.0 = edge)
+                double dr = detector.row - seeker.row;
+                double dc = detector.col - seeker.col;
+                double distance = std::sqrt(dr * dr + dc * dc);
+                double ratio = distance / detector.radius;
 
-                // Kill the seeker
-                seeker.alive = false;
-                seeker.intercepted = true;
-                seeker.interceptedByDetector = detector.id;
-                seeker.interceptedAtStep = currentStep;
+                // Determine intercept probability based on distance ratio
+                double interceptChance;
+                if (ratio <= 0.5) {
+                    interceptChance = 0.90;  // inner 50% of radius
+                } else if (ratio <= 0.7) {
+                    interceptChance = 0.60;  // 50-70% of radius
+                } else {
+                    interceptChance = 0.50;  // 70-100% of radius
+                }
 
-                // Log on the detector side
-                detector.interceptCount++;
-                detector.intercepts.push_back({seeker.id, currentStep});
+                // Roll the dice
+                double roll = dist(rng);
+                if (roll < interceptChance) {
+                    std::cout << "  Step " << currentStep << ": Detector " << detector.id
+                              << " intercepted Seeker " << seeker.id
+                              << " at (" << seeker.row << "," << seeker.col << ")"
+                              << " [dist=" << std::fixed << std::setprecision(1)
+                              << (ratio * 100) << "%, chance=" << (interceptChance * 100) << "%]\n";
 
-                break;  // seeker is dead, no need to check more detectors
+                    seeker.alive = false;
+                    seeker.intercepted = true;
+                    seeker.interceptedByDetector = detector.id;
+                    seeker.interceptedAtStep = currentStep;
+
+                    detector.interceptCount++;
+                    detector.intercepts.push_back({seeker.id, currentStep});
+
+                    break;
+                } else {
+                    std::cout << "  Step " << currentStep << ": Detector " << detector.id
+                              << " missed Seeker " << seeker.id
+                              << " [dist=" << std::fixed << std::setprecision(1)
+                              << (ratio * 100) << "%, chance=" << (interceptChance * 100) << "%]\n";
+                }
             }
         }
     }
