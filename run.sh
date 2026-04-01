@@ -13,3 +13,7 @@ cmake --build build -j
 
 # Run visualizer (creates Paths winh PNGs)
 ./myEnv/bin/python3 visulaize.py
+
+mkdir output
+
+python3 Analysis/IterationAnalysis.py runs/ output/

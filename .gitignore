@@ -6,3 +6,4 @@ runs/
 paths/
 scenario.json
 grid_cache.txt
+output/
