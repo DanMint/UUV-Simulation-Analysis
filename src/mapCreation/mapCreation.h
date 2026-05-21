@@ -6,7 +6,6 @@
 #include <utility>
 #include <iostream>
 
-// Forward declaration so the header doesn't need GDAL includes
 class OGRPolygon;
 
 /**
@@ -19,18 +18,20 @@ class OGRPolygon;
  * Grid cell values:
  *   0 = water
  *   1 = land
- *   2 = seeker (attacker)
- *   3 = target (defender)
- *   4 = detector (interceptor — defender side)
+ *   2 = seeker      (attacker)
+ *   3 = target      (defender, stationary)
+ *   4 = detector    (defender sensor — sense only)
+ *   5 = interceptor (defender effector — kill only)
  */
 class MapCreation {
 public:
     // ─── Cell ID constants ──────────────────────────────────────────
-    static constexpr int WATER    = 0;
-    static constexpr int LAND     = 1;
-    static constexpr int SEEKER   = 2;
-    static constexpr int TARGET   = 3;
-    static constexpr int DETECTOR = 4;
+    static constexpr int WATER       = 0;
+    static constexpr int LAND        = 1;
+    static constexpr int SEEKER      = 2;
+    static constexpr int TARGET      = 3;
+    static constexpr int DETECTOR    = 4;
+    static constexpr int INTERCEPTOR = 5;
 
     // ─── Constructor / Factory ──────────────────────────────────────
 
@@ -47,37 +48,25 @@ public:
     int getCell(int row, int col) const;
     bool isValid(int row, int col) const;
 
-    /** Check if cell is water (0) — empty, no unit. */
     bool isWater(int row, int col) const;
-
-    /** Check if cell is passable (anything except land). */
     bool isPassable(int row, int col) const;
 
-    /** Get all empty water cell coordinates as (col, row) pairs. */
     std::vector<std::pair<int, int>> getAllWaterCells() const;
 
     // ─── Unit Placement ─────────────────────────────────────────────
 
     /**
      * Place a unit onto the grid. Only succeeds on water cells (0).
-     * @param unitType  Use SEEKER (2), TARGET (3), or DETECTOR (4)
-     * @return true if placed, false if cell is land, occupied, or out of bounds.
+     * @param unitType  SEEKER, TARGET, DETECTOR, or INTERCEPTOR
      */
     bool placeUnit(int row, int col, int unitType);
 
-    /**
-     * Remove a unit from the grid (resets cell back to water).
-     * @return true if a unit was actually removed.
-     */
+    /** Remove a unit (resets cell back to water). */
     bool removeUnit(int row, int col);
 
-    /** Clear ALL units from the grid (reset every 2/3/4 back to 0). */
+    /** Clear ALL units from the grid (resets every 2/3/4/5 back to 0). */
     void clearAllUnits();
 
-    /**
-     * Place units from a list of (type_string, (row, col)) pairs.
-     * @return number of units successfully placed.
-     */
     int placeUnitsFromConfig(
         const std::vector<std::pair<std::string, std::pair<int,int>>>& units);
 
@@ -102,7 +91,6 @@ public:
     void printStats() const;
 
 private:
-    // ─── Grid dimensions ────────────────────────────────────────────
     int m_cellsN;
     int m_canvasWidth;
     int m_canvasHeight;
@@ -110,10 +98,8 @@ private:
     double m_rowSpace;
     int m_cellSize;
 
-    // ─── The grid itself ────────────────────────────────────────────
     std::vector<std::vector<int>> m_grid;
 
-    // ─── Map data ───────────────────────────────────────────────────
     double m_minDepth;
     double m_maxDepth;
 
@@ -122,10 +108,7 @@ private:
         double depth1;
         double depth2;
     };
-
     std::vector<ScaledPolygon> m_polygons;
-
-    // ─── Private methods ────────────────────────────────────────────
 
     void loadShapefile(const std::string& shpPath);
     void classifyCells();
@@ -140,6 +123,11 @@ private:
     void extractPolygon(OGRPolygon* ogrPoly,
                         double depth1, double depth2,
                         double minX, double maxY, double scale);
+
+    /** Helper: returns true if a cell holds any kind of unit (2/3/4/5). */
+    static bool isUnitCell(int v) {
+        return v == SEEKER || v == TARGET || v == DETECTOR || v == INTERCEPTOR;
+    }
 };
 
 #endif // MAPCREATION_H

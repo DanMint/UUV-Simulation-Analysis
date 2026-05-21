@@ -49,7 +49,6 @@ int SpawnConfig::countType(const std::string& type) const {
 }
 
 int SpawnConfig::totalUnits() const { return static_cast<int>(m_units.size()); }
-
 void SpawnConfig::clear() { m_units.clear(); }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -67,23 +66,26 @@ const std::vector<std::vector<int>>& SpawnConfig::getGrid() const { return m_gri
 bool SpawnConfig::hasMapData() const { return m_hasMapData; }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  DETECTOR RADIUS
+//  RADII
 // ════════════════════════════════════════════════════════════════════════════════
 
 void SpawnConfig::setDetectorRadius(double radius) {
     m_detectorRadius = (radius > 0.0) ? radius : 1.0;
 }
-
 double SpawnConfig::getDetectorRadius() const { return m_detectorRadius; }
 
+void SpawnConfig::setInterceptorRadius(double radius) {
+    m_interceptorRadius = (radius > 0.0) ? radius : 1.0;
+}
+double SpawnConfig::getInterceptorRadius() const { return m_interceptorRadius; }
+
 // ════════════════════════════════════════════════════════════════════════════════
-//  NOISE LEVEL
+//  NOISE
 // ════════════════════════════════════════════════════════════════════════════════
 
 void SpawnConfig::setMaxNoiseLevel(double noise) {
     m_maxNoiseLevel = (noise >= 0.0) ? noise : 0.0;
 }
-
 double SpawnConfig::getMaxNoiseLevel() const { return m_maxNoiseLevel; }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -98,7 +100,7 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
 
     file << "{\n";
 
-    // ── Map info section ──
+    // ── Map info ──
     if (m_hasMapData) {
         file << "  \"map\": {\n";
         file << "    \"shp_path\": \"" << m_mapInfo.shpPath << "\",\n";
@@ -111,7 +113,6 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         file << "    \"land_count\": " << m_mapInfo.landCount << "\n";
         file << "  },\n";
 
-        // ── Grid section (compact: one row per line) ──
         file << "  \"grid\": [\n";
         for (int r = 0; r < (int)m_grid.size(); r++) {
             file << "    [";
@@ -126,13 +127,12 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         file << "  ],\n";
     }
 
-    // ── Detector settings ──
-    file << "  \"detector_radius\": " << m_detectorRadius << ",\n";
+    // ── Defender settings ──
+    file << "  \"detector_radius\": "    << m_detectorRadius    << ",\n";
+    file << "  \"interceptor_radius\": " << m_interceptorRadius << ",\n";
+    file << "  \"max_noise_level\": "    << m_maxNoiseLevel     << ",\n";
 
-    // ── Noise settings ──
-    file << "  \"max_noise_level\": " << m_maxNoiseLevel << ",\n";
-
-    // ── Units section ──
+    // ── Units ──
     file << "  \"units\": [\n";
     for (int i = 0; i < (int)m_units.size(); i++) {
         const auto& u = m_units[i];
@@ -158,8 +158,8 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
 //  JSON LOAD
 // ════════════════════════════════════════════════════════════════════════════════
 
-// Helper: extract a string value after "key":
-static std::string extractString(const std::string& content, const std::string& key, size_t searchFrom = 0) {
+static std::string extractString(const std::string& content, const std::string& key,
+                                 size_t searchFrom = 0) {
     size_t pos = content.find("\"" + key + "\"", searchFrom);
     if (pos == std::string::npos) return "";
     size_t colonPos = content.find(":", pos);
@@ -168,15 +168,16 @@ static std::string extractString(const std::string& content, const std::string& 
     return content.substr(valStart, valEnd - valStart);
 }
 
-// Helper: extract a numeric value after "key":
-static double extractNumber(const std::string& content, const std::string& key, size_t searchFrom = 0) {
+static double extractNumber(const std::string& content, const std::string& key,
+                            size_t searchFrom = 0) {
     size_t pos = content.find("\"" + key + "\"", searchFrom);
     if (pos == std::string::npos) return 0.0;
     size_t colonPos = content.find(":", pos);
-    // Skip whitespace after colon
     size_t valStart = colonPos + 1;
-    while (valStart < content.size() && (content[valStart] == ' ' || content[valStart] == '\t'))
+    while (valStart < content.size() &&
+           (content[valStart] == ' ' || content[valStart] == '\t')) {
         valStart++;
+    }
     return std::stod(content.substr(valStart));
 }
 
@@ -192,39 +193,35 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
 
     SpawnConfig config;
 
-    // ── Load map info if present ──
+    // ── Map info ──
     if (content.find("\"map\"") != std::string::npos) {
         size_t mapSection = content.find("\"map\"");
 
         MapInfo info;
         info.shpPath      = extractString(content, "shp_path", mapSection);
-        info.cellsN       = static_cast<int>(extractNumber(content, "cells_n", mapSection));
-        info.canvasWidth   = static_cast<int>(extractNumber(content, "canvas_width", mapSection));
-        info.canvasHeight  = static_cast<int>(extractNumber(content, "canvas_height", mapSection));
+        info.cellsN       = static_cast<int>(extractNumber(content, "cells_n",       mapSection));
+        info.canvasWidth  = static_cast<int>(extractNumber(content, "canvas_width",  mapSection));
+        info.canvasHeight = static_cast<int>(extractNumber(content, "canvas_height", mapSection));
         info.minDepth     = extractNumber(content, "min_depth", mapSection);
         info.maxDepth     = extractNumber(content, "max_depth", mapSection);
         info.waterCount   = static_cast<int>(extractNumber(content, "water_count", mapSection));
-        info.landCount    = static_cast<int>(extractNumber(content, "land_count", mapSection));
+        info.landCount    = static_cast<int>(extractNumber(content, "land_count",  mapSection));
 
-        // ── Load grid if present ──
+        // ── Grid ──
         std::vector<std::vector<int>> grid;
         size_t gridPos = content.find("\"grid\"");
         if (gridPos != std::string::npos && info.cellsN > 0) {
-            // Find the opening [ of the grid array
             size_t gridStart = content.find("[", gridPos);
-
-            // Parse each row: find inner [...] arrays
             size_t pos = gridStart + 1;
             for (int r = 0; r < info.cellsN; r++) {
                 size_t rowStart = content.find("[", pos);
-                size_t rowEnd = content.find("]", rowStart);
+                size_t rowEnd   = content.find("]", rowStart);
                 std::string rowStr = content.substr(rowStart + 1, rowEnd - rowStart - 1);
 
                 std::vector<int> row;
                 std::istringstream rowStream(rowStr);
                 std::string cell;
                 while (std::getline(rowStream, cell, ',')) {
-                    // Trim whitespace
                     size_t first = cell.find_first_not_of(" \t\n\r");
                     if (first != std::string::npos) {
                         row.push_back(std::stoi(cell.substr(first)));
@@ -241,17 +238,18 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
                   << info.landCount << " land)\n";
     }
 
-    // ── Load detector radius if present ──
+    // ── Radii / noise ──
     if (content.find("\"detector_radius\"") != std::string::npos) {
         config.m_detectorRadius = extractNumber(content, "detector_radius");
     }
-
-    // ── Load noise level if present ──
+    if (content.find("\"interceptor_radius\"") != std::string::npos) {
+        config.m_interceptorRadius = extractNumber(content, "interceptor_radius");
+    }
     if (content.find("\"max_noise_level\"") != std::string::npos) {
         config.m_maxNoiseLevel = extractNumber(content, "max_noise_level");
     }
 
-    // ── Load units ──
+    // ── Units ──
     size_t unitsPos = content.find("\"units\"");
     if (unitsPos != std::string::npos) {
         size_t pos = unitsPos;
@@ -260,7 +258,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             if (pos == std::string::npos) break;
 
             size_t typeStart = content.find("\"", content.find(":", pos) + 1) + 1;
-            size_t typeEnd = content.find("\"", typeStart);
+            size_t typeEnd   = content.find("\"", typeStart);
             std::string type = content.substr(typeStart, typeEnd - typeStart);
 
             size_t rowPos = content.find("\"row\"", typeEnd);
@@ -293,12 +291,17 @@ void SpawnConfig::printSummary() const {
         std::cout << "  Land cells:   " << m_mapInfo.landCount << std::endl;
     }
 
-    std::cout << "  Total units:  " << totalUnits() << std::endl;
-    std::cout << "  Seekers:      " << countType("seeker") << std::endl;
-    std::cout << "  Targets:      " << countType("target") << std::endl;
-    std::cout << "  Detectors:    " << countType("detector") << std::endl;
+    std::cout << "  Total units:  " << totalUnits()                << std::endl;
+    std::cout << "  Seekers:      " << countType("seeker")         << std::endl;
+    std::cout << "  Targets:      " << countType("target")         << std::endl;
+    std::cout << "  Detectors:    " << countType("detector")       << std::endl;
+    std::cout << "  Interceptors: " << countType("interceptor")    << std::endl;
+
     if (countType("detector") > 0) {
-        std::cout << "  Det. radius:  " << m_detectorRadius << " cells" << std::endl;
+        std::cout << "  Det. radius:  " << m_detectorRadius    << " cells" << std::endl;
+    }
+    if (countType("interceptor") > 0) {
+        std::cout << "  Int. radius:  " << m_interceptorRadius << " cells" << std::endl;
     }
     std::cout << "  Noise level:  " << m_maxNoiseLevel
               << (m_maxNoiseLevel > 0 ? " (wave/wind noise enabled)" : " (no noise)")

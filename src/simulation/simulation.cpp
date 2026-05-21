@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include <cmath>
+#include <iomanip>
 #include <limits>
 #include <iostream>
 
@@ -12,11 +13,9 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_rng(std::random_device{}())
 {
-    // Build agent lists from the spawn config
-    int seekerId = 0;
-    int targetId = 0;
-    int detectorId = 0;
-    double detectorRadius = config.getDetectorRadius();
+    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0;
+    double detRadius = config.getDetectorRadius();
+    double intRadius = config.getInterceptorRadius();
 
     for (const auto& unit : config.getUnits()) {
         if (unit.type == "seeker") {
@@ -24,15 +23,30 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
         } else if (unit.type == "target") {
             m_targets.emplace_back(targetId++, unit.row, unit.col);
         } else if (unit.type == "detector") {
-            m_detectors.emplace_back(detectorId++, unit.row, unit.col, detectorRadius);
+            m_detectors.emplace_back(detectorId++, unit.row, unit.col, detRadius);
+        } else if (unit.type == "interceptor") {
+            m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
         }
     }
 
-    std::cout << "Simulation created: " << m_seekers.size() << " seekers, "
-              << m_targets.size() << " targets, "
-              << m_detectors.size() << " detectors (radius=" << detectorRadius << "), "
+    std::cout << "Simulation created: "
+              << m_seekers.size()      << " seekers, "
+              << m_targets.size()      << " targets, "
+              << m_detectors.size()    << " detectors (r=" << detRadius << "), "
+              << m_interceptors.size() << " interceptors (r=" << intRadius << "), "
               << "noise=" << m_maxNoiseLevel << ", "
               << "max " << m_maxSteps << " steps\n";
+
+    // Friendly warnings about asymmetric defender setups
+    if (!m_detectors.empty() && m_interceptors.empty()) {
+        std::cout << "  WARNING: detectors present but no interceptors. "
+                  << "Seekers will be tracked but never killed.\n";
+    }
+    if (m_detectors.empty() && !m_interceptors.empty()) {
+        std::cout << "  WARNING: interceptors present but no detectors. "
+                  << "Under sense-then-shoot doctrine, no seeker can be tracked, "
+                  << "so interceptors will never fire.\n";
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -46,7 +60,6 @@ int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
     for (int i = 0; i < static_cast<int>(m_targets.size()); i++) {
         if (!m_targets[i].alive) continue;
 
-        // Euclidean distance for target selection (not pathfinding)
         double dr = seeker.row - m_targets[i].row;
         double dc = seeker.col - m_targets[i].col;
         double dist = std::sqrt(dr * dr + dc * dc);
@@ -64,112 +77,131 @@ int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
 // ════════════════════════════════════════════════════════════════════════════════
 
 bool Simulation::checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const {
-    // Seeker reaches target when it's on the same cell
     return seeker.row == target.row && seeker.col == target.col;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  DETECTOR INTERCEPTION
+//  SENSE PHASE — DETECTORS UPDATE TRACKS
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  For every alive seeker:
+//    - For every alive detector whose sensingRadius contains the seeker:
+//        * Log a sighting (every step the seeker is inside).
+//        * On the FIRST detection, mark the seeker as tracked
+//          (sticky — stays tracked for the rest of the run).
+//
+//  Detectors do not kill anything. Killing is the interceptor's job.
+//
 // ════════════════════════════════════════════════════════════════════════════════
 
-void Simulation::checkDetectorIntercepts(int currentStep) {
-    // Random engine — static so it persists across calls
-    static std::mt19937 rng(std::random_device{}());
-    static std::uniform_real_distribution<double> dist(0.0, 1.0);
-
+void Simulation::updateDetectorTracks(int currentStep) {
     for (auto& seeker : m_seekers) {
         if (!seeker.alive || seeker.reachedTarget) continue;
 
         for (auto& detector : m_detectors) {
             if (!detector.alive) continue;
+            if (!detector.isInRange(seeker.row, seeker.col)) continue;
 
-            if (detector.isInRange(seeker.row, seeker.col)) {
-                // Calculate how far into the radius the seeker is (0.0 = on top, 1.0 = edge)
-                double dr = detector.row - seeker.row;
-                double dc = detector.col - seeker.col;
-                double distance = std::sqrt(dr * dr + dc * dc);
-                double ratio = distance / detector.radius;
+            // Log this sighting unconditionally (analysis can de-dup later)
+            detector.recordSighting(seeker.id, currentStep);
 
-                // Determine intercept probability based on distance ratio
-                double interceptChance;
-                if (ratio <= 0.5) {
-                    interceptChance = 0.90;  // inner 50% of radius
-                } else if (ratio <= 0.7) {
-                    interceptChance = 0.60;  // 50-70% of radius
-                } else {
-                    interceptChance = 0.50;  // 70-100% of radius
-                }
-
-                // Roll the dice
-                double roll = dist(rng);
-                if (roll < interceptChance) {
-                    std::cout << "  Step " << currentStep << ": Detector " << detector.id
-                              << " intercepted Seeker " << seeker.id
-                              << " at (" << seeker.row << "," << seeker.col << ")"
-                              << " [dist=" << std::fixed << std::setprecision(1)
-                              << (ratio * 100) << "%, chance=" << (interceptChance * 100) << "%]\n";
-
-                    seeker.alive = false;
-                    seeker.intercepted = true;
-                    seeker.interceptedByDetector = detector.id;
-                    seeker.interceptedAtStep = currentStep;
-
-                    detector.interceptCount++;
-                    detector.intercepts.push_back({seeker.id, currentStep});
-
-                    break;
-                } else {
-                    std::cout << "  Step " << currentStep << ": Detector " << detector.id
-                              << " missed Seeker " << seeker.id
-                              << " [dist=" << std::fixed << std::setprecision(1)
-                              << (ratio * 100) << "%, chance=" << (interceptChance * 100) << "%]\n";
-                }
+            // First detection: mark seeker as tracked
+            if (!seeker.detected) {
+                seeker.detected = true;
+                seeker.firstDetectedAtStep = currentStep;
+                seeker.firstDetectedByDetector = detector.id;
+                std::cout << "  Step " << currentStep
+                          << ": Detector " << detector.id
+                          << " acquired Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")\n";
             }
         }
     }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  APPLY NOISE
+//  SHOOT PHASE — INTERCEPTORS ENGAGE TRACKED SEEKERS
 // ════════════════════════════════════════════════════════════════════════════════
 //
-//  After A* computes next position (x2, y2), the actual position becomes
-//  (x2 + rx, y2 + ry) where rx, ry ∈ [-N, N] (uniform random integers).
-//  This simulates environmental noise like waves and wind.
+//  Sense-then-shoot doctrine: an interceptor will only roll a kill
+//  against a seeker that has been detected by some detector.
+//  Untracked seekers are skipped entirely.
 //
-//  If the noisy position is out of bounds or blocked (land), the seeker
-//  stays at the A* position — the noise is "absorbed" by the obstacle.
-//  A line-of-sight check (Bresenham's line) ensures the displacement
-//  doesn't cross any land cells, preventing seekers from teleporting
-//  over land masses to disconnected water bodies.
+//  The kill probability comes from the interceptor's own distance-tiered
+//  model (see interceptorAgent.h):
+//      inner 50% of radius -> 90%, 50-70% -> 60%, 70-100% -> 50%.
 //
-//  After displacement, the seeker's pre-computed A* path is invalidated
-//  and must be recomputed from the new position.
-//
+// ════════════════════════════════════════════════════════════════════════════════
+
+void Simulation::checkInterceptorEngagements(int currentStep) {
+    std::uniform_real_distribution<double> roll(0.0, 1.0);
+
+    for (auto& seeker : m_seekers) {
+        if (!seeker.alive || seeker.reachedTarget) continue;
+        if (!seeker.detected) continue;  // <-- core doctrine: no track, no shot
+
+        for (auto& interceptor : m_interceptors) {
+            if (!interceptor.alive) continue;
+            if (!interceptor.isInRange(seeker.row, seeker.col)) continue;
+
+            double pKill = interceptor.killProbability(seeker.row, seeker.col);
+            double r = roll(m_rng);
+
+            // For logging only
+            double dr = interceptor.row - seeker.row;
+            double dc = interceptor.col - seeker.col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+            double ratio = (interceptor.killRadius > 0.0)
+                ? dist / interceptor.killRadius : 0.0;
+
+            if (r < pKill) {
+                std::cout << "  Step " << currentStep
+                          << ": Interceptor " << interceptor.id
+                          << " killed Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")"
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+
+                seeker.alive = false;
+                seeker.intercepted = true;
+                seeker.interceptedByInterceptor = interceptor.id;
+                seeker.interceptedAtStep = currentStep;
+
+                interceptor.recordIntercept(seeker.id, currentStep);
+                break;  // seeker is dead, stop checking other interceptors
+            } else {
+                std::cout << "  Step " << currentStep
+                          << ": Interceptor " << interceptor.id
+                          << " missed Seeker " << seeker.id
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  APPLY NOISE  (unchanged from the previous version)
 // ════════════════════════════════════════════════════════════════════════════════
 
 bool Simulation::applyNoise(SeekerAgent& seeker) {
     if (m_maxNoiseLevel <= 0.0) return false;
     if (!seeker.alive || seeker.reachedTarget) return false;
 
-    // Generate random displacement in [-N, N] as real numbers, then round
     std::uniform_real_distribution<double> dist(-m_maxNoiseLevel, m_maxNoiseLevel);
     int rx = static_cast<int>(std::round(dist(m_rng)));
     int ry = static_cast<int>(std::round(dist(m_rng)));
 
-    if (rx == 0 && ry == 0) return false;  // no displacement
+    if (rx == 0 && ry == 0) return false;
 
     int newRow = seeker.row + ry;
     int newCol = seeker.col + rx;
 
-    // Check if noisy position is valid and passable
     if (!m_map.isValid(newRow, newCol)) return false;
     if (!m_map.isPassable(newRow, newCol)) return false;
 
-    // ── Line-of-sight check ──
-    // Walk from current position to noisy position using Bresenham's line.
-    // Reject the displacement if ANY intermediate cell is blocked (land).
-    // This prevents seekers from "teleporting" over land masses.
+    // ── Bresenham line-of-sight check: reject if any cell along the
+    //    displacement is blocked (prevents teleporting over land). ──
     {
         int r0 = seeker.row, c0 = seeker.col;
         int r1 = newRow, c1 = newCol;
@@ -185,29 +217,24 @@ bool Simulation::applyNoise(SeekerAgent& seeker) {
             if (e2 > -dr) { err -= dr; c += sc; }
             if (e2 <  dc) { err += dc; r += sr; }
 
-            // Check every cell along the line (except start, which we're on)
             if (!m_map.isValid(r, c) || !m_map.isPassable(r, c)) {
-                return false;  // path crosses land — reject displacement
+                return false;
             }
         }
     }
 
-    // Apply the displacement
     seeker.row = newRow;
     seeker.col = newCol;
-
-    // Record the noisy position in move history
     seeker.moveHistory.push_back({newRow, newCol});
 
-    // Invalidate current path — must be recomputed from new position
+    // Invalidate path — must be recomputed from new position
     seeker.path.clear();
     seeker.pathIndex = 0;
-
     return true;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  ASSIGN TARGETS
+//  ASSIGN TARGETS  (unchanged)
 // ════════════════════════════════════════════════════════════════════════════════
 
 void Simulation::assignTargets(const Pathfinding& pf) {
@@ -215,9 +242,8 @@ void Simulation::assignTargets(const Pathfinding& pf) {
         if (!seeker.alive || seeker.reachedTarget) continue;
 
         int tIdx = findNearestTarget(seeker);
-        if (tIdx < 0) continue;  // no alive targets
+        if (tIdx < 0) continue;
 
-        // Only recompute path if we need a new target or have no path
         if (seeker.targetId != m_targets[tIdx].id || !seeker.hasPath()) {
             seeker.targetId = m_targets[tIdx].id;
             seeker.computePath(pf, m_targets[tIdx].row, m_targets[tIdx].col);
@@ -241,7 +267,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
     result.allSeekersDead = true;
     result.maxNoiseLevel = m_maxNoiseLevel;
 
-    // Seeker results
+    // ── Seekers ──
     for (const auto& s : m_seekers) {
         SimResult::SeekerResult sr;
         sr.id = s.id;
@@ -251,15 +277,20 @@ SimResult Simulation::buildResult(int totalSteps) const {
         sr.reachedTarget = s.reachedTarget;
         sr.targetId = s.targetId;
         sr.moveHistory = s.moveHistory;
+
+        sr.detected = s.detected;
+        sr.firstDetectedAtStep = s.firstDetectedAtStep;
+        sr.firstDetectedByDetector = s.firstDetectedByDetector;
+
         sr.intercepted = s.intercepted;
-        sr.interceptedByDetector = s.interceptedByDetector;
+        sr.interceptedByInterceptor = s.interceptedByInterceptor;
         sr.interceptedAtStep = s.interceptedAtStep;
         result.seekerResults.push_back(sr);
 
         if (s.alive) result.allSeekersDead = false;
     }
 
-    // Target results
+    // ── Targets ──
     for (const auto& t : m_targets) {
         SimResult::TargetResult tr;
         tr.id = t.id;
@@ -273,18 +304,32 @@ SimResult Simulation::buildResult(int totalSteps) const {
         if (t.alive) result.allTargetsDestroyed = false;
     }
 
-    // Detector results
+    // ── Detectors (now sensor-only) ──
     for (const auto& d : m_detectors) {
         SimResult::DetectorResult dr;
         dr.id = d.id;
         dr.row = d.row;
         dr.col = d.col;
-        dr.radius = d.radius;
-        dr.interceptCount = d.interceptCount;
-        for (const auto& ic : d.intercepts) {
-            dr.intercepts.push_back({ic.seekerId, ic.step});
+        dr.sensingRadius = d.sensingRadius;
+        dr.sightingCount = d.sightingCount;
+        for (const auto& s : d.sightings) {
+            dr.sightings.push_back({s.seekerId, s.step});
         }
         result.detectorResults.push_back(dr);
+    }
+
+    // ── Interceptors (new) ──
+    for (const auto& i : m_interceptors) {
+        SimResult::InterceptorResult ir;
+        ir.id = i.id;
+        ir.row = i.row;
+        ir.col = i.col;
+        ir.killRadius = i.killRadius;
+        ir.killCount = i.killCount;
+        for (const auto& ic : i.intercepts) {
+            ir.intercepts.push_back({ic.seekerId, ic.step});
+        }
+        result.interceptorResults.push_back(ir);
     }
 
     result.computeSummary();
@@ -292,16 +337,13 @@ SimResult Simulation::buildResult(int totalSteps) const {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  RUN SIMULATION
+//  MAIN LOOP
 // ════════════════════════════════════════════════════════════════════════════════
 
 SimResult Simulation::run() {
     std::cout << "\n--- Simulation starting ---\n";
 
-    // Create pathfinder from the current grid
     Pathfinding pf(m_map.getGrid());
-
-    // Initial target assignment — compute paths for all seekers
     assignTargets(pf);
 
     int step = 0;
@@ -311,38 +353,32 @@ SimResult Simulation::run() {
     while (step < m_maxSteps && !allTargetsDead && !allSeekersFinished) {
         step++;
 
-        // ── Move each seeker one step ──
+        // ── 1. Move ──
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
             seeker.moveStep();
         }
 
-        // ── Apply environmental noise (wave/wind displacement) ──
-        // After A* gives the next position, displace by random (rx, ry).
-        // This invalidates the pre-computed path, forcing recomputation.
+        // ── 2. Noise ──
         if (m_maxNoiseLevel > 0.0) {
-            for (auto& seeker : m_seekers) {
-                applyNoise(seeker);
-            }
+            for (auto& seeker : m_seekers) applyNoise(seeker);
         }
 
-        // ── Check detector interceptions FIRST ──
-        // Seekers that enter a detector's radius are destroyed
-        // before they can reach a target on the same step
-        checkDetectorIntercepts(step);
+        // ── 3. SENSE: detectors update tracks ──
+        updateDetectorTracks(step);
 
-        // ── Check collisions: did any seeker reach its target? ──
+        // ── 4. SHOOT: interceptors engage tracked seekers ──
+        checkInterceptorEngagements(step);
+
+        // ── 5. Collisions: seekers vs. targets ──
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
-
             for (auto& target : m_targets) {
                 if (!target.alive) continue;
-
                 if (checkCollision(seeker, target)) {
                     std::cout << "  Step " << step << ": Seeker " << seeker.id
                               << " reached Target " << target.id
                               << " at (" << target.row << "," << target.col << ")\n";
-
                     target.alive = false;
                     seeker.reachedTarget = true;
                     break;
@@ -350,48 +386,38 @@ SimResult Simulation::run() {
             }
         }
 
-        // ── Check if we need to retarget ──
+        // ── 6. Retarget if needed ──
         bool needsRetarget = false;
         for (const auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
-            // Check if our target is still alive
-            if (seeker.targetId >= 0 && seeker.targetId < static_cast<int>(m_targets.size())) {
+            if (seeker.targetId >= 0 &&
+                seeker.targetId < static_cast<int>(m_targets.size())) {
                 if (!m_targets[seeker.targetId].alive) {
-                    needsRetarget = true;
-                    break;
+                    needsRetarget = true; break;
                 }
             }
-            // Check if we ran out of path
-            if (!seeker.hasPath()) {
-                needsRetarget = true;
-                break;
-            }
+            if (!seeker.hasPath()) { needsRetarget = true; break; }
         }
-        if (needsRetarget) {
-            assignTargets(pf);
-        }
+        if (needsRetarget) assignTargets(pf);
 
-        // ── Check termination conditions ──
+        // ── 7. Termination ──
         allTargetsDead = true;
         for (const auto& t : m_targets) {
             if (t.alive) { allTargetsDead = false; break; }
         }
-
         allSeekersFinished = true;
         for (const auto& s : m_seekers) {
             if (s.alive && !s.reachedTarget && s.hasPath()) {
-                allSeekersFinished = false;
-                break;
+                allSeekersFinished = false; break;
             }
         }
     }
 
     std::cout << "--- Simulation finished at step " << step << " ---\n";
 
-    // Build and return results
     SimResult result = buildResult(step);
 
-    // Patch in destruction step info
+    // Patch in destruction info on targets
     for (auto& tr : result.targetResults) {
         if (tr.destroyed) {
             for (const auto& sr : result.seekerResults) {

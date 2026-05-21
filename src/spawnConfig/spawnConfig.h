@@ -10,9 +10,10 @@
 
 /**
  * A single unit placement on the grid.
+ * type ∈ { "seeker", "target", "detector", "interceptor" }
  */
 struct UnitSpawn {
-    std::string type;  // "seeker", "target", or "detector"
+    std::string type;
     int row;
     int col;
 };
@@ -21,10 +22,10 @@ struct UnitSpawn {
  * Map metadata stored alongside the config.
  */
 struct MapInfo {
-    std::string shpPath;     // original shapefile path
-    int cellsN;              // grid resolution (e.g. 100)
-    int canvasWidth;         // virtual canvas width
-    int canvasHeight;        // virtual canvas height
+    std::string shpPath;
+    int cellsN;
+    int canvasWidth;
+    int canvasHeight;
     double minDepth;
     double maxDepth;
     int waterCount;
@@ -37,8 +38,10 @@ struct MapInfo {
  * A complete scenario file containing:
  *   1. Map metadata (source file, dimensions, depth range)
  *   2. The full grid (2D water/land matrix)
- *   3. Unit placements (seekers, targets, detectors)
- *   4. Detector radius (single value for all detectors)
+ *   3. Unit placements (seekers, targets, detectors, interceptors)
+ *   4. Detector sensing radius (single value applied to all detectors)
+ *   5. Interceptor kill radius (single value applied to all interceptors)
+ *   6. Max environmental noise level
  *
  * One JSON file = one complete, self-contained scenario.
  */
@@ -57,52 +60,35 @@ public:
     int totalUnits() const;
     void clear();
 
-    // ─── Detector radius ────────────────────────────────────────────
+    // ─── Detector sensing radius ────────────────────────────────────
 
-    /** Set the detection radius (in grid cells) for all detectors. */
+    /** Set the detection radius (cells) for all detectors. */
     void setDetectorRadius(double radius);
-
-    /** Get the current detector radius. Default is 3.0. */
+    /** Get the current detector sensing radius. Default 3.0. */
     double getDetectorRadius() const;
+
+    // ─── Interceptor kill radius ────────────────────────────────────
+
+    /** Set the kill radius (cells) for all interceptors. */
+    void setInterceptorRadius(double radius);
+    /** Get the current interceptor kill radius. Default 3.0. */
+    double getInterceptorRadius() const;
 
     // ─── Noise level ─────────────────────────────────────────────────
 
-    /**
-     * Set the max noise level N for pathfinding noise.
-     * At each step, seeker position is displaced by (rx, ry)
-     * where rx, ry are random integers in [-N, N].
-     * Simulates environmental factors like waves and wind.
-     */
     void setMaxNoiseLevel(double noise);
-
-    /** Get the current max noise level. Default is 0.0 (no noise). */
     double getMaxNoiseLevel() const;
 
     // ─── Map data ───────────────────────────────────────────────────
 
-    /** Attach map info and grid data to this config. */
     void setMapData(const MapInfo& info, const std::vector<std::vector<int>>& grid);
-
-    /** Get the stored map info. */
     const MapInfo& getMapInfo() const;
-
-    /** Get the stored grid. Empty if no map data was attached. */
     const std::vector<std::vector<int>>& getGrid() const;
-
-    /** Check if this config has map data. */
     bool hasMapData() const;
 
     // ─── JSON I/O ───────────────────────────────────────────────────
 
-    /**
-     * Save everything (map info + grid + units + detector radius) to a single JSON file.
-     */
     void saveJSON(const std::string& filepath) const;
-
-    /**
-     * Load a complete scenario from JSON.
-     * Contains map info, grid, unit placements, and detector radius.
-     */
     static SpawnConfig loadJSON(const std::string& filepath);
 
     // ─── Debug ──────────────────────────────────────────────────────
@@ -114,8 +100,10 @@ private:
     MapInfo m_mapInfo = {};
     std::vector<std::vector<int>> m_grid;
     bool m_hasMapData = false;
-    double m_detectorRadius = 3.0;  // default radius in grid cells
-    double m_maxNoiseLevel = 0.0;    // default: no noise
+
+    double m_detectorRadius    = 3.0;  // sensing radius (cells)
+    double m_interceptorRadius = 3.0;  // kill radius (cells)
+    double m_maxNoiseLevel     = 0.0;  // wave/wind noise level
 };
 
 #endif // SPAWNCONFIG_H

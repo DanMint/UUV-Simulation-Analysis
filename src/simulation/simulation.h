@@ -6,35 +6,42 @@
 #include <random>
 #include "mapCreation.h"
 #include "pathfinding.h"
-#include "agent.h"
+#include "targetAgent.h"
+#include "seekerAgent.h"
+#include "detectorAgent.h"
+#include "interceptorAgent.h"
 #include "spawnConfig.h"
 #include "simResult.h"
 
 /**
  * Simulation
  *
- * Runs one complete simulation:
- *   1. Seekers compute paths to nearest targets (A*)
- *   2. Each step, seekers move one cell along their path
- *   3. Apply environmental noise (wave/wind displacement)
- *   4. Check if any seeker is within a detector's radius (intercepted → destroyed)
- *   5. Check if any seeker reached a target (collision → target destroyed)
- *   6. If target destroyed, remaining seekers retarget
- *   7. Stop when all targets destroyed, all seekers dead, or max steps reached
+ * Runs one complete simulation. Per step:
+ *   1. Each living seeker moves one cell along its A* path
+ *   2. Environmental noise (wave/wind) displaces seekers and may
+ *      invalidate paths
+ *   3. Detectors update tracks: any seeker inside a detector's sensing
+ *      radius becomes `detected` (sticky)
+ *   4. Interceptors engage: any detected seeker inside an interceptor's
+ *      kill radius is rolled against the interceptor's probabilistic
+ *      kill model
+ *   5. Check seeker -> target collisions
+ *   6. If any target was destroyed, surviving seekers retarget
+ *   7. Loop until all targets dead, all seekers dead/reached, or
+ *      maxSteps reached
  *
- * Produces a SimResult when finished.
- * Does NOT save results — that's SimResult's job.
+ * Doctrine: SENSE-THEN-SHOOT.
+ *   - A lone detector sees but cannot kill.
+ *   - A lone interceptor cannot fire — no tracks, no shots.
+ *
+ * Produces a SimResult when finished. Does NOT save the result file —
+ * that is SimResult's responsibility.
  */
 class Simulation {
 public:
-    /**
-     * @param map       The grid (with units stamped on it)
-     * @param config    Spawn configuration (unit positions + detector radius + noise)
-     * @param maxSteps  Maximum steps before forced termination
-     */
     Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000);
 
-    /** Run the simulation to completion. Returns results. */
+    /** Run to completion. Returns results. */
     SimResult run();
 
 private:
@@ -42,31 +49,39 @@ private:
     int m_maxSteps;
     double m_maxNoiseLevel;
 
-    std::vector<SeekerAgent> m_seekers;
-    std::vector<TargetAgent> m_targets;
-    std::vector<DetectorAgent> m_detectors;
+    std::vector<SeekerAgent>      m_seekers;
+    std::vector<TargetAgent>      m_targets;
+    std::vector<DetectorAgent>    m_detectors;
+    std::vector<InterceptorAgent> m_interceptors;
 
-    // Random number generator for noise
     mutable std::mt19937 m_rng;
 
-    /** Find the nearest alive target to a seeker. Returns target index or -1. */
+    /** Nearest living target to a seeker (Euclidean). -1 if none. */
     int findNearestTarget(const SeekerAgent& seeker) const;
 
-    /** Check if a seeker has reached its target (same cell). */
+    /** True if seeker and target occupy the same cell. */
     bool checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const;
 
-    /** Check all detectors against all alive seekers. Kill seekers in range. */
-    void checkDetectorIntercepts(int currentStep);
+    /**
+     * Detectors look for seekers; sets `detected = true` on first sight
+     * and logs every sighting (including repeats).
+     */
+    void updateDetectorTracks(int currentStep);
 
     /**
-     * Apply environmental noise to a seeker's position.
-     * Displaces by (rx, ry) where rx, ry ∈ [-N, N].
-     * If the noisy position is invalid or blocked, seeker stays put.
-     * Returns true if position was displaced.
+     * Interceptors engage tracked seekers in range using their
+     * probabilistic kill model. Untracked seekers are skipped.
+     */
+    void checkInterceptorEngagements(int currentStep);
+
+    /**
+     * Apply environmental noise to a seeker's position. Bresenham
+     * line-of-sight enforced so the seeker cannot jump over land.
+     * Invalidates the seeker's path on success.
      */
     bool applyNoise(SeekerAgent& seeker);
 
-    /** Assign each seeker to its nearest target and compute paths. */
+    /** Re-assign each seeker to its nearest target and recompute paths. */
     void assignTargets(const Pathfinding& pf);
 
     /** Build the final result struct from current agent state. */
