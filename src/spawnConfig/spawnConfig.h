@@ -7,10 +7,38 @@
 #include <sstream>
 #include <iostream>
 #include <stdexcept>
+#include <algorithm>
 
-/**
- * A single unit placement on the grid.
- * type ∈ { "seeker", "target", "detector", "interceptor" }
+// ─── SpawnZone ───────────────────────────────────────────────────────────────
+//
+// A rectangular constraint region on the grid, shared by both the attacker
+// and defender sides. Row/col values are inclusive grid indices.
+//
+// The attacker GA searches for optimal seeker positions within attacker zones.
+// The defender GA searches for optimal defender positions within defender zones.
+// Manual unit placement is unaffected by zones.
+//
+struct SpawnZone {
+    int rowMin;
+    int colMin;
+    int rowMax;
+    int colMax;
+
+    /** True if (row, col) falls inside this zone (inclusive). */
+    bool contains(int row, int col) const {
+        return row >= rowMin && row <= rowMax &&
+               col >= colMin && col <= colMax;
+    }
+
+    int width()  const { return colMax - colMin + 1; }
+    int height() const { return rowMax - rowMin + 1; }
+    int area()   const { return width() * height(); }
+};
+
+// ─── UnitSpawn ────────────────────────────────────────────────────────────────
+
+/** A single unit placement on the grid.
+ *  type in { "seeker", "target", "detector", "interceptor" }
  */
 struct UnitSpawn {
     std::string type;
@@ -18,9 +46,8 @@ struct UnitSpawn {
     int col;
 };
 
-/**
- * Map metadata stored alongside the config.
- */
+// ─── MapInfo ──────────────────────────────────────────────────────────────────
+
 struct MapInfo {
     std::string shpPath;
     int cellsN;
@@ -32,17 +59,17 @@ struct MapInfo {
     int landCount;
 };
 
+// ─── SpawnConfig ─────────────────────────────────────────────────────────────
 /**
- * SpawnConfig
+ * Complete scenario descriptor:
+ *   - Map metadata + full grid
+ *   - Unit placements (seekers, targets, detectors, interceptors)
+ *   - Detector sensing radius and interceptor kill radius
+ *   - Environmental noise level
+ *   - Attacker spawn zones  (GA searches within these for optimal attacker positions)
+ *   - Defender spawn zones  (GA searches within these for optimal defender positions)
  *
- * A complete scenario file containing:
- *   1. Map metadata (source file, dimensions, depth range)
- *   2. The full grid (2D water/land matrix)
- *   3. Unit placements (seekers, targets, detectors, interceptors)
- *   4. Detector sensing radius (single value applied to all detectors)
- *   5. Interceptor kill radius (single value applied to all interceptors)
- *   6. Max environmental noise level
- *
+ * Zones are optional. Without them the GA falls back to any water cell.
  * One JSON file = one complete, self-contained scenario.
  */
 class SpawnConfig {
@@ -60,38 +87,60 @@ public:
     int totalUnits() const;
     void clear();
 
-    // ─── Detector sensing radius ────────────────────────────────────
+    // ─── Radii ──────────────────────────────────────────────────────
 
-    /** Set the detection radius (cells) for all detectors. */
-    void setDetectorRadius(double radius);
-    /** Get the current detector sensing radius. Default 3.0. */
+    void   setDetectorRadius(double radius);
     double getDetectorRadius() const;
 
-    // ─── Interceptor kill radius ────────────────────────────────────
-
-    /** Set the kill radius (cells) for all interceptors. */
-    void setInterceptorRadius(double radius);
-    /** Get the current interceptor kill radius. Default 3.0. */
+    void   setInterceptorRadius(double radius);
     double getInterceptorRadius() const;
 
-    // ─── Noise level ─────────────────────────────────────────────────
+    // ─── Noise ──────────────────────────────────────────────────────
 
-    void setMaxNoiseLevel(double noise);
+    void   setMaxNoiseLevel(double noise);
     double getMaxNoiseLevel() const;
 
-    // ─── Map data ───────────────────────────────────────────────────
+    // ─── Attacker spawn zones ────────────────────────────────────────
+    //
+    // Multiple zones allowed. The GA restricts attacker spawn positions
+    // to water cells inside at least one attacker zone.
+
+    /** Add a zone. Coordinates are normalised (min/max swapped if needed). */
+    void addAttackerZone(int rowMin, int colMin, int rowMax, int colMax);
+
+    /** Remove the first attacker zone containing (row, col). Returns true if one was found. */
+    bool removeAttackerZoneContaining(int row, int col);
+
+    /** Remove all attacker zones. */
+    void clearAttackerZones();
+
+    const std::vector<SpawnZone>& getAttackerZones() const;
+    bool hasAttackerZones() const;
+
+    // ─── Defender spawn zones ────────────────────────────────────────
+    //
+    // Same semantics as attacker zones but for the defender side.
+
+    void addDefenderZone(int rowMin, int colMin, int rowMax, int colMax);
+    bool removeDefenderZoneContaining(int row, int col);
+    void clearDefenderZones();
+
+    const std::vector<SpawnZone>& getDefenderZones() const;
+    bool hasDefenderZones() const;
+
+    // ─── Map data ────────────────────────────────────────────────────
 
     void setMapData(const MapInfo& info, const std::vector<std::vector<int>>& grid);
     const MapInfo& getMapInfo() const;
     const std::vector<std::vector<int>>& getGrid() const;
     bool hasMapData() const;
 
-    // ─── JSON I/O ───────────────────────────────────────────────────
+    // ─── JSON I/O ────────────────────────────────────────────────────
 
     void saveJSON(const std::string& filepath) const;
     static SpawnConfig loadJSON(const std::string& filepath);
 
-    // ─── Debug ──────────────────────────────────────────────────────
+    // ─── Debug ───────────────────────────────────────────────────────
 
     void printSummary() const;
 
@@ -101,9 +150,12 @@ private:
     std::vector<std::vector<int>> m_grid;
     bool m_hasMapData = false;
 
-    double m_detectorRadius    = 3.0;  // sensing radius (cells)
-    double m_interceptorRadius = 3.0;  // kill radius (cells)
-    double m_maxNoiseLevel     = 0.0;  // wave/wind noise level
+    double m_detectorRadius    = 3.0;
+    double m_interceptorRadius = 3.0;
+    double m_maxNoiseLevel     = 0.0;
+
+    std::vector<SpawnZone> m_attackerZones;
+    std::vector<SpawnZone> m_defenderZones;
 };
 
 #endif // SPAWNCONFIG_H
