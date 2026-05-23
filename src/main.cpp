@@ -105,6 +105,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
+                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 
@@ -128,6 +129,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
+                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
         }
@@ -195,6 +197,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
+                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 

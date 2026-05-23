@@ -474,8 +474,8 @@ bool MapCreation::placeUnit(int row, int col, int unitType) {
 
 bool MapCreation::removeUnit(int row, int col) {
     if (!isValid(row, col)) return false;
-    // Only remove actual units (2, 3, or 4), not terrain
-    if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET || m_grid[row][col] == DETECTOR) {
+    // Only remove actual units (2/3/4/5), not terrain
+    if (isUnitCell(m_grid[row][col])) {
         m_grid[row][col] = WATER;
         return true;
     }
@@ -485,7 +485,7 @@ bool MapCreation::removeUnit(int row, int col) {
 void MapCreation::clearAllUnits() {
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
-            if (m_grid[row][col] == SEEKER || m_grid[row][col] == TARGET || m_grid[row][col] == DETECTOR) {
+            if (isUnitCell(m_grid[row][col])) {
                 m_grid[row][col] = WATER;
             }
         }
@@ -498,9 +498,10 @@ int MapCreation::placeUnitsFromConfig(
     int placed = 0;
     for (const auto& [type, pos] : units) {
         int unitType = WATER; // fallback
-        if (type == "seeker")  unitType = SEEKER;
-        else if (type == "target") unitType = TARGET;
-        else if (type == "detector") unitType = DETECTOR;
+        if      (type == "seeker")      unitType = SEEKER;
+        else if (type == "target")      unitType = TARGET;
+        else if (type == "detector")    unitType = DETECTOR;
+        else if (type == "interceptor") unitType = INTERCEPTOR;
         else continue;
 
         if (placeUnit(pos.first, pos.second, unitType)) {
@@ -598,16 +599,18 @@ void MapCreation::loadCache(const std::string& cachePath) {
 
 void MapCreation::printGrid() const {
     std::cout << "\nGrid (" << m_cellsN << "x" << m_cellsN
-              << ", . = water, # = land, S = seeker, T = target, D = detector):\n\n";
+              << ", . = water, # = land, S = seeker, T = target, "
+              << "D = detector, I = interceptor):\n\n";
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
             switch (m_grid[row][col]) {
-                case WATER:    std::cout << '.'; break;
-                case LAND:     std::cout << '#'; break;
-                case SEEKER:   std::cout << 'S'; break;
-                case TARGET:   std::cout << 'T'; break;
-                case DETECTOR: std::cout << 'D'; break;
-                default:       std::cout << '?'; break;
+                case WATER:       std::cout << '.'; break;
+                case LAND:        std::cout << '#'; break;
+                case SEEKER:      std::cout << 'S'; break;
+                case TARGET:      std::cout << 'T'; break;
+                case DETECTOR:    std::cout << 'D'; break;
+                case INTERCEPTOR: std::cout << 'I'; break;
+                default:          std::cout << '?'; break;
             }
         }
         std::cout << '\n';
