@@ -42,7 +42,8 @@ MapVisualizer::MapVisualizer(const MapCreation& map, int windowSize)
       m_zoneDrawMode(""),
       m_zoneDragging(false),
       m_zoneDragStartRow(-1),  m_zoneDragStartCol(-1),
-      m_zoneDragCurrentRow(-1), m_zoneDragCurrentCol(-1)
+      m_zoneDragCurrentRow(-1), m_zoneDragCurrentCol(-1),
+      m_gaPrepMode(false)
 {
     m_cellSize = static_cast<float>(m_windowSize) / m_map.getCellsN();
 }
@@ -344,7 +345,16 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
     int nAtk = static_cast<int>(m_config.getAttackerZones().size());
     int nDef = static_cast<int>(m_config.getDefenderZones().size());
 
-    if (m_zoneDrawMode == "attacker") {
+    if (m_gaPrepMode && m_zoneDrawMode.empty()) {
+        // ── GA prep mode, not currently drawing a zone ───────────────────────
+        textColor = sf::Color(200, 130, 255);  // purple
+        ss << "GA PREP MODE (Q to exit)  |  T=target  Z=ATK zone  X=DEF zone"
+           << "  |  Targets:" << m_config.countType("target")
+           << "  ATK:"        << nAtk
+           << "  DEF:"        << nDef
+           << "  |  Enter=save scenario for GA";
+    }
+    else if (m_zoneDrawMode == "attacker") {
         textColor = sf::Color(255, 140, 60);   // coral
         if (m_zoneDragging) {
             int r1 = std::min(m_zoneDragStartRow, m_zoneDragCurrentRow);
@@ -408,7 +418,11 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
     int nDef = static_cast<int>(m_config.getDefenderZones().size());
 
     std::ostringstream ss;
-    if (m_zoneDrawMode == "attacker") {
+    if (m_gaPrepMode && m_zoneDrawMode.empty()) {
+        ss << "UUV Spawn Tool  |  GA PREP MODE  |  T:" << m_config.countType("target")
+           << "  ATK=" << nAtk << "  DEF=" << nDef;
+    }
+    else if (m_zoneDrawMode == "attacker") {
         ss << "UUV Spawn Tool  |  ATK ZONE DRAW  |  ATK=" << nAtk << " DEF=" << nDef;
     } else if (m_zoneDrawMode == "defender") {
         ss << "UUV Spawn Tool  |  DEF ZONE DRAW  |  ATK=" << nAtk << " DEF=" << nDef;
@@ -473,9 +487,14 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
 
                 // ── Unit modes — exit zone draw if active ─────────────────────
                 if (k->code == sf::Keyboard::Key::S) {
-                    m_currentType = "seeker";
-                    m_zoneDrawMode = "";  m_zoneDragging = false;
-                    updateTitle(window);
+                    if (m_gaPrepMode) {
+                        std::cout << "Seeker placement disabled in GA prep mode. "
+                                  << "The GA will spawn seekers within attacker zones.\n";
+                    } else {
+                        m_currentType = "seeker";
+                        m_zoneDrawMode = "";  m_zoneDragging = false;
+                        updateTitle(window);
+                    }
                 }
                 else if (k->code == sf::Keyboard::Key::T) {
                     m_currentType = "target";
@@ -483,13 +502,39 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     updateTitle(window);
                 }
                 else if (k->code == sf::Keyboard::Key::D) {
-                    m_currentType = "detector";
-                    m_zoneDrawMode = "";  m_zoneDragging = false;
-                    updateTitle(window);
+                    if (m_gaPrepMode) {
+                        std::cout << "Detector placement disabled in GA prep mode.\n";
+                    } else {
+                        m_currentType = "detector";
+                        m_zoneDrawMode = "";  m_zoneDragging = false;
+                        updateTitle(window);
+                    }
                 }
                 else if (k->code == sf::Keyboard::Key::I) {
-                    m_currentType = "interceptor";
-                    m_zoneDrawMode = "";  m_zoneDragging = false;
+                    if (m_gaPrepMode) {
+                        std::cout << "Interceptor placement disabled in GA prep mode.\n";
+                    } else {
+                        m_currentType = "interceptor";
+                        m_zoneDrawMode = "";  m_zoneDragging = false;
+                        updateTitle(window);
+                    }
+                }
+
+                // ── Q — toggle GA prep mode ───────────────────────────────────
+                else if (k->code == sf::Keyboard::Key::Q) {
+                    m_gaPrepMode = !m_gaPrepMode;
+                    if (m_gaPrepMode) {
+                        // Switch to target mode if we were in a disabled mode
+                        if (m_currentType == "seeker"   ||
+                            m_currentType == "detector" ||
+                            m_currentType == "interceptor") {
+                            m_currentType = "target";
+                        }
+                        std::cout << "GA PREP MODE ON  —  only targets and zones can be "
+                                  << "placed. Press Q to exit.\n";
+                    } else {
+                        std::cout << "GA PREP MODE OFF  —  all unit types available again.\n";
+                    }
                     updateTitle(window);
                 }
 
@@ -586,11 +631,14 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
 
                 // ── Save ─────────────────────────────────────────────────────
                 else if (k->code == sf::Keyboard::Key::Enter) {
-                    if (m_config.totalUnits() > 0) {
+                    bool hasSomething = m_config.totalUnits()    > 0
+                                     || m_config.hasAttackerZones()
+                                     || m_config.hasDefenderZones();
+                    if (hasSomething) {
                         if (!savePath.empty()) m_config.saveJSON(savePath);
                         m_config.printSummary();
                     } else {
-                        std::cout << "No units placed. Nothing saved.\n";
+                        std::cout << "Nothing placed. Nothing saved.\n";
                     }
                     window.close();
                     return m_config;

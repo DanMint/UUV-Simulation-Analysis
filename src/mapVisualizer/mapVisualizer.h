@@ -23,6 +23,13 @@
  *   Enter            Save scenario and return
  *   Escape           Cancel
  *
+ * ── GA preparation mode (new) ───────────────────────────────────────
+ *   Q                Toggle GA prep mode on/off
+ *                    In GA prep mode the S, D, I keys are inert — the
+ *                    user only places targets and draws zones. The
+ *                    Python GA fills in seekers (and later detectors /
+ *                    interceptors) within the zones at evaluation time.
+ *
  * ── Zone drawing ────────────────────────────────────────────────────
  *   Z                Enter / exit attacker zone draw mode
  *   X                Enter / exit defender zone draw mode
@@ -58,6 +65,12 @@ private:
     int  m_zoneDragStartCol;
     int  m_zoneDragCurrentRow;
     int  m_zoneDragCurrentCol;
+
+    // ── GA-prep mode ─────────────────────────────────────────────────
+    // When true, the seeker / detector / interceptor keys are inert.
+    // The user only places targets and draws zones; the GA fills in
+    // the rest later. Toggled with the Q key.
+    bool m_gaPrepMode;
 
     // ── Colors ───────────────────────────────────────────────────────
     static const sf::Color WATER_COLOR;
