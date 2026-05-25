@@ -17,10 +17,15 @@ void printUsage(const char* progName) {
               << "  Right click  - Remove unit\n"
               << "  S key        - Switch to Seeker mode (attacker, red triangle)\n"
               << "  T key        - Switch to Target mode (defender, blue square)\n"
-              << "  D key        - Switch to Detector mode (interceptor, orange diamond)\n"
-              << "  + / - keys   - Adjust detector radius\n"
+              << "  D key        - Switch to Detector mode (sensor, orange diamond)\n"
+              << "  I key        - Switch to Interceptor mode (effector, purple diamond)\n"
+              << "  Z key        - Draw ATTACKER spawn zones for the GA\n"
+              << "  X key        - Draw DEFENDER spawn zones for the GA\n"
+              << "  Q key        - Toggle GA-prep mode (targets + zones only)\n"
+              << "  + / - keys   - Adjust detector sensing radius\n"
+              << "  { / } keys   - Adjust interceptor kill radius\n"
               << "  [ / ] keys   - Adjust noise level (wave/wind)\n"
-              << "  C key        - Clear all units\n"
+              << "  C key        - Clear all units (zones preserved)\n"
               << "  Enter        - Save scenario and run simulation\n"
               << "  Escape       - Close without saving\n";
 }
@@ -94,8 +99,9 @@ int main(int argc, char* argv[]) {
             MapVisualizer visualizer(map);
             config = visualizer.run("");
 
-            if (config.totalUnits() == 0) {
-                std::cout << "No units placed. Exiting.\n";
+            if (config.totalUnits() == 0 &&
+                !config.hasAttackerZones() && !config.hasDefenderZones()) {
+                std::cout << "No units or zones placed. Exiting.\n";
                 return 0;
             }
 
@@ -138,6 +144,24 @@ int main(int argc, char* argv[]) {
         map.printGrid();
 
         // ── Run simulation ───────────────────────────────────────────
+
+        // ── GA-prep scenario: no seekers placed but zones exist ──────
+        // This is intentional: the user is preparing a scenario for the
+        // Python GA to fill in. Save and exit cleanly — no simulation runs.
+        if (config.countType("seeker") == 0 && config.hasAttackerZones()) {
+            std::cout << "\n=== GA Preparation Scenario ===\n";
+            std::cout << "  Targets:         " << config.countType("target") << "\n";
+            std::cout << "  Detectors:       " << config.countType("detector") << "\n";
+            std::cout << "  Interceptors:    " << config.countType("interceptor") << "\n";
+            std::cout << "  Attacker zones:  " << config.getAttackerZones().size() << "\n";
+            std::cout << "  Defender zones:  " << config.getDefenderZones().size() << "\n";
+            std::cout << "\nScenario saved to scenario.json — no simulation run.\n";
+            std::cout << "Hand this scenario to the Python GA to optimise attacker positions.\n";
+
+            // Create empty runs/ so downstream visualize.py doesn't crash
+            std::system("mkdir -p runs");
+            return 0;
+        }
 
         if (config.countType("seeker") == 0) {
             std::cout << "No seekers placed. Cannot run simulation.\n";
