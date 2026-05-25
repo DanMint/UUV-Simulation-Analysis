@@ -81,12 +81,14 @@ double SpawnConfig::getMaxNoiseLevel() const    { return m_maxNoiseLevel; }
 //  ATTACKER SPAWN ZONES
 // ════════════════════════════════════════════════════════════════════════════════
 
-void SpawnConfig::addAttackerZone(int rowMin, int colMin, int rowMax, int colMax) {
+void SpawnConfig::addAttackerZone(int rowMin, int colMin, int rowMax, int colMax,
+                                  int numSeekers) {
     SpawnZone z;
     z.rowMin = std::min(rowMin, rowMax);
     z.colMin = std::min(colMin, colMax);
     z.rowMax = std::max(rowMin, rowMax);
     z.colMax = std::max(colMin, colMax);
+    z.numSeekers = (numSeekers >= 0) ? numSeekers : 0;
     m_attackerZones.push_back(z);
 }
 
@@ -108,12 +110,15 @@ bool SpawnConfig::hasAttackerZones() const                       { return !m_att
 //  DEFENDER SPAWN ZONES
 // ════════════════════════════════════════════════════════════════════════════════
 
-void SpawnConfig::addDefenderZone(int rowMin, int colMin, int rowMax, int colMax) {
+void SpawnConfig::addDefenderZone(int rowMin, int colMin, int rowMax, int colMax,
+                                  int numDetectors, int numInterceptors) {
     SpawnZone z;
     z.rowMin = std::min(rowMin, rowMax);
     z.colMin = std::min(colMin, colMax);
     z.rowMax = std::max(rowMin, rowMax);
     z.colMax = std::max(colMin, colMax);
+    z.numDetectors    = (numDetectors    >= 0) ? numDetectors    : 0;
+    z.numInterceptors = (numInterceptors >= 0) ? numInterceptors : 0;
     m_defenderZones.push_back(z);
 }
 
@@ -192,6 +197,9 @@ static std::vector<SpawnZone> parseZoneArray(const std::string& content,
         z.colMin = static_cast<int>(extractNumber(obj, "col_min"));
         z.rowMax = static_cast<int>(extractNumber(obj, "row_max"));
         z.colMax = static_cast<int>(extractNumber(obj, "col_max"));
+        z.numSeekers      = static_cast<int>(extractNumber(obj, "num_seekers"));
+        z.numDetectors    = static_cast<int>(extractNumber(obj, "num_detectors"));
+        z.numInterceptors = static_cast<int>(extractNumber(obj, "num_interceptors"));
         zones.push_back(z);
 
         pos = objClose + 1;
@@ -249,7 +257,8 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         file << "    { \"row_min\": " << z.rowMin
              << ", \"col_min\": "     << z.colMin
              << ", \"row_max\": "     << z.rowMax
-             << ", \"col_max\": "     << z.colMax << " }";
+             << ", \"col_max\": "     << z.colMax
+             << ", \"num_seekers\": " << z.numSeekers << " }";
         if (i < (int)m_attackerZones.size() - 1) file << ",";
         file << "\n";
     }
@@ -259,10 +268,12 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     file << "  \"defender_zones\": [\n";
     for (int i = 0; i < (int)m_defenderZones.size(); i++) {
         const auto& z = m_defenderZones[i];
-        file << "    { \"row_min\": " << z.rowMin
-             << ", \"col_min\": "     << z.colMin
-             << ", \"row_max\": "     << z.rowMax
-             << ", \"col_max\": "     << z.colMax << " }";
+        file << "    { \"row_min\": "          << z.rowMin
+             << ", \"col_min\": "              << z.colMin
+             << ", \"row_max\": "              << z.rowMax
+             << ", \"col_max\": "              << z.colMax
+             << ", \"num_detectors\": "        << z.numDetectors
+             << ", \"num_interceptors\": "     << z.numInterceptors << " }";
         if (i < (int)m_defenderZones.size() - 1) file << ",";
         file << "\n";
     }
@@ -428,22 +439,35 @@ void SpawnConfig::printSummary() const {
               << (m_maxNoiseLevel > 0 ? " (enabled)" : " (off)") << std::endl;
 
     if (!m_attackerZones.empty()) {
-        std::cout << "  Attacker zones: " << m_attackerZones.size() << std::endl;
+        int totalSeekers = 0;
+        for (const auto& z : m_attackerZones) totalSeekers += z.numSeekers;
+        std::cout << "  Attacker zones: " << m_attackerZones.size()
+                  << "  (GA will spawn " << totalSeekers << " seeker(s) total)\n";
         for (int i = 0; i < (int)m_attackerZones.size(); i++) {
             const auto& z = m_attackerZones[i];
             std::cout << "    Zone " << (i+1) << ": rows " << z.rowMin << "-" << z.rowMax
                       << ", cols " << z.colMin << "-" << z.colMax
-                      << "  (" << z.width() << "x" << z.height() << ")\n";
+                      << "  (" << z.width() << "x" << z.height() << ")"
+                      << "  seekers=" << z.numSeekers << "\n";
         }
     }
 
     if (!m_defenderZones.empty()) {
-        std::cout << "  Defender zones: " << m_defenderZones.size() << std::endl;
+        int totalDet = 0, totalInt = 0;
+        for (const auto& z : m_defenderZones) {
+            totalDet += z.numDetectors;
+            totalInt += z.numInterceptors;
+        }
+        std::cout << "  Defender zones: " << m_defenderZones.size()
+                  << "  (GA will spawn " << totalDet << " detector(s), "
+                  << totalInt << " interceptor(s) total)\n";
         for (int i = 0; i < (int)m_defenderZones.size(); i++) {
             const auto& z = m_defenderZones[i];
             std::cout << "    Zone " << (i+1) << ": rows " << z.rowMin << "-" << z.rowMax
                       << ", cols " << z.colMin << "-" << z.colMax
-                      << "  (" << z.width() << "x" << z.height() << ")\n";
+                      << "  (" << z.width() << "x" << z.height() << ")"
+                      << "  det=" << z.numDetectors
+                      << "  int=" << z.numInterceptors << "\n";
         }
     }
 

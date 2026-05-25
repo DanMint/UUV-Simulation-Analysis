@@ -43,7 +43,11 @@ MapVisualizer::MapVisualizer(const MapCreation& map, int windowSize)
       m_zoneDragging(false),
       m_zoneDragStartRow(-1),  m_zoneDragStartCol(-1),
       m_zoneDragCurrentRow(-1), m_zoneDragCurrentCol(-1),
-      m_gaPrepMode(false)
+      m_gaPrepMode(false),
+      m_zoneInputState(""),
+      m_pendingZone{0, 0, 0, 0},
+      m_pendingFirstCount(0),
+      m_typingBuffer("")
 {
     m_cellSize = static_cast<float>(m_windowSize) / m_map.getCellsN();
 }
@@ -173,15 +177,53 @@ void MapVisualizer::drawZones(sf::RenderWindow& window, sf::Font* font) const {
     // ── Draw all attacker zones ──
     const auto& atkZones = m_config.getAttackerZones();
     for (int i = 0; i < (int)atkZones.size(); i++) {
-        drawOneZone(atkZones[i], ATK_ZONE_FILL, ATK_ZONE_BORDER,
-                    "ATK " + std::to_string(i + 1));
+        std::string label = "ATK " + std::to_string(i + 1);
+        if (atkZones[i].numSeekers > 0)
+            label += " (" + std::to_string(atkZones[i].numSeekers) + "S)";
+        drawOneZone(atkZones[i], ATK_ZONE_FILL, ATK_ZONE_BORDER, label);
     }
 
     // ── Draw all defender zones ──
     const auto& defZones = m_config.getDefenderZones();
     for (int i = 0; i < (int)defZones.size(); i++) {
-        drawOneZone(defZones[i], DEF_ZONE_FILL, DEF_ZONE_BORDER,
-                    "DEF " + std::to_string(i + 1));
+        std::string label = "DEF " + std::to_string(i + 1);
+        std::string suffix;
+        if (defZones[i].numDetectors > 0)
+            suffix += std::to_string(defZones[i].numDetectors) + "D";
+        if (defZones[i].numInterceptors > 0) {
+            if (!suffix.empty()) suffix += " ";
+            suffix += std::to_string(defZones[i].numInterceptors) + "I";
+        }
+        if (!suffix.empty()) label += " (" + suffix + ")";
+        drawOneZone(defZones[i], DEF_ZONE_FILL, DEF_ZONE_BORDER, label);
+    }
+
+    // ── Pending zone (drawn rectangle, awaiting count input) ──
+    if (!m_zoneInputState.empty()) {
+        const SpawnZone& z = m_pendingZone;
+        float x = z.colMin * m_cellSize;
+        float y = z.rowMin * m_cellSize;
+        float w = z.width()  * m_cellSize;
+        float h = z.height() * m_cellSize;
+
+        bool isAtk = (m_zoneInputState == "atk_seekers");
+        sf::Color fill   = isAtk ? ATK_ZONE_FILL   : DEF_ZONE_FILL;
+        sf::Color border = isAtk ? ATK_ZONE_BORDER : DEF_ZONE_BORDER;
+
+        sf::RectangleShape rect(sf::Vector2f(w, h));
+        rect.setPosition(sf::Vector2f(x, y));
+        rect.setFillColor(fill);
+        rect.setOutlineColor(border);
+        rect.setOutlineThickness(3.5f);   // thicker = "pending"
+        window.draw(rect);
+
+        if (font != nullptr && w > 60.f && h > 18.f) {
+            sf::Text lbl(*font, "PENDING - type count", 11);
+            lbl.setFillColor(sf::Color(255, 255, 255, 230));
+            lbl.setStyle(sf::Text::Bold);
+            lbl.setPosition(sf::Vector2f(x + 6.f, y + 4.f));
+            window.draw(lbl);
+        }
     }
 
     // ── Live drag preview ──
@@ -345,7 +387,19 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
     int nAtk = static_cast<int>(m_config.getAttackerZones().size());
     int nDef = static_cast<int>(m_config.getDefenderZones().size());
 
-    if (m_gaPrepMode && m_zoneDrawMode.empty()) {
+    if (!m_zoneInputState.empty()) {
+        // ── Count-input prompt — highest priority ─────────────────────────────
+        textColor = sf::Color(255, 220, 80);  // bright yellow
+        std::string prompt;
+        if      (m_zoneInputState == "atk_seekers")      prompt = "SEEKERS in this attacker zone";
+        else if (m_zoneInputState == "def_detectors")    prompt = "DETECTORS in this defender zone";
+        else if (m_zoneInputState == "def_interceptors") prompt = "INTERCEPTORS in this defender zone";
+
+        ss << "How many " << prompt << "?  >>> "
+           << (m_typingBuffer.empty() ? "_" : m_typingBuffer + "_")
+           << "    [type digits | Enter=confirm | Backspace | Esc=cancel zone]";
+    }
+    else if (m_gaPrepMode && m_zoneDrawMode.empty()) {
         // ── GA prep mode, not currently drawing a zone ───────────────────────
         textColor = sf::Color(200, 130, 255);  // purple
         ss << "GA PREP MODE (Q to exit)  |  T=target  Z=ATK zone  X=DEF zone"
@@ -484,6 +538,58 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
             if (const auto* k = event->getIf<sf::Event::KeyPressed>()) {
                 bool shift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)
                           || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+
+                // ── Zone count input — takes priority over all other keys ────
+                if (!m_zoneInputState.empty()) {
+                    if (k->code == sf::Keyboard::Key::Enter) {
+                        int count = 0;
+                        try { if (!m_typingBuffer.empty()) count = std::stoi(m_typingBuffer); }
+                        catch (...) { count = 0; }
+
+                        if (m_zoneInputState == "atk_seekers") {
+                            m_config.addAttackerZone(
+                                m_pendingZone.rowMin, m_pendingZone.colMin,
+                                m_pendingZone.rowMax, m_pendingZone.colMax,
+                                count);
+                            std::cout << "Added ATK zone "
+                                      << m_config.getAttackerZones().size()
+                                      << " with " << count << " seeker(s)\n";
+                            m_zoneInputState = "";
+                            m_typingBuffer.clear();
+                        }
+                        else if (m_zoneInputState == "def_detectors") {
+                            m_pendingFirstCount = count;
+                            m_zoneInputState    = "def_interceptors";
+                            m_typingBuffer.clear();
+                            std::cout << "How many INTERCEPTORS in this defender zone? "
+                                      << "(type digits, Enter to confirm, Esc to cancel)\n";
+                        }
+                        else if (m_zoneInputState == "def_interceptors") {
+                            m_config.addDefenderZone(
+                                m_pendingZone.rowMin, m_pendingZone.colMin,
+                                m_pendingZone.rowMax, m_pendingZone.colMax,
+                                m_pendingFirstCount, count);
+                            std::cout << "Added DEF zone "
+                                      << m_config.getDefenderZones().size()
+                                      << " with " << m_pendingFirstCount << " detector(s) and "
+                                      << count << " interceptor(s)\n";
+                            m_zoneInputState = "";
+                            m_typingBuffer.clear();
+                        }
+                        updateTitle(window);
+                    }
+                    else if (k->code == sf::Keyboard::Key::Escape) {
+                        std::cout << "Zone cancelled.\n";
+                        m_zoneInputState = "";
+                        m_typingBuffer.clear();
+                        updateTitle(window);
+                    }
+                    else if (k->code == sf::Keyboard::Key::Backspace) {
+                        if (!m_typingBuffer.empty()) m_typingBuffer.pop_back();
+                    }
+                    // Block every other key while we're collecting count input
+                    continue;
+                }
 
                 // ── Unit modes — exit zone draw if active ─────────────────────
                 if (k->code == sf::Keyboard::Key::S) {
@@ -649,6 +755,16 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 }
             }
 
+            // ── Text input (for digits while collecting zone counts) ──────────
+            if (const auto* txt = event->getIf<sf::Event::TextEntered>()) {
+                if (!m_zoneInputState.empty()) {
+                    char32_t ch = txt->unicode;
+                    if (ch >= U'0' && ch <= U'9' && m_typingBuffer.size() < 5) {
+                        m_typingBuffer += static_cast<char>(ch);
+                    }
+                }
+            }
+
             // ── Mouse movement ────────────────────────────────────────────────
             if (const auto* mv = event->getIf<sf::Event::MouseMoved>()) {
                 mouseToGrid(mv->position.x, mv->position.y, hoverRow, hoverCol);
@@ -663,6 +779,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
 
             // ── Mouse press ───────────────────────────────────────────────────
             if (const auto* btn = event->getIf<sf::Event::MouseButtonPressed>()) {
+                // Block clicks while we're collecting zone counts
+                if (!m_zoneInputState.empty()) continue;
+
                 int clickRow, clickCol;
                 if (!mouseToGrid(btn->position.x, btn->position.y, clickRow, clickCol))
                     continue;
@@ -709,7 +828,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 }
             }
 
-            // ── Mouse release — finalise zone drag ────────────────────────────
+            // ── Mouse release — capture drag rectangle, prompt for unit counts ────
             if (const auto* rel = event->getIf<sf::Event::MouseButtonReleased>()) {
                 if (rel->button == sf::Mouse::Button::Left && m_zoneDragging) {
                     int r1 = std::min(m_zoneDragStartRow,   m_zoneDragCurrentRow);
@@ -718,19 +837,25 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     int c2 = std::max(m_zoneDragStartCol,   m_zoneDragCurrentCol);
 
                     if (r1 != r2 || c1 != c2) {
-                        // Add the new zone
+                        // Store the rectangle and enter count-input state.
+                        // The zone is only added to the config once the user
+                        // commits the counts with Enter.
+                        m_pendingZone.rowMin = r1;  m_pendingZone.colMin = c1;
+                        m_pendingZone.rowMax = r2;  m_pendingZone.colMax = c2;
+                        m_pendingZone.numSeekers      = 0;
+                        m_pendingZone.numDetectors    = 0;
+                        m_pendingZone.numInterceptors = 0;
+                        m_typingBuffer.clear();
+                        m_pendingFirstCount = 0;
+
                         if (m_zoneDrawMode == "attacker") {
-                            m_config.addAttackerZone(r1, c1, r2, c2);
-                            std::cout << "Added ATK zone " << m_config.getAttackerZones().size()
-                                      << ": rows " << r1 << "-" << r2
-                                      << ", cols " << c1 << "-" << c2
-                                      << "  (" << (c2-c1+1) << "x" << (r2-r1+1) << " cells)\n";
+                            m_zoneInputState = "atk_seekers";
+                            std::cout << "How many SEEKERS in this attacker zone? "
+                                      << "(type digits, Enter to confirm, Esc to cancel)\n";
                         } else if (m_zoneDrawMode == "defender") {
-                            m_config.addDefenderZone(r1, c1, r2, c2);
-                            std::cout << "Added DEF zone " << m_config.getDefenderZones().size()
-                                      << ": rows " << r1 << "-" << r2
-                                      << ", cols " << c1 << "-" << c2
-                                      << "  (" << (c2-c1+1) << "x" << (r2-r1+1) << " cells)\n";
+                            m_zoneInputState = "def_detectors";
+                            std::cout << "How many DETECTORS in this defender zone? "
+                                      << "(type digits, Enter to confirm, Esc to cancel)\n";
                         }
                     }
                     m_zoneDragging = false;

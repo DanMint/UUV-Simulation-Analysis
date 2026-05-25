@@ -24,6 +24,13 @@ struct SpawnZone {
     int rowMax;
     int colMax;
 
+    // ── Unit counts requested for this zone ───────────────────────
+    // Attacker zones use numSeekers; defender zones use the other two.
+    // Default 0 means "no units of that type from this zone".
+    int numSeekers      = 0;
+    int numDetectors    = 0;
+    int numInterceptors = 0;
+
     /** True if (row, col) falls inside this zone (inclusive). */
     bool contains(int row, int col) const {
         return row >= rowMin && row <= rowMax &&
@@ -105,8 +112,10 @@ public:
     // Multiple zones allowed. The GA restricts attacker spawn positions
     // to water cells inside at least one attacker zone.
 
-    /** Add a zone. Coordinates are normalised (min/max swapped if needed). */
-    void addAttackerZone(int rowMin, int colMin, int rowMax, int colMax);
+    /** Add a zone. Coordinates are normalised (min/max swapped if needed).
+     *  numSeekers is how many seekers the GA should spawn inside this zone. */
+    void addAttackerZone(int rowMin, int colMin, int rowMax, int colMax,
+                         int numSeekers = 0);
 
     /** Remove the first attacker zone containing (row, col). Returns true if one was found. */
     bool removeAttackerZoneContaining(int row, int col);
@@ -121,7 +130,8 @@ public:
     //
     // Same semantics as attacker zones but for the defender side.
 
-    void addDefenderZone(int rowMin, int colMin, int rowMax, int colMax);
+    void addDefenderZone(int rowMin, int colMin, int rowMax, int colMax,
+                         int numDetectors = 0, int numInterceptors = 0);
     bool removeDefenderZoneContaining(int row, int col);
     void clearDefenderZones();
 

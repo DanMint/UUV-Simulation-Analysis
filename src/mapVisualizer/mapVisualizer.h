@@ -72,6 +72,18 @@ private:
     // the rest later. Toggled with the Q key.
     bool m_gaPrepMode;
 
+    // ── Zone count input state ───────────────────────────────────────
+    // After the user releases a zone drag, the zone is "pending" while
+    // we collect unit counts from the keyboard.
+    //   ""                  -> not collecting input
+    //   "atk_seekers"       -> attacker zone, awaiting seeker count
+    //   "def_detectors"     -> defender zone, awaiting detector count
+    //   "def_interceptors"  -> defender zone, awaiting interceptor count
+    std::string m_zoneInputState;
+    SpawnZone   m_pendingZone;        // rectangle waiting for counts
+    int         m_pendingFirstCount;  // detectors count, held between the two defender prompts
+    std::string m_typingBuffer;       // digits typed so far
+
     // ── Colors ───────────────────────────────────────────────────────
     static const sf::Color WATER_COLOR;
     static const sf::Color LAND_COLOR;
