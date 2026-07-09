@@ -25,7 +25,29 @@ add_executable(uuv_sim
     src/agents/seekerAgent.cpp
 )
 
+add_executable(test_target_assignment
+    tests/test_target_assignment.cpp
+    src/mapCreation/mapCreation.cpp
+    src/spawnConfig/spawnConfig.cpp
+    src/pathfinding/pathfinding.cpp
+    src/simulation/simulation.cpp
+    src/simulation/simResult.cpp
+    src/agents/targetAgent.cpp
+    src/agents/detectorAgent.cpp
+    src/agents/interceptorAgent.cpp
+    src/agents/seekerAgent.cpp
+)
+
 target_include_directories(uuv_sim PRIVATE
+    src/agents
+    src/mapCreation
+    src/spawnConfig
+    src/mapVisualizer
+    src/pathfinding
+    src/simulation
+)
+
+target_include_directories(test_target_assignment PRIVATE
     src/agents
     src/mapCreation
     src/spawnConfig
@@ -76,6 +98,10 @@ separate_arguments(GDAL_CFLAGS)
 target_compile_options(uuv_sim PRIVATE ${GDAL_CFLAGS})
 target_link_directories(uuv_sim PRIVATE ${GDAL_PREFIX}/lib)
 target_link_libraries(uuv_sim PRIVATE gdal)
+
+target_compile_options(test_target_assignment PRIVATE ${GDAL_CFLAGS})
+target_link_directories(test_target_assignment PRIVATE ${GDAL_PREFIX}/lib)
+target_link_libraries(test_target_assignment PRIVATE gdal)
 
 # Helpful on Apple Silicon if you ever accidentally mix archs
 if (APPLE)
