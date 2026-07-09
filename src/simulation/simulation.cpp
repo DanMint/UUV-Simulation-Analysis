@@ -4,6 +4,7 @@
 #include <limits>
 #include <iostream>
 
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  CONSTRUCTOR
 // ════════════════════════════════════════════════════════════════════════════════
@@ -13,7 +14,7 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_rng(std::random_device{}())
 {
-    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0;
+    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, patrolId = 0;
     double detRadius = config.getDetectorRadius();
     double intRadius = config.getInterceptorRadius();
 
@@ -26,6 +27,9 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
             m_detectors.emplace_back(detectorId++, unit.row, unit.col, detRadius);
         } else if (unit.type == "interceptor") {
             m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
+        }
+        else if (unit.type == "patrol") {
+            m_patrolDefenders.emplace_back(patrolId++, unit.row, unit.col, detRadius, intRadius);
         }
     }
 
@@ -116,6 +120,21 @@ void Simulation::updateDetectorTracks(int currentStep) {
                           << " at (" << seeker.row << "," << seeker.col << ")\n";
             }
         }
+        // NEW — patrol defenders also sense
+        for (auto& patrol : m_patrolDefenders) {
+            if (!patrol.alive) continue;
+            if (!patrol.isInSensingRange(seeker.row, seeker.col)) continue;
+            patrol.recordSighting(seeker.id, currentStep);
+            if (!seeker.detected) {
+                seeker.detected = true;
+                seeker.firstDetectedAtStep = currentStep;
+                seeker.firstDetectedByDetector = patrol.id;
+                std::cout << "  Step " << currentStep
+                          << ": Patrol Defender " << patrol.id
+                          << " acquired Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")\n";
+            }
+        }
     }
 }
 
@@ -172,6 +191,40 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
             } else {
                 std::cout << "  Step " << currentStep
                           << ": Interceptor " << interceptor.id
+                          << " missed Seeker " << seeker.id
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+            }
+        }
+        // NEW — patrol defenders also shoot
+        if (!seeker.alive) continue; // already killed above, skip
+        for (auto& patrol : m_patrolDefenders) {
+            if (!patrol.alive) continue;
+            if (!patrol.isInKillRange(seeker.row, seeker.col)) continue;
+
+            double pKill = patrol.killProbability(seeker.row, seeker.col);
+            double r = roll(m_rng);
+            double dr = patrol.row - seeker.row;
+            double dc = patrol.col - seeker.col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+            double ratio = (patrol.killRadius > 0.0) ? dist / patrol.killRadius : 0.0;
+
+            if (r < pKill) {
+                std::cout << "  Step " << currentStep
+                          << ": Patrol Defender " << patrol.id
+                          << " killed Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")"
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+                seeker.alive = false;
+                seeker.intercepted = true;
+                seeker.interceptedByInterceptor = patrol.id;
+                seeker.interceptedAtStep = currentStep;
+                patrol.recordIntercept(seeker.id, currentStep);
+                break;
+            } else {
+                std::cout << "  Step " << currentStep
+                          << ": Patrol Defender " << patrol.id
                           << " missed Seeker " << seeker.id
                           << " [dist=" << std::fixed << std::setprecision(1)
                           << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
@@ -357,6 +410,12 @@ SimResult Simulation::run() {
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
             seeker.moveStep();
+        }
+
+        // ── 1b. Move patrol defenders (dynamic only) ──
+        for (auto& patrol : m_patrolDefenders) {
+            if (!patrol.alive) continue;
+            if (patrol.isDynamic) patrol.moveTowardWaypoint();
         }
 
         // ── 2. Noise ──

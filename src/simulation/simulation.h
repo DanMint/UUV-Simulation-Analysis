@@ -13,6 +13,8 @@
 #include "spawnConfig.h"
 #include "simResult.h"
 
+#include "../agents/patrolAgent.h" // Chris note: Had to add this 
+
 /**
  * Simulation
  *
@@ -54,6 +56,8 @@ private:
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
 
+    std::vector<PatrolDefenderAgent> m_patrolDefenders; //Chris added
+
     mutable std::mt19937 m_rng;
 
     /** Nearest living target to a seeker (Euclidean). -1 if none. */
@@ -86,6 +90,8 @@ private:
 
     /** Build the final result struct from current agent state. */
     SimResult buildResult(int totalSteps) const;
+
+    void updatePatrolDefenders(int currentStep); //Chris added
 };
 
 #endif // SIMULATION_H

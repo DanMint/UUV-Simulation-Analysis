@@ -303,6 +303,17 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             d.setOutlineThickness(1.5f);
             window.draw(d);
         }
+        else if (unit.type == "patrol_defender") {
+            float side = half * 1.4f;
+            sf::RectangleShape d(sf::Vector2f(side, side));
+            d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
+            d.setPosition(sf::Vector2f(cx, cy));
+            d.setRotation(sf::degrees(45.f));
+            d.setFillColor(sf::Color(0, 210, 255));  // cyan
+            d.setOutlineColor(sf::Color::White);
+            d.setOutlineThickness(1.5f);
+            window.draw(d);
+        }
 
         // Label letter
         if (font != nullptr && m_cellSize >= 10.0f) {
@@ -311,6 +322,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             else if (unit.type == "target")      lbl = "T";
             else if (unit.type == "detector")    lbl = "D";
             else if (unit.type == "interceptor") lbl = "I";
+            else if (unit.type == "patrol_defender") lbl = "P"; //Chris add
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) fs = 8;
@@ -624,6 +636,13 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         m_zoneDrawMode = "";  m_zoneDragging = false;
                         updateTitle(window);
                     }
+                }
+
+                else if (k->code == sf::Keyboard::Key::P) {//Chris add
+                    m_currentType = "patrol_defender";
+                    m_zoneDrawMode = "";
+                    m_zoneDragging = false;
+                    updateTitle(window);
                 }
 
                 // ── Q — toggle GA prep mode ───────────────────────────────────

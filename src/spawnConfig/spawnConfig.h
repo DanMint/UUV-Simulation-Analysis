@@ -45,7 +45,7 @@ struct SpawnZone {
 // ─── UnitSpawn ────────────────────────────────────────────────────────────────
 
 /** A single unit placement on the grid.
- *  type in { "seeker", "target", "detector", "interceptor" }
+ *  type in { "seeker", "target", "detector", "interceptor",  "patrol_defender"}
  */
 struct UnitSpawn {
     std::string type;
