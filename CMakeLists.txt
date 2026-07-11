@@ -20,9 +20,10 @@ add_executable(uuv_sim
     src/simulation/simulation.cpp
     src/simulation/simResult.cpp
     src/agents/targetAgent.cpp
+    src/agents/seekerAgent.cpp
+    src/agents/attackerAgent.cpp
     src/agents/detectorAgent.cpp
     src/agents/interceptorAgent.cpp
-    src/agents/seekerAgent.cpp
 )
 
 target_include_directories(uuv_sim PRIVATE
