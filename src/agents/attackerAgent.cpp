@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cctype>
+#include <cmath>
 #include <iostream>
 
 // ── Constructor ───────────────────────────────────────────────────────────────
@@ -15,6 +16,8 @@ AttackerAgent::AttackerAgent(int id, int row, int col)
       emissionFreqLowHz(0), emissionFreqHighHz(0),
       shallowWaterCapable(false), isAerial(false), isSurfaceVessel(false),
       unitCostMin(0.f), unitCostMax(0.f),
+      sensingRadius(5.0), sightingCount(0),
+      killRadius(3.0), killCount(0),
       fsmState(AgentFSMState::S0_IDLE), fallbackReason(""),
       stepDelay(1), stepDelayCounter(0),
       missionSuccess(false), stepsToTarget(0),
@@ -359,6 +362,34 @@ bool AttackerAgent::moveStepWithSpeed() {
     if (stepDelayCounter < stepDelay) return false;
     stepDelayCounter = 0;
     return moveStep();
+}
+
+bool AttackerAgent::isInRange(int checkRow, int checkCol) const {
+    double dr = row - checkRow;
+    double dc = col - checkCol;
+    return std::sqrt(dr * dr + dc * dc) <= sensingRadius;
+}
+
+void AttackerAgent::recordSighting(int seekerId, int step) {
+    sightings.push_back({seekerId, step});
+    sightingCount++;
+}
+
+double AttackerAgent::killProbability(int checkRow, int checkCol) const {
+    double dr = row - checkRow;
+    double dc = col - checkCol;
+    double dist = std::sqrt(dr * dr + dc * dc);
+    if (dist > killRadius) return 0.0;
+
+    double ratio = (killRadius > 0.0) ? dist / killRadius : 0.0;
+    if (ratio <= 0.5) return 0.90;
+    if (ratio <= 0.7) return 0.60;
+    return 0.50;
+}
+
+void AttackerAgent::recordIntercept(int seekerId, int step) {
+    intercepts.push_back({seekerId, step});
+    killCount++;
 }
 
 // ── isDetectableByHydrophone ──────────────────────────────────────────────────

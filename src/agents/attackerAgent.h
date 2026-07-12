@@ -3,6 +3,7 @@
 
 #include "seekerAgent.h"
 #include <string>
+#include <vector>
 
 /**
  * AttackerAgent
@@ -75,6 +76,23 @@ struct AttackerAgent : public SeekerAgent {
     float unitCostMin;            // estimated unit cost lower bound (USD)
     float unitCostMax;            // estimated unit cost upper bound (USD)
 
+    // ── Detection / Engagement ─────────────────────────────────────────────────
+    double sensingRadius;         // detection range for attacker sensors
+    int    sightingCount;         // logged sighting count
+    struct Sighting {
+        int seekerId;
+        int step;
+    };
+    std::vector<Sighting> sightings;
+
+    double killRadius;            // engagement range for attacker intercepts
+    int    killCount;             // successful intercepts logged
+    struct Intercept {
+        int seekerId;
+        int step;
+    };
+    std::vector<Intercept> intercepts;
+
     // ── FSM state ─────────────────────────────────────────────────────────────
     AgentFSMState fsmState;       // current FSM state
     std::string   fallbackReason; // set when FSM enters FALLBACK
@@ -135,6 +153,18 @@ struct AttackerAgent : public SeekerAgent {
 
     /** Speed-aware move — skips steps based on stepDelay. */
     bool moveStepWithSpeed();
+
+    /** True if an enemy position is within this attacker's sensing range. */
+    bool isInRange(int checkRow, int checkCol) const;
+
+    /** Log a sighting of a seeker at a given step. */
+    void recordSighting(int seekerId, int step);
+
+    /** Distance-tiered kill probability at the given position. */
+    double killProbability(int checkRow, int checkCol) const;
+
+    /** Log a successful intercept of a seeker at a given step. */
+    void recordIntercept(int seekerId, int step);
 
     /** True if detectable by underwater hydrophone (not aerial, not surface). */
     bool isDetectableByHydrophone() const;
