@@ -13,7 +13,7 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_rng(std::random_device{}())
 {
-    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0;
+    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, attackerId = 0;
     double detRadius = config.getDetectorRadius();
     double intRadius = config.getInterceptorRadius();
 
@@ -26,6 +26,9 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
             m_detectors.emplace_back(detectorId++, unit.row, unit.col, detRadius);
         } else if (unit.type == "interceptor") {
             m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
+        }
+        else if (unit.type == "attacker") {
+            m_attackers.emplace_back(attackerId++, unit.row, unit.col);
         }
     }
 
@@ -116,6 +119,25 @@ void Simulation::updateDetectorTracks(int currentStep) {
                           << " at (" << seeker.row << "," << seeker.col << ")\n";
             }
         }
+        //Attacker detection phase
+        for (auto& attacker : m_attackers) {
+            if (!attacker.alive) continue;
+            if (!attacker.isInRange(seeker.row, seeker.col)) continue;
+
+            // Log this sighting unconditionally (analysis can de-dup later)
+            attacker.recordSighting(seeker.id, currentStep);
+
+            // First detection: mark seeker as tracked
+            if (!seeker.detected) {
+                seeker.detected = true;
+                seeker.firstDetectedAtStep = currentStep;
+                seeker.firstDetectedByDetector = attacker.id;
+                std::cout << "  Step " << currentStep
+                          << ": Attacker " << attacker.id
+                          << " acquired Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")\n";
+            }
+        }
     }
 }
 
@@ -172,6 +194,44 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
             } else {
                 std::cout << "  Step " << currentStep
                           << ": Interceptor " << interceptor.id
+                          << " missed Seeker " << seeker.id
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+            }
+        }
+        if(!seeker.alive) continue;  // dead seekers don't check other interceptors
+        for (auto& attacker : m_attackers) {
+            if (!attacker.alive) continue;
+            if (!attacker.isInRange(seeker.row, seeker.col)) continue;
+
+            double pKill = attacker.killProbability(seeker.row, seeker.col);
+            double r = roll(m_rng);
+
+            // For logging only
+            double dr = attacker.row - seeker.row;
+            double dc = attacker.col - seeker.col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+            double ratio = (attacker.killRadius > 0.0)
+                ? dist / attacker.killRadius : 0.0;
+
+            if (r < pKill) {
+                std::cout << "  Step " << currentStep
+                          << ": Attacker " << attacker.id
+                          << " killed Seeker " << seeker.id
+                          << " at (" << seeker.row << "," << seeker.col << ")"
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+
+                seeker.alive = false;
+                seeker.intercepted = true;
+                seeker.interceptedByInterceptor = attacker.id;
+                seeker.interceptedAtStep = currentStep;
+
+                attacker.recordIntercept(seeker.id, currentStep);
+                break;  // seeker is dead, stop checking other attackers
+            } else {
+                std::cout << "  Step " << currentStep
+                          << ": Attacker " << attacker.id
                           << " missed Seeker " << seeker.id
                           << " [dist=" << std::fixed << std::setprecision(1)
                           << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
@@ -359,6 +419,11 @@ SimResult Simulation::run() {
             seeker.moveStep();
         }
 
+        // ── 1b. Move attackers ──
+        for (auto& attacker : m_attackers) {
+            if (!attacker.alive) continue;
+            attacker.moveStepWithSpeed();
+        }
         // ── 2. Noise ──
         if (m_maxNoiseLevel > 0.0) {
             for (auto& seeker : m_seekers) applyNoise(seeker);

@@ -303,6 +303,15 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             d.setOutlineThickness(1.5f);
             window.draw(d);
         }
+        else if (unit.type == "attacker") {
+            sf::CircleShape tri(half, 3);
+            tri.setOrigin(sf::Vector2f(half, half));
+            tri.setPosition(sf::Vector2f(cx, cy));
+            tri.setFillColor(sf::Color(255, 100, 50)); // Orange-red for attacker
+            tri.setOutlineColor(sf::Color::White);
+            tri.setOutlineThickness(1.5f);
+            window.draw(tri);
+        }
 
         // Label letter
         if (font != nullptr && m_cellSize >= 10.0f) {
@@ -752,6 +761,12 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 else if (k->code == sf::Keyboard::Key::Escape) {
                     window.close();
                     return SpawnConfig();
+                }
+                else if (k->code == sf::Keyboard::Key::A) {
+                    m_currentType = "attacker";
+                    m_zoneDrawMode = "";  
+                    m_zoneDragging = false;
+                    updateTitle(window);
                 }
             }
 

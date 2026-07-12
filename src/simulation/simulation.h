@@ -12,6 +12,7 @@
 #include "interceptorAgent.h"
 #include "spawnConfig.h"
 #include "simResult.h"
+#include "attackerAgent.h"
 
 /**
  * Simulation
@@ -53,6 +54,7 @@ private:
     std::vector<TargetAgent>      m_targets;
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
+    std::vector<AttackerAgent>     m_attackers;
 
     mutable std::mt19937 m_rng;
 
@@ -86,6 +88,8 @@ private:
 
     /** Build the final result struct from current agent state. */
     SimResult buildResult(int totalSteps) const;
+
+    void updateAttackerStates(int currentStep, const Pathfinding& pf);
 };
 
 #endif // SIMULATION_H

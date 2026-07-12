@@ -27,7 +27,8 @@ void printUsage(const char* progName) {
               << "  [ / ] keys   - Adjust noise level (wave/wind)\n"
               << "  C key        - Clear all units (zones preserved)\n"
               << "  Enter        - Save scenario and run simulation\n"
-              << "  Escape       - Close without saving\n";
+              << "  Escape       - Close without saving\n"
+              << "  A key        - Switch to Attacker mode (red triangle)\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -222,6 +223,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "attacker")    unitType = MapCreation::SEEKER;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 
