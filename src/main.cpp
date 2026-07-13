@@ -2,10 +2,12 @@
 #include "spawnConfig.h"
 #include "mapVisualizer.h"
 #include "simulation.h"
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <cstdlib>
+#include <limits>
 
 void printUsage(const char* progName) {
     std::cout << "Usage:\n"
@@ -160,7 +162,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Hand this scenario to the Python GA to optimise attacker positions.\n";
 
             // Create empty runs/ so downstream visualize.py doesn't crash
-            std::system("mkdir -p runs");
+            std::filesystem::create_directories("runs");
             return 0;
         }
 
@@ -193,7 +195,7 @@ int main(int argc, char* argv[]) {
 
         // Create runs/ directory
         std::string runsDir = "runs";
-        std::system(("mkdir -p " + runsDir).c_str());
+        std::filesystem::create_directories(runsDir);
 
         std::cout << "\n── Running " << numIterations << " iteration(s) ──\n";
         if (numIterations > 1) {
@@ -259,6 +261,10 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
+
+    std::cout << "\nPress Enter to exit and review logs...";
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cin.get();
 
     return 0;
 }

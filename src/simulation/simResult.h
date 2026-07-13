@@ -87,6 +87,34 @@ struct SimResult {
         std::vector<Intercept> intercepts;
     };
 
+    struct AttackerResult {
+        int id;
+        int row;
+        int col;
+        bool alive;
+        std::string state;
+        bool missionSuccess;
+        int stepsTaken;
+        double pathCost;
+        int nodesExpanded;
+        int targetId;
+        int killCount;
+
+        struct Sighting {
+            int seekerId;
+            int step;
+        };
+        std::vector<Sighting> sightings;
+
+        struct Intercept {
+            int seekerId;
+            int step;
+        };
+        std::vector<Intercept> intercepts;
+
+        std::vector<std::pair<int,int>> moveHistory;
+    };
+
     // ─── Run-level data ─────────────────────────────────────────────
 
     int totalSteps;
@@ -98,6 +126,7 @@ struct SimResult {
     std::vector<TargetResult>      targetResults;
     std::vector<DetectorResult>    detectorResults;
     std::vector<InterceptorResult> interceptorResults;
+    std::vector<AttackerResult>    attackerResults;
 
     // ─── Summary statistics (filled by computeSummary) ──────────────
 
@@ -105,6 +134,7 @@ struct SimResult {
     int seekersThatReached;
     int seekersDetected;     // ever tracked
     int seekersIntercepted;  // killed by an interceptor
+    int attackersAlive;
     double avgStepsToTarget;
 
     // ─── Methods ────────────────────────────────────────────────────

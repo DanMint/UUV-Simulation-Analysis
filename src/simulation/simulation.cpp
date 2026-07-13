@@ -29,12 +29,14 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
         }
         else if (unit.type == "attacker") {
             m_attackers.emplace_back(attackerId++, unit.row, unit.col);
+            m_attackers.back().agentType = "attacker";
         }
     }
 
     std::cout << "Simulation created: "
               << m_seekers.size()      << " seekers, "
               << m_targets.size()      << " targets, "
+              << m_attackers.size()    << " attackers, "
               << m_detectors.size()    << " detectors (r=" << detRadius << "), "
               << m_interceptors.size() << " interceptors (r=" << intRadius << "), "
               << "noise=" << m_maxNoiseLevel << ", "
@@ -119,25 +121,6 @@ void Simulation::updateDetectorTracks(int currentStep) {
                           << " at (" << seeker.row << "," << seeker.col << ")\n";
             }
         }
-        //Attacker detection phase
-        for (auto& attacker : m_attackers) {
-            if (!attacker.alive) continue;
-            if (!attacker.isInRange(seeker.row, seeker.col)) continue;
-
-            // Log this sighting unconditionally (analysis can de-dup later)
-            attacker.recordSighting(seeker.id, currentStep);
-
-            // First detection: mark seeker as tracked
-            if (!seeker.detected) {
-                seeker.detected = true;
-                seeker.firstDetectedAtStep = currentStep;
-                seeker.firstDetectedByDetector = attacker.id;
-                std::cout << "  Step " << currentStep
-                          << ": Attacker " << attacker.id
-                          << " acquired Seeker " << seeker.id
-                          << " at (" << seeker.row << "," << seeker.col << ")\n";
-            }
-        }
     }
 }
 
@@ -200,43 +183,6 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
             }
         }
         if(!seeker.alive) continue;  // dead seekers don't check other interceptors
-        for (auto& attacker : m_attackers) {
-            if (!attacker.alive) continue;
-            if (!attacker.isInRange(seeker.row, seeker.col)) continue;
-
-            double pKill = attacker.killProbability(seeker.row, seeker.col);
-            double r = roll(m_rng);
-
-            // For logging only
-            double dr = attacker.row - seeker.row;
-            double dc = attacker.col - seeker.col;
-            double dist = std::sqrt(dr * dr + dc * dc);
-            double ratio = (attacker.killRadius > 0.0)
-                ? dist / attacker.killRadius : 0.0;
-
-            if (r < pKill) {
-                std::cout << "  Step " << currentStep
-                          << ": Attacker " << attacker.id
-                          << " killed Seeker " << seeker.id
-                          << " at (" << seeker.row << "," << seeker.col << ")"
-                          << " [dist=" << std::fixed << std::setprecision(1)
-                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
-
-                seeker.alive = false;
-                seeker.intercepted = true;
-                seeker.interceptedByInterceptor = attacker.id;
-                seeker.interceptedAtStep = currentStep;
-
-                attacker.recordIntercept(seeker.id, currentStep);
-                break;  // seeker is dead, stop checking other attackers
-            } else {
-                std::cout << "  Step " << currentStep
-                          << ": Attacker " << attacker.id
-                          << " missed Seeker " << seeker.id
-                          << " [dist=" << std::fixed << std::setprecision(1)
-                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
-            }
-        }
     }
 }
 
@@ -275,7 +221,7 @@ bool Simulation::applyNoise(SeekerAgent& seeker) {
         while (r != r1 || c != c1) {
             int e2 = 2 * err;
             if (e2 > -dr) { err -= dr; c += sc; }
-            if (e2 <  dc) { err += dc; r += sr; }
+            if (e2 < dc) { err += dc; r += sr; }
 
             if (!m_map.isValid(r, c) || !m_map.isPassable(r, c)) {
                 return false;
@@ -287,15 +233,10 @@ bool Simulation::applyNoise(SeekerAgent& seeker) {
     seeker.col = newCol;
     seeker.moveHistory.push_back({newRow, newCol});
 
-    // Invalidate path — must be recomputed from new position
     seeker.path.clear();
     seeker.pathIndex = 0;
     return true;
 }
-
-// ════════════════════════════════════════════════════════════════════════════════
-//  ASSIGN TARGETS  (unchanged)
-// ════════════════════════════════════════════════════════════════════════════════
 
 void Simulation::assignTargets(const Pathfinding& pf) {
     for (auto& seeker : m_seekers) {
@@ -392,8 +333,78 @@ SimResult Simulation::buildResult(int totalSteps) const {
         result.interceptorResults.push_back(ir);
     }
 
+    // ── Attackers (new) ──
+    for (const auto& a : m_attackers) {
+        SimResult::AttackerResult ar;
+        ar.id = a.id;
+        ar.row = a.row;
+        ar.col = a.col;
+        ar.alive = a.alive;
+        ar.state = a.stateName();
+        ar.missionSuccess = a.missionSuccess;
+        ar.stepsTaken = a.stepsTaken;
+        ar.pathCost = a.pathCost;
+        ar.nodesExpanded = a.nodesExpanded;
+        ar.targetId = a.targetId;
+        ar.killCount = a.killCount;
+        for (const auto& s : a.sightings) {
+            ar.sightings.push_back({s.seekerId, s.step});
+        }
+        for (const auto& ic : a.intercepts) {
+            ar.intercepts.push_back({ic.seekerId, ic.step});
+        }
+        ar.moveHistory = a.moveHistory;
+        result.attackerResults.push_back(ar);
+    }
+
     result.computeSummary();
     return result;
+}
+
+void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
+    for (auto& attacker : m_attackers) {
+        if (!attacker.alive) continue;
+
+        // Retarget if the current target died.
+        if (attacker.targetId >= 0 &&
+            attacker.targetId < static_cast<int>(m_targets.size()) &&
+            !m_targets[attacker.targetId].alive) {
+            attacker.targetId = -1;
+            attacker.path.clear();
+            attacker.pathIndex = 0;
+            attacker.fsmState = AgentFSMState::S0_IDLE;
+            attacker.milestone25 = attacker.milestone50 = attacker.milestone75 = false;
+        }
+
+        // Find the nearest alive target.
+        int bestTarget = -1;
+        double bestDist = std::numeric_limits<double>::max();
+        for (int i = 0; i < static_cast<int>(m_targets.size()); i++) {
+            if (!m_targets[i].alive) continue;
+            double dr = attacker.row - m_targets[i].row;
+            double dc = attacker.col - m_targets[i].col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestTarget = i;
+            }
+        }
+        if (bestTarget < 0) continue;
+
+        attacker.targetId = m_targets[bestTarget].id;
+        attacker.setMissionTarget(m_targets[bestTarget].row,
+                                  m_targets[bestTarget].col);
+        std::cout << "  Step " << currentStep
+                  << ": Attacker " << attacker.id
+                  << " assigned Target " << m_targets[bestTarget].id
+                  << " at (" << m_targets[bestTarget].row
+                  << "," << m_targets[bestTarget].col << ")\n";
+        std::cout << "    state before tick: " << attacker.stateName()
+                  << " pos=(" << attacker.row << "," << attacker.col << ")\n";
+        attacker.tick(pf);
+        std::cout << "    state after tick : " << attacker.stateName()
+                  << " pos=(" << attacker.row << "," << attacker.col << ")\n";
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -419,11 +430,9 @@ SimResult Simulation::run() {
             seeker.moveStep();
         }
 
-        // ── 1b. Move attackers ──
-        for (auto& attacker : m_attackers) {
-            if (!attacker.alive) continue;
-            attacker.moveStepWithSpeed();
-        }
+        // ── 1b. Move attackers / execute attacker FSMs ──
+        updateAttackerStates(step, pf);
+
         // ── 2. Noise ──
         if (m_maxNoiseLevel > 0.0) {
             for (auto& seeker : m_seekers) applyNoise(seeker);
@@ -446,6 +455,21 @@ SimResult Simulation::run() {
                               << " at (" << target.row << "," << target.col << ")\n";
                     target.alive = false;
                     seeker.reachedTarget = true;
+                    break;
+                }
+            }
+        }
+
+        for (auto& attacker : m_attackers) {
+            if (!attacker.alive || attacker.reachedTarget) continue;
+            for (auto& target : m_targets) {
+                if (!target.alive) continue;
+                if (attacker.row == target.row && attacker.col == target.col) {
+                    std::cout << "  Step " << step << ": Attacker " << attacker.id
+                              << " reached Target " << target.id
+                              << " at (" << target.row << "," << target.col << ")\n";
+                    target.alive = false;
+                    attacker.reachedTarget = true;
                     break;
                 }
             }

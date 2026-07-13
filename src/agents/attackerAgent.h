@@ -129,6 +129,8 @@ struct AttackerAgent : public SeekerAgent {
      * Returns true while the agent is still active (not S9/ABORT).
      */
     bool tick(int destRow, int destCol, const class Pathfinding& pf);
+    bool tick(const class Pathfinding& pf);
+    void setMissionTarget(int destRow, int destCol);
 
     /**
      * Standalone FSM demo — runs the full lifecycle and prints every state

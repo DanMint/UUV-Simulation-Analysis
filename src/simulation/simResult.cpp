@@ -25,6 +25,11 @@ void SimResult::computeSummary() {
     avgStepsToTarget = (seekersThatReached > 0)
         ? totalStepsReached / seekersThatReached
         : 0.0;
+
+    attackersAlive = 0;
+    for (const auto& a : attackerResults) {
+        if (a.alive) attackersAlive++;
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -43,6 +48,8 @@ void SimResult::print() const {
               << " / " << seekerResults.size() << std::endl;
     std::cout << "  Seekers intercepted: " << seekersIntercepted
               << " / " << seekerResults.size() << std::endl;
+    std::cout << "  Attackers active:    " << attackersAlive
+              << " / " << attackerResults.size() << std::endl;
     std::cout << "  Avg steps to target: " << avgStepsToTarget << std::endl;
 
     std::cout << "\n  Seekers:" << std::endl;
@@ -110,6 +117,37 @@ void SimResult::print() const {
         }
     }
 
+    if (!attackerResults.empty()) {
+        std::cout << "\n  Attackers:" << std::endl;
+        for (const auto& a : attackerResults) {
+            std::cout << "    Attacker " << a.id
+                      << " at (" << a.row << "," << a.col << ")"
+                      << " state=" << a.state
+                      << " alive=" << (a.alive ? "yes" : "no")
+                      << " target=" << a.targetId
+                      << " steps=" << a.stepsTaken
+                      << " kills=" << a.killCount;
+            if (a.missionSuccess) std::cout << " -> mission success";
+            std::cout << std::endl;
+            if (!a.sightings.empty()) {
+                std::cout << "      sightings:";
+                for (const auto& s : a.sightings) {
+                    std::cout << " seeker " << s.seekerId
+                              << " @" << s.step;
+                }
+                std::cout << std::endl;
+            }
+            if (!a.intercepts.empty()) {
+                std::cout << "      intercepts:";
+                for (const auto& it : a.intercepts) {
+                    std::cout << " seeker " << it.seekerId
+                              << " @" << it.step;
+                }
+                std::cout << std::endl;
+            }
+        }
+    }
+
     std::cout << "=========================\n" << std::endl;
 }
 
@@ -139,6 +177,8 @@ void SimResult::saveJSON(const std::string& filepath) const {
     file << "    \"total_seekers\": " << seekerResults.size() << ",\n";
     file << "    \"total_detectors\": " << detectorResults.size() << ",\n";
     file << "    \"total_interceptors\": " << interceptorResults.size() << ",\n";
+    file << "    \"total_attackers\": " << attackerResults.size() << ",\n";
+    file << "    \"attackers_alive\": " << attackersAlive << ",\n";
     file << "    \"avg_steps_to_target\": " << avgStepsToTarget << "\n";
     file << "  },\n";
 
@@ -250,6 +290,56 @@ void SimResult::saveJSON(const std::string& filepath) const {
 
         file << "    }";
         if (i < (int)interceptorResults.size() - 1) file << ",";
+        file << "\n";
+    }
+    file << "  ],\n";
+
+    // ── Attackers ──
+    file << "  \"attackers\": [\n";
+    for (int i = 0; i < (int)attackerResults.size(); i++) {
+        const auto& a = attackerResults[i];
+        file << "    {\n";
+        file << "      \"id\": " << a.id << ",\n";
+        file << "      \"row\": " << a.row << ",\n";
+        file << "      \"col\": " << a.col << ",\n";
+        file << "      \"alive\": " << (a.alive ? "true" : "false") << ",\n";
+        file << "      \"state\": \"" << a.state << "\",\n";
+        file << "      \"mission_success\": " << (a.missionSuccess ? "true" : "false") << ",\n";
+        file << "      \"steps_taken\": " << a.stepsTaken << ",\n";
+        file << "      \"path_cost\": " << a.pathCost << ",\n";
+        file << "      \"nodes_expanded\": " << a.nodesExpanded << ",\n";
+        file << "      \"target_id\": " << a.targetId << ",\n";
+        file << "      \"kill_count\": " << a.killCount << ",\n";
+
+        file << "      \"sightings\": [\n";
+        for (int j = 0; j < (int)a.sightings.size(); j++) {
+            file << "        { \"seeker_id\": " << a.sightings[j].seekerId
+                 << ", \"step\": " << a.sightings[j].step << " }";
+            if (j < (int)a.sightings.size() - 1) file << ",";
+            file << "\n";
+        }
+        file << "      ],\n";
+
+        file << "      \"intercepts\": [\n";
+        for (int j = 0; j < (int)a.intercepts.size(); j++) {
+            file << "        { \"seeker_id\": " << a.intercepts[j].seekerId
+                 << ", \"step\": " << a.intercepts[j].step << " }";
+            if (j < (int)a.intercepts.size() - 1) file << ",";
+            file << "\n";
+        }
+        file << "      ],\n";
+
+        file << "      \"move_history\": [\n";
+        for (int j = 0; j < (int)a.moveHistory.size(); j++) {
+            file << "        [" << a.moveHistory[j].first
+                 << ", " << a.moveHistory[j].second << "]";
+            if (j < (int)a.moveHistory.size() - 1) file << ",";
+            file << "\n";
+        }
+        file << "      ]\n";
+
+        file << "    }";
+        if (i < (int)attackerResults.size() - 1) file << ",";
         file << "\n";
     }
     file << "  ]\n";

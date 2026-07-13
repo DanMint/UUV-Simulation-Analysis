@@ -162,6 +162,9 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
     switch (fsmState) {
 
         case AgentFSMState::S0_IDLE:
+            std::cout << "[" << agentType << " id=" << id
+                      << "] S0 -> S1: waking up and accepting mission"
+                      << "\n";
             enterS1(destRow, destCol);
             [[fallthrough]];
 
@@ -236,6 +239,20 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
     return true;
 }
 
+bool AttackerAgent::tick(const Pathfinding& pf) {
+    if (_destRow < 0 || _destCol < 0) {
+        std::cout << "[" << agentType << " id=" << id
+                  << "] WARNING: tick(pf) called without a mission target\n";
+        return false;
+    }
+    return tick(_destRow, _destCol, pf);
+}
+
+void AttackerAgent::setMissionTarget(int destRow, int destCol) {
+    _destRow = destRow;
+    _destCol = destCol;
+}
+
 // ── FSM state implementations ─────────────────────────────────────────────────
 
 void AttackerAgent::enterS1(int destRow, int destCol) {
@@ -264,6 +281,10 @@ void AttackerAgent::enterS3(int destRow, int destCol, const Pathfinding& pf) {
               << "-$" << unitCostMax << "\n";
 
     computePath(pf, destRow, destCol);
+    std::cout << "[" << agentType << " id=" << id
+              << "] path length=" << path.size()
+              << ", path cost=" << pathCost
+              << ", nodes expanded=" << nodesExpanded << "\n";
 
     if (!hasPath()) {
         triggerFallback("no valid A* path to target");
@@ -361,7 +382,17 @@ bool AttackerAgent::moveStepWithSpeed() {
     stepDelayCounter++;
     if (stepDelayCounter < stepDelay) return false;
     stepDelayCounter = 0;
-    return moveStep();
+    bool moved = moveStep();
+    if (moved) {
+        std::cout << "[" << agentType << " id=" << id
+                  << "] moved to (" << row << "," << col << ")"
+                  << " step=" << stepsTaken << "\n";
+    } else {
+        std::cout << "[" << agentType << " id=" << id
+                  << "] waiting or no path available (pathIndex=" << pathIndex
+                  << ", pathSize=" << path.size() << ")\n";
+    }
+    return moved;
 }
 
 bool AttackerAgent::isInRange(int checkRow, int checkCol) const {
