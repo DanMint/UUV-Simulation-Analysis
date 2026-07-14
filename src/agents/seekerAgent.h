@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "pathfinding.h"
+#include "vehicleSpecs.h"
 
 /**
  * SeekerAgent
@@ -31,6 +32,9 @@ struct SeekerAgent {
     bool alive;
     bool reachedTarget;
 
+    // Vehicle specs (optional — seekers can have vehicle types too)
+    VehicleSpecs specs;
+
     // A* path
     std::vector<Pathfinding::Pos> path;
     int pathIndex;
@@ -57,6 +61,13 @@ struct SeekerAgent {
     int interceptedAtStep;          // step of the kill (-1)
 
     SeekerAgent(int id, int row, int col);
+
+    /**
+     * Create a fully configured SeekerAgent for the given vehicle type.
+     * Vehicle types include UUVs (bluerov2, riptide, etc.) and UAVs (tb2, etc.).
+     * If type is invalid, defaults to "bluerov2".
+     */
+    static SeekerAgent create(const std::string& type, int id, int row, int col);
 
     /** Compute A* path to a target. Updates path, pathCost, nodesExpanded. */
     void computePath(const Pathfinding& pf, int destRow, int destCol);

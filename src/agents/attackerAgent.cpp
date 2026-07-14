@@ -1,5 +1,7 @@
 #include "attackerAgent.h"
 #include "pathfinding.h"
+#include "vehicleSpecs.h"
+#include <stdexcept>
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
@@ -11,15 +13,11 @@
 
 AttackerAgent::AttackerAgent(int id, int row, int col)
     : SeekerAgent(id, row, col),
-      agentType("unknown"), manufacturer("unknown"),
-      speedKnotsMin(0.f), speedKnotsMax(0.f),
-      emissionFreqLowHz(0), emissionFreqHighHz(0),
-      shallowWaterCapable(false), isAerial(false), isSurfaceVessel(false),
-      unitCostMin(0.f), unitCostMax(0.f),
+      specs(getVehicleSpecs("bluerov2")),  // default specs, will be overridden by factory
       sensingRadius(5.0), sightingCount(0),
       killRadius(3.0), killCount(0),
       fsmState(AgentFSMState::S0_IDLE), fallbackReason(""),
-      stepDelay(1), stepDelayCounter(0),
+      stepDelayCounter(0),
       missionSuccess(false), stepsToTarget(0),
       milestone25(false), milestone50(false), milestone75(false)
 {
@@ -29,100 +27,15 @@ AttackerAgent::AttackerAgent(int id, int row, int col)
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 AttackerAgent AttackerAgent::create(const std::string& type, int id, int row, int col) {
-    std::string t = type;
-    std::transform(t.begin(), t.end(), t.begin(), ::tolower);
-
     AttackerAgent a(id, row, col);
-    a.agentType = t;
-
-    // UUVs
-    if (t == "bluerov2") {
-        a.manufacturer = "Blue Robotics";
-        a.speedKnotsMin = 1.f;  a.speedKnotsMax = 3.f;
-        a.emissionFreqLowHz = 300000; a.emissionFreqHighHz = 450000;
-        a.shallowWaterCapable = true;
-        a.isAerial = false; a.isSurfaceVessel = false;
-        a.unitCostMin = 6000.f; a.unitCostMax = 6000.f;
-        a.stepDelay = 3;
+    
+    try {
+        a.specs = getVehicleSpecs(type);
+    } catch (const std::invalid_argument& e) {
+        std::cout << "[AttackerAgent] WARNING: " << e.what() << " — using bluerov2 defaults\n";
+        a.specs = getVehicleSpecs("bluerov2");
     }
-    else if (t == "riptide") {
-        a.manufacturer = "BAE Systems / Riptide";
-        a.speedKnotsMin = 2.f;  a.speedKnotsMax = 5.f;
-        a.emissionFreqLowHz = 200000; a.emissionFreqHighHz = 400000;
-        a.shallowWaterCapable = true;
-        a.isAerial = false; a.isSurfaceVessel = false;
-        a.unitCostMin = 15000.f; a.unitCostMax = 45000.f;
-        a.stepDelay = 2;
-    }
-    else if (t == "blueboat") {
-        a.manufacturer = "Blue Robotics";
-        a.speedKnotsMin = 2.f;  a.speedKnotsMax = 6.f;
-        a.emissionFreqLowHz = 450000; a.emissionFreqHighHz = 650000;
-        a.shallowWaterCapable = true;
-        a.isAerial = false; a.isSurfaceVessel = true;
-        a.unitCostMin = 5000.f; a.unitCostMax = 5000.f;
-        a.stepDelay = 2;
-    }
-    else if (t == "yuco") {
-        a.manufacturer = "Seaber";
-        a.speedKnotsMin = 2.f;  a.speedKnotsMax = 6.f;
-        a.emissionFreqLowHz = 300000; a.emissionFreqHighHz = 600000;
-        a.shallowWaterCapable = true;
-        a.isAerial = false; a.isSurfaceVessel = false;
-        a.unitCostMin = 50000.f; a.unitCostMax = 100000.f;
-        a.stepDelay = 2;
-    }
-    else if (t == "nemosens") {
-        a.manufacturer = "RTSYS";
-        a.speedKnotsMin = 2.f;  a.speedKnotsMax = 4.f;
-        a.emissionFreqLowHz = 200000; a.emissionFreqHighHz = 500000;
-        a.shallowWaterCapable = true;
-        a.isAerial = false; a.isSurfaceVessel = false;
-        a.unitCostMin = 60000.f; a.unitCostMax = 115000.f;
-        a.stepDelay = 2;
-    }
-    else if (t == "hugin") {
-        a.manufacturer = "Kongsberg";
-        a.speedKnotsMin = 2.f;  a.speedKnotsMax = 5.f;
-        a.emissionFreqLowHz = 200000; a.emissionFreqHighHz = 400000;
-        a.shallowWaterCapable = true;
-        a.isAerial = false; a.isSurfaceVessel = false;
-        a.unitCostMin = 2000000.f; a.unitCostMax = 4000000.f;
-        a.stepDelay = 2;
-    }
-    // UAVs
-    else if (t == "tb2") {
-        a.manufacturer = "Baykar Technologies";
-        a.speedKnotsMin = 90.f; a.speedKnotsMax = 110.f;
-        a.emissionFreqLowHz = 0; a.emissionFreqHighHz = 0;
-        a.shallowWaterCapable = false;
-        a.isAerial = true; a.isSurfaceVessel = false;
-        a.unitCostMin = 2000000.f; a.unitCostMax = 5000000.f;
-        a.stepDelay = 1;
-    }
-    else if (t == "queenhornet") {
-        a.manufacturer = "Wild Hornets";
-        a.speedKnotsMin = 38.f; a.speedKnotsMax = 43.f;
-        a.emissionFreqLowHz = 0; a.emissionFreqHighHz = 0;
-        a.shallowWaterCapable = false;
-        a.isAerial = true; a.isSurfaceVessel = false;
-        a.unitCostMin = 1000.f; a.unitCostMax = 5000.f;
-        a.stepDelay = 1;
-    }
-    else if (t == "shahed") {
-        a.manufacturer = "HESA (Iran)";
-        a.speedKnotsMin = 90.f; a.speedKnotsMax = 100.f;
-        a.emissionFreqLowHz = 0; a.emissionFreqHighHz = 0;
-        a.shallowWaterCapable = false;
-        a.isAerial = true; a.isSurfaceVessel = false;
-        a.unitCostMin = 20000.f; a.unitCostMax = 50000.f;
-        a.stepDelay = 1;
-    }
-    else {
-        std::cout << "[AttackerAgent] WARNING: unknown type '" << type
-                  << "' — default specs applied\n";
-    }
-
+    
     return a;
 }
 
@@ -152,7 +65,7 @@ void AttackerAgent::triggerFallback(const std::string& reason) {
     fsmState       = AgentFSMState::FALLBACK;
     fallbackReason = reason;
     alive          = false;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] FALLBACK: " << reason << "\n";
 }
 
@@ -162,7 +75,7 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
     switch (fsmState) {
 
         case AgentFSMState::S0_IDLE:
-            std::cout << "[" << agentType << " id=" << id
+            std::cout << "[" << specs.agentType << " id=" << id
                       << "] S0 -> S1: waking up and accepting mission"
                       << "\n";
             enterS1(destRow, destCol);
@@ -179,12 +92,12 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
                 return true;
             }
             // log aerial detectability note
-            if (isAerial) {
-                std::cout << "[" << agentType << " id=" << id
+            if (specs.isAerial) {
+                std::cout << "[" << specs.agentType << " id=" << id
                           << "] S2: VALIDATE — aerial agent, hydrophone detection N/A\n";
             } else {
-                std::cout << "[" << agentType << " id=" << id
-                          << "] S2: VALIDATE — emission " << emissionFreqLowHz
+                std::cout << "[" << specs.agentType << " id=" << id
+                          f<< "] S2: VALIDATE — emission " << emissionFreqLowHz
                           << "-" << emissionFreqHighHz << " Hz, detectable by hydrophone\n";
             }
             enterS3(destRow, destCol, pf);
@@ -193,7 +106,7 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
 
         case AgentFSMState::S3_INIT_BEHAVIOR:
             fsmState = AgentFSMState::S4_EXECUTE;
-            std::cout << "[" << agentType << " id=" << id
+            std::cout << "[" << specs.agentType << " id=" << id
                       << "] S4: EXECUTE — mission underway\n";
             break;
 
@@ -241,7 +154,7 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
 
 bool AttackerAgent::tick(const Pathfinding& pf) {
     if (_destRow < 0 || _destCol < 0) {
-        std::cout << "[" << agentType << " id=" << id
+        std::cout << "[" << specs.agentType << " id=" << id
                   << "] WARNING: tick(pf) called without a mission target\n";
         return false;
     }
@@ -259,29 +172,29 @@ void AttackerAgent::enterS1(int destRow, int destCol) {
     _destRow = destRow;
     _destCol = destCol;
     fsmState = AgentFSMState::S1_RECEIVE_MISSION;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S1: RECEIVE_MISSION — target=("
               << destRow << "," << destCol << ")\n";
 }
 
 void AttackerAgent::enterS2(int destRow, int destCol) {
     fsmState = AgentFSMState::S2_VALIDATE;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S2: VALIDATE — checking entry point and target\n";
 }
 
 void AttackerAgent::enterS3(int destRow, int destCol, const Pathfinding& pf) {
     fsmState = AgentFSMState::S3_INIT_BEHAVIOR;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S3: INIT_BEHAVIOR"
-              << " — speed=" << speedKnotsMin << "-" << speedKnotsMax << " kn"
-              << ", stepDelay=" << stepDelay
-              << ", shallow=" << (shallowWaterCapable ? "yes" : "no")
-              << ", cost=$" << std::fixed << std::setprecision(0) << unitCostMin
-              << "-$" << unitCostMax << "\n";
+              << " — speed=" << specs.speedKnotsMin << "-" << specs.speedKnotsMax << " kn"
+              << ", stepDelay=" << specs.stepDelay
+              << ", shallow=" << (specs.shallowWaterCapable ? "yes" : "no")
+              << ", cost=$" << std::fixed << std::setprecision(0) << specs.unitCostMin
+              << "-$" << specs.unitCostMax << "\n";
 
     computePath(pf, destRow, destCol);
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] path length=" << path.size()
               << ", path cost=" << pathCost
               << ", nodes expanded=" << nodesExpanded << "\n";
@@ -301,17 +214,17 @@ bool AttackerAgent::runS4() {
                       : 1.f;
 
         if (!milestone25 && done >= 0.25f) {
-            std::cout << "[" << agentType << " id=" << id
+            std::cout << "[" << specs.agentType << " id=" << id
                       << "] S4: 25% of mission complete\n";
             milestone25 = true;
         }
         if (!milestone50 && done >= 0.50f) {
-            std::cout << "[" << agentType << " id=" << id
+            std::cout << "[" << specs.agentType << " id=" << id
                       << "] S4: 50% of mission complete\n";
             milestone50 = true;
         }
         if (!milestone75 && done >= 0.75f) {
-            std::cout << "[" << agentType << " id=" << id
+            std::cout << "[" << specs.agentType << " id=" << id
                       << "] S4: 75% of mission complete\n";
             milestone75 = true;
         }
@@ -321,7 +234,7 @@ bool AttackerAgent::runS4() {
 
 void AttackerAgent::enterS5() {
     fsmState = AgentFSMState::S5_LOG_RESULT;
-    std::cout << "[" << agentType << " id=" << id << "] S5: LOG_RESULT\n";
+    std::cout << "[" << specs.agentType << " id=" << id << "] S5: LOG_RESULT\n";
     std::cout << "    outcome   : "
               << (missionSuccess ? "TARGET REACHED" : "MISSION FAILED") << "\n";
     std::cout << "    steps     : " << stepsToTarget << "\n";
@@ -336,7 +249,7 @@ void AttackerAgent::enterS5() {
 
 void AttackerAgent::enterS6() {
     fsmState = AgentFSMState::S6_UPDATE_SHARED;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S6: UPDATE_SHARED — pushing to GA optimizer\n";
     std::cout << "    P(detected)    = " << (detected ? "1.0" : "0.0") << "\n";
     std::cout << "    P(intercepted) = " << (intercepted ? "1.0" : "0.0") << "\n";
@@ -348,13 +261,13 @@ void AttackerAgent::enterS6() {
 void AttackerAgent::enterS7() {
     fsmState = AgentFSMState::S7_DEACTIVATE;
     alive    = false;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S7: DEACTIVATE — agent dimmed on map\n";
 }
 
 void AttackerAgent::enterS8() {
     fsmState = AgentFSMState::S8_COMPLETE;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S8: COMPLETE — result recorded\n";
 }
 
@@ -364,14 +277,14 @@ void AttackerAgent::enterS9() {
     missionSuccess   = false;
     stepsToTarget    = 0;
     milestone25 = milestone50 = milestone75 = false;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] S9: RESET — ready for next GA scenario\n";
 }
 
 void AttackerAgent::enterAbort() {
     fsmState = AgentFSMState::ABORT;
     alive    = false;
-    std::cout << "[" << agentType << " id=" << id
+    std::cout << "[" << specs.agentType << " id=" << id
               << "] ABORT — agent removed from simulation\n";
 }
 
@@ -380,15 +293,15 @@ void AttackerAgent::enterAbort() {
 
 bool AttackerAgent::moveStepWithSpeed() {
     stepDelayCounter++;
-    if (stepDelayCounter < stepDelay) return false;
+    if (stepDelayCounter < specs.stepDelay) return false;
     stepDelayCounter = 0;
     bool moved = moveStep();
     if (moved) {
-        std::cout << "[" << agentType << " id=" << id
+        std::cout << "[" << specs.agentType << " id=" << id
                   << "] moved to (" << row << "," << col << ")"
                   << " step=" << stepsTaken << "\n";
     } else {
-        std::cout << "[" << agentType << " id=" << id
+        std::cout << "[" << specs.agentType << " id=" << id
                   << "] waiting or no path available (pathIndex=" << pathIndex
                   << ", pathSize=" << path.size() << ")\n";
     }
@@ -426,8 +339,8 @@ void AttackerAgent::recordIntercept(int seekerId, int step) {
 // ── isDetectableByHydrophone ──────────────────────────────────────────────────
 
 bool AttackerAgent::isDetectableByHydrophone() const {
-    if (isAerial)        return false;
-    if (isSurfaceVessel) return false;
+    if (specs.isAerial)        return false;
+    if (specs.isSurfaceVessel) return false;
     return true;
 }
 
@@ -435,20 +348,20 @@ bool AttackerAgent::isDetectableByHydrophone() const {
 
 bool AttackerAgent::isInFrequencyRange(int detectorLowHz, int detectorHighHz) const {
     if (!isDetectableByHydrophone()) return false;
-    return emissionFreqLowHz  <= detectorHighHz &&
-           emissionFreqHighHz >= detectorLowHz;
+    return specs.emissionFreqLowHz  <= detectorHighHz &&
+           specs.emissionFreqHighHz >= detectorLowHz;
 }
 
 // ── summary ───────────────────────────────────────────────────────────────────
 
 std::string AttackerAgent::summary() const {
     std::ostringstream ss;
-    ss << "[" << agentType << " id=" << id << "]"
+    ss << "[" << specs.agentType << " id=" << id << "]"
        << " state=" << stateName()
        << " pos=(" << row << "," << col << ")"
        << " alive=" << (alive ? "yes" : "no")
        << " detected=" << (detected ? "yes" : "no")
        << " steps=" << stepsTaken
-       << " cost=$" << std::fixed << std::setprecision(0) << unitCostMin;
+       << " cost=$" << std::fixed << std::setprecision(0) << specs.unitCostMin;
     return ss.str();
 }

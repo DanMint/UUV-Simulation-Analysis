@@ -2,6 +2,7 @@
 #define ATTACKER_AGENT_H
 
 #include "seekerAgent.h"
+#include "vehicleSpecs.h"
 #include <string>
 #include <vector>
 
@@ -61,20 +62,8 @@ enum class AgentFSMState {
 
 struct AttackerAgent : public SeekerAgent {
 
-    // ── Platform metadata ─────────────────────────────────────────────────────
-    std::string agentType;        // e.g. "bluerov2", "hugin", "tb2"
-    std::string manufacturer;     // e.g. "Blue Robotics", "Kongsberg"
-
-    // ── Real-world specs ──────────────────────────────────────────────────────
-    float speedKnotsMin;          // minimum speed in knots
-    float speedKnotsMax;          // maximum speed in knots
-    int   emissionFreqLowHz;      // lower bound of acoustic emission (Hz)
-    int   emissionFreqHighHz;     // upper bound of acoustic emission (Hz)
-    bool  shallowWaterCapable;    // can operate in shallow/harbor water?
-    bool  isAerial;               // true = UAV, not detectable by hydrophone
-    bool  isSurfaceVessel;        // true = USV (BlueBoat)
-    float unitCostMin;            // estimated unit cost lower bound (USD)
-    float unitCostMax;            // estimated unit cost upper bound (USD)
+    // ── Vehicle Specs (shared data-driven approach) ──────────────────────────
+    VehicleSpecs specs;
 
     // ── Detection / Engagement ─────────────────────────────────────────────────
     double sensingRadius;         // detection range for attacker sensors
@@ -98,7 +87,6 @@ struct AttackerAgent : public SeekerAgent {
     std::string   fallbackReason; // set when FSM enters FALLBACK
 
     // ── Movement ──────────────────────────────────────────────────────────────
-    int stepDelay;                // steps between each grid cell move (speed sim)
     int stepDelayCounter;         // internal counter
 
     // ── Mission result ────────────────────────────────────────────────────────

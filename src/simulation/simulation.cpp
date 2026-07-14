@@ -19,7 +19,11 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
 
     for (const auto& unit : config.getUnits()) {
         if (unit.type == "seeker") {
-            m_seekers.emplace_back(seekerId++, unit.row, unit.col);
+            if (!unit.vehicleType.empty()) {
+                m_seekers.push_back(SeekerAgent::create(unit.vehicleType, seekerId++, unit.row, unit.col));
+            } else {
+                m_seekers.emplace_back(seekerId++, unit.row, unit.col);
+            }
         } else if (unit.type == "target") {
             m_targets.emplace_back(targetId++, unit.row, unit.col);
         } else if (unit.type == "detector") {
@@ -28,8 +32,11 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
             m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
         }
         else if (unit.type == "attacker") {
-            m_attackers.emplace_back(attackerId++, unit.row, unit.col);
-            m_attackers.back().agentType = "attacker";
+            if (!unit.vehicleType.empty()) {
+                m_attackers.push_back(AttackerAgent::create(unit.vehicleType, attackerId++, unit.row, unit.col));
+            } else {
+                m_attackers.push_back(AttackerAgent::create("bluerov2", attackerId++, unit.row, unit.col));
+            }
         }
     }
 

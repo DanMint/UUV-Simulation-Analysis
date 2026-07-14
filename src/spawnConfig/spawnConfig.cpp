@@ -7,7 +7,14 @@
 bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
     for (const auto& u : m_units)
         if (u.row == row && u.col == col) return false;
-    m_units.push_back({type, row, col});
+    m_units.push_back({type, row, col, ""});  // empty vehicleType by default
+    return true;
+}
+
+bool SpawnConfig::addUnit(const std::string& type, int row, int col, const std::string& vehicleType) {
+    for (const auto& u : m_units)
+        if (u.row == row && u.col == col) return false;
+    m_units.push_back({type, row, col, vehicleType});
     return true;
 }
 
@@ -405,7 +412,20 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             size_t colPos = content.find("\"col\"", rowPos);
             int col = static_cast<int>(extractNumber(content, "col", rowPos));
 
-            config.addUnit(type, row, col);
+            // Optional vehicleType field
+            std::string vehicleType = "";
+            size_t vPos = content.find("\"vehicle_type\"", colPos);
+            if (vPos != std::string::npos && vPos < content.find(",", colPos) + 50) {
+                size_t vStart = content.find("\"", content.find(":", vPos) + 1) + 1;
+                size_t vEnd   = content.find("\"", vStart);
+                vehicleType = content.substr(vStart, vEnd - vStart);
+            }
+
+            if (!vehicleType.empty()) {
+                config.addUnit(type, row, col, vehicleType);
+            } else {
+                config.addUnit(type, row, col);
+            }
             pos = colPos + 1;
         }
     }
