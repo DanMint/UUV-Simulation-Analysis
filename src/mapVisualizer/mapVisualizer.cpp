@@ -612,6 +612,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         std::cout << "Detector placement disabled in GA prep mode.\n";
                     } else {
                         m_currentType = "detector";
+                        m_currentTierIndex = 0;  // reset to default tier when switching to detector
                         m_zoneDrawMode = "";  m_zoneDragging = false;
                         updateTitle(window);
                     }
@@ -693,7 +694,21 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     m_config.clear();
                     updateTitle(window);
                 }
-
+                //--- Up/Down arrow keys -- cycle current drone tier (worse/cheap - better/expensive)__
+                else if (k->code ==sf::Keyboard ::Key::Up) {
+                    if (m_currentTierIndex < (int)m_droneTiers.size() -1 ) {
+                        m_currentTierIndex++;
+                    }
+                    std::cout <<"Drone tier" << m_droneTiers[m_currentTierIndex] << "\n";
+                    updateTitle(window);    
+                    }
+                else if (k->code ==sf::Keyboard ::Key::Down) {
+                    if (m_currentTierIndex > 0) {
+                        m_currentTierIndex--;
+                    }
+                    std::cout <<"Drone tier" << m_droneTiers[m_currentTierIndex] << "\n";
+                    updateTitle(window);
+                }
                 // ── Detector sensing radius  + / - ────────────────────────────
                 else if (k->code == sf::Keyboard::Key::Equal ||
                          k->code == sf::Keyboard::Key::Add) {
@@ -799,6 +814,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     } else {
                         // Place unit (existing behaviour)
                         if (m_map.isWater(clickRow, clickCol)) {
+                            const std:: string& droneType = m_droneTiers[m_currentTierIndex];
                             if (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
                                 m_config.removeUnit(clickRow, clickCol);
                                 m_config.addUnit(m_currentType, clickRow, clickCol);

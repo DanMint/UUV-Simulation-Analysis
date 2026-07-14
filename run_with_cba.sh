@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export HF_TOKEN=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
+
 
 echo 
 rm -rf output/

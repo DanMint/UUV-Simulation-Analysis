@@ -26,6 +26,7 @@ struct SimResult {
 
     struct SeekerResult {
         int id;
+        std::string droneType; // e.g. "705 Institute", "HSU-001"
         int stepsTaken;
         double pathCost;
         int nodesExpanded;
@@ -75,6 +76,7 @@ struct SimResult {
 
     struct InterceptorResult {
         int id;
+        std::string droneType; // e.g. "705 Institute", "HSU-001"
         int row;
         int col;
         double killRadius;

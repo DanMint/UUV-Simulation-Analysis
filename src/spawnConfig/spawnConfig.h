@@ -49,6 +49,7 @@ struct SpawnZone {
  */
 struct UnitSpawn {
     std::string type;
+    std::string droneType; // e.g. "705 Institute", "HSU-001" 
     int row;
     int col;
 };
@@ -85,7 +86,7 @@ public:
 
     // ─── Unit management ────────────────────────────────────────────
 
-    bool addUnit(const std::string& type, int row, int col);
+    bool addUnit(const std::string& type, int row, int col,const std::string& droneType = "");
     bool removeUnit(int row, int col);
     const UnitSpawn* getUnitAt(int row, int col) const;
     const std::vector<UnitSpawn>& getUnits() const;
