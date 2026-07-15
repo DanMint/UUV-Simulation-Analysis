@@ -159,3 +159,20 @@ cmake --build build -j
 ```
 
 This skips the spawn tool and runs the simulation directly with the saved unit positions and settings.
+
+## Attacker Agents (Nadeem — Nadeem-Branch)
+
+Adds a multi-platform attacker agent system to the simulation. Press **A** in the spawn tool to enter attacker mode, then **1-9** to select a vehicle type before clicking to place.
+
+Supported platforms:
+- **1** BlueROV2 — 1-3 kn, $6k, 300k-450k Hz
+- **2** Riptide Micro — 2-5 kn, $15k-45k, 200k-400k Hz
+- **3** BlueBoat — 2-6 kn, $5k, 450k-650k Hz (surface)
+- **4** YUCO Carrier — 2-6 kn, $50k-100k, 300k-600k Hz
+- **5** NemoSens — 2-4 kn, $60k-115k, 200k-500k Hz
+- **6** HUGIN Superior — 2-5 kn, $2M-4M, 200k-400k Hz
+- **7** Bayraktar TB2 — 90-110 kn, $2M-5M, aerial
+- **8** Queen Hornet — 38-43 kn, $1k-5k, aerial
+- **9** Shahed 136 — 90-100 kn, $20k-50k, aerial
+
+Each agent runs a full FSM lifecycle (S0-S9) with terminal output showing state transitions, path cost, detection status, and mission outcome. Aerial agents are not detectable by hydrophone arrays.

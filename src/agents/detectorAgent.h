@@ -23,6 +23,8 @@ struct DetectorAgent {
     double sensingRadius;   // detection range in cells (Euclidean)
     bool alive;
     int sightingCount;      // total (seeker, step) sightings logged
+    int freqLowHz  = 0;       // lower bound of detectable frequency range
+    int freqHighHz = 999999;  // upper bound — defaults to detect everything
 
     struct Sighting {
         int seekerId;

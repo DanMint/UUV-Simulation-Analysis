@@ -31,6 +31,11 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
         } else if (unit.type == "interceptor") {
             m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
         }
+        // ── Attacker agents  ──────────────────────────────────────────
+        // Unlike seekers which use SeekerAgent directly, attackers use the
+        // AttackerAgent factory so each unit gets correct real-world specs
+        // (speed, emission frequency, cost) based on its vehicleType string.
+        // Falls back to bluerov2 if no type was specified in the spawn tool.
         else if (unit.type == "attacker") {
             if (!unit.vehicleType.empty()) {
                 m_attackers.push_back(AttackerAgent::create(unit.vehicleType, attackerId++, unit.row, unit.col));
@@ -126,6 +131,52 @@ void Simulation::updateDetectorTracks(int currentStep) {
                           << ": Detector " << detector.id
                           << " acquired Seeker " << seeker.id
                           << " at (" << seeker.row << "," << seeker.col << ")\n";
+            }
+        }
+    }
+    // ── Attacker detection  ──────────────────────────────────────────
+    // Aerial agents are skipped entirely — hydrophones can't detect them.
+    // Underwater agents are checked against the detector's frequency range.
+    // Only agents whose emission frequency overlaps the detector's band get tracked.
+    for (auto& attacker : m_attackers) {
+        if (!attacker.alive || attacker.reachedTarget) continue;
+        if (!attacker.isDetectableByHydrophone()) continue;
+
+        for (auto& detector : m_detectors) {
+            if (!detector.alive) continue;
+            if (!detector.isInRange(attacker.row, attacker.col)) continue;
+            if (!attacker.isInFrequencyRange(detector.freqLowHz, detector.freqHighHz)) continue;
+
+            if (!attacker.detected) {
+                attacker.detected = true;
+                attacker.firstDetectedAtStep = currentStep;
+                attacker.firstDetectedByDetector = detector.id;
+                std::cout << "  Step " << currentStep
+                          << ": Detector " << detector.id
+                          << " acquired Attacker " << attacker.id
+                          << " (" << attacker.specs.agentType << ")"
+                          << " at (" << attacker.row << "," << attacker.col << ")\n";
+            }
+        }
+    }
+    for (auto& attacker : m_attackers) {
+        if (!attacker.alive || attacker.reachedTarget) continue;
+        if (!attacker.isDetectableByHydrophone()) continue; // skip aerial
+
+        for (auto& detector : m_detectors) {
+            if (!detector.alive) continue;
+            if (!detector.isInRange(attacker.row, attacker.col)) continue;
+            if (!attacker.isInFrequencyRange(detector.freqLowHz, detector.freqHighHz)) continue;
+
+            if (!attacker.detected) {
+                attacker.detected = true;
+                attacker.firstDetectedAtStep = currentStep;
+                attacker.firstDetectedByDetector = detector.id;
+                std::cout << "  Step " << currentStep
+                          << ": Detector " << detector.id
+                          << " acquired Attacker " << attacker.id
+                          << " (" << attacker.specs.agentType << ")"
+                          << " at (" << attacker.row << "," << attacker.col << ")\n";
             }
         }
     }
@@ -340,7 +391,10 @@ SimResult Simulation::buildResult(int totalSteps) const {
         result.interceptorResults.push_back(ir);
     }
 
-    // ── Attackers (new) ──
+    // ── Attackers ────────────────────────────────────────────────────
+    // Collects FSM state, mission success, path cost, and detection/intercept
+    // records for each attacker. These metrics feed the GA fitness function
+    // (P(detected) * P(killed)) in the optimization phase.
     for (const auto& a : m_attackers) {
         SimResult::AttackerResult ar;
         ar.id = a.id;
@@ -367,7 +421,24 @@ SimResult Simulation::buildResult(int totalSteps) const {
     result.computeSummary();
     return result;
 }
-
+// ════════════════════════════════════════════════════════════════════════════════
+//  ATTACKER FSM TICK
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  Called once per simulation step for all alive attackers.
+//  Unlike seekers which just call moveStep() directly, attackers use tick()
+//  which drives the full FSM lifecycle: S0 (idle) → S1 (receive mission) →
+//  S2 (validate) → S3 (init/pathfind) → S4 (execute/move) → S5 (log) →
+//  S6 (update shared state) → S7 (deactivate) → S8 (complete) → S9 (reset).
+//
+//  Speed-aware movement: each agent type has a stepDelay that controls how
+//  often it actually moves. BlueROV2 (stepDelay=4) moves once every 4 steps,
+//  HUGIN (stepDelay=2) moves every 2, TB2 (stepDelay=1) moves every step.
+//  This reflects real knot-speed differences between platforms.
+//
+//  Retargeting: if an attacker's current target was destroyed, its FSM resets
+//  to S0_IDLE so it can receive a new mission on the next tick.
+// ════════════════════════════════════════════════════════════════════════════════
 void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
     for (auto& attacker : m_attackers) {
         if (!attacker.alive) continue;
@@ -466,7 +537,11 @@ SimResult Simulation::run() {
                 }
             }
         }
-
+        // ── 5b. Attacker collisions ─────────────────────────────────
+        // Mirrors seeker collision check but for attackers. When an attacker
+        // reaches a target cell, the target is destroyed and the attacker's
+        // FSM transitions from S4_EXECUTE toward S5_LOG_RESULT internally
+        // on the next tick via the reachedTarget flag.
         for (auto& attacker : m_attackers) {
             if (!attacker.alive || attacker.reachedTarget) continue;
             for (auto& target : m_targets) {
