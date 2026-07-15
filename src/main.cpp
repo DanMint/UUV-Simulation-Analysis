@@ -30,7 +30,10 @@ void printUsage(const char* progName) {
               << "  C key        - Clear all units (zones preserved)\n"
               << "  Enter        - Save scenario and run simulation\n"
               << "  Escape       - Close without saving\n"
-              << "  A key        - Switch to Attacker mode (red triangle)\n";
+              << "  A key        - Switch to Attacker mode (red triangle)\n"
+              << "                  1=BlueROV2  2=Riptide  3=BlueBoat\n"
+              << "                  4=YUCO  5=NemoSens  6=HUGIN\n"
+              << "                  7=TB2  8=QueenHornet  9=Shahed\n";
 }
 
 int main(int argc, char* argv[]) {

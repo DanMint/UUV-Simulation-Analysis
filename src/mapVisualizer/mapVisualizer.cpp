@@ -764,8 +764,22 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 }
                 else if (k->code == sf::Keyboard::Key::A) {
                     m_currentType = "attacker";
-                    m_zoneDrawMode = "";  
+                    m_vehicleType = "bluerov2"; // default
+                    m_zoneDrawMode = "";
                     m_zoneDragging = false;
+                    updateTitle(window);
+                }
+                // while in attacker mode, 1-6 selects vehicle type
+                else if (m_currentType == "attacker") {
+                    if (k->code == sf::Keyboard::Key::Num1) m_vehicleType = "bluerov2";
+                    if (k->code == sf::Keyboard::Key::Num2) m_vehicleType = "riptide";
+                    if (k->code == sf::Keyboard::Key::Num3) m_vehicleType = "blueboat";
+                    if (k->code == sf::Keyboard::Key::Num4) m_vehicleType = "yuco";
+                    if (k->code == sf::Keyboard::Key::Num5) m_vehicleType = "nemosens";
+                    if (k->code == sf::Keyboard::Key::Num6) m_vehicleType = "hugin";
+                    if (k->code == sf::Keyboard::Key::Num7) m_vehicleType = "tb2";
+                    if (k->code == sf::Keyboard::Key::Num8) m_vehicleType = "queenhornet";
+                    if (k->code == sf::Keyboard::Key::Num9) m_vehicleType = "shahed";
                     updateTitle(window);
                 }
             }
@@ -814,9 +828,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     } else {
                         // Place unit (existing behaviour)
                         if (m_map.isWater(clickRow, clickCol)) {
-                            if (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
+                            if (!m_config.addUnit(m_currentType, clickRow, clickCol, m_vehicleType)) {
                                 m_config.removeUnit(clickRow, clickCol);
-                                m_config.addUnit(m_currentType, clickRow, clickCol);
+                                m_config.addUnit(m_currentType, clickRow, clickCol, m_vehicleType);
                             }
                         }
                         updateTitle(window);

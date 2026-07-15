@@ -97,8 +97,8 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
                           << "] S2: VALIDATE — aerial agent, hydrophone detection N/A\n";
             } else {
                 std::cout << "[" << specs.agentType << " id=" << id
-                          f<< "] S2: VALIDATE — emission " << emissionFreqLowHz
-                          << "-" << emissionFreqHighHz << " Hz, detectable by hydrophone\n";
+                          << "] S2: VALIDATE — emission " << specs.emissionFreqLowHz
+                          << "-" << specs.emissionFreqHighHz << " Hz, detectable by hydrophone\n";
             }
             enterS3(destRow, destCol, pf);
             break;

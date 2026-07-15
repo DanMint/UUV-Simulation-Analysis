@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(UUVSim LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Default to Release (with -O2) if no build type specified
@@ -25,6 +25,7 @@ add_executable(uuv_sim
     src/agents/attackerAgent.cpp
     src/agents/detectorAgent.cpp
     src/agents/interceptorAgent.cpp
+    src/agents/vehicleSpecs.cpp
 )
 
 target_include_directories(uuv_sim PRIVATE
