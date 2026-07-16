@@ -291,8 +291,12 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     for (int i = 0; i < (int)m_units.size(); i++) {
         const auto& u = m_units[i];
         file << "    { \"type\": \"" << u.type
-             << "\", \"row\": "      << u.row
-             << ", \"col\": "        << u.col << " }";
+            << "\", \"row\": "      << u.row
+            << ", \"col\": "        << u.col;
+        if (!u.vehicleType.empty()) {
+            file << ", \"vehicle_type\": \"" << u.vehicleType << "\"";
+        }
+        file << " }";
         if (i < (int)m_units.size() - 1) file << ",";
         file << "\n";
     }

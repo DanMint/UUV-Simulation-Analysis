@@ -84,3 +84,4 @@ target_link_libraries(uuv_sim PRIVATE gdal)
 if (APPLE)
     message(STATUS "CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}")
 endif()
+

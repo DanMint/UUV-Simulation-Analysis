@@ -100,7 +100,7 @@ VehicleSpecs getVehicleSpecs(const std::string& type) {
             .speedKnotsMax     = 5.0f,
             .emissionFreqLowHz = 200000,
             .emissionFreqHighHz = 400000,
-            .shallowWaterCapable = false,
+            .shallowWaterCapable = true,
             .isAerial          = false,
             .isSurfaceVessel   = false,
             .unitCostMin       = 2000000.0f,

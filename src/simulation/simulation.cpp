@@ -140,27 +140,6 @@ void Simulation::updateDetectorTracks(int currentStep) {
     // Only agents whose emission frequency overlaps the detector's band get tracked.
     for (auto& attacker : m_attackers) {
         if (!attacker.alive || attacker.reachedTarget) continue;
-        if (!attacker.isDetectableByHydrophone()) continue;
-
-        for (auto& detector : m_detectors) {
-            if (!detector.alive) continue;
-            if (!detector.isInRange(attacker.row, attacker.col)) continue;
-            if (!attacker.isInFrequencyRange(detector.freqLowHz, detector.freqHighHz)) continue;
-
-            if (!attacker.detected) {
-                attacker.detected = true;
-                attacker.firstDetectedAtStep = currentStep;
-                attacker.firstDetectedByDetector = detector.id;
-                std::cout << "  Step " << currentStep
-                          << ": Detector " << detector.id
-                          << " acquired Attacker " << attacker.id
-                          << " (" << attacker.specs.agentType << ")"
-                          << " at (" << attacker.row << "," << attacker.col << ")\n";
-            }
-        }
-    }
-    for (auto& attacker : m_attackers) {
-        if (!attacker.alive || attacker.reachedTarget) continue;
         if (!attacker.isDetectableByHydrophone()) continue; // skip aerial
 
         for (auto& detector : m_detectors) {
@@ -241,6 +220,51 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
             }
         }
         if(!seeker.alive) continue;  // dead seekers don't check other interceptors
+    }
+    // ── Interceptor engagement for attackers ─────────────────────────
+    // Mirrors seeker engagement but for attackers. Uses same sense-then-shoot
+    // doctrine — only detected attackers can be engaged by interceptors.
+    for (auto& attacker : m_attackers) {
+        if (!attacker.alive || attacker.reachedTarget) continue;
+        if (!attacker.detected) continue;
+
+        for (auto& interceptor : m_interceptors) {
+            if (!interceptor.alive) continue;
+            if (!interceptor.isInRange(attacker.row, attacker.col)) continue;
+
+            double pKill = interceptor.killProbability(attacker.row, attacker.col);
+            double r = roll(m_rng);
+
+            double dr = interceptor.row - attacker.row;
+            double dc = interceptor.col - attacker.col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+            double ratio = (interceptor.killRadius > 0.0)
+                ? dist / interceptor.killRadius : 0.0;
+
+            if (r < pKill) {
+                std::cout << "  Step " << currentStep
+                          << ": Interceptor " << interceptor.id
+                          << " killed Attacker " << attacker.id
+                          << " (" << attacker.specs.agentType << ")"
+                          << " at (" << attacker.row << "," << attacker.col << ")"
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+
+                attacker.alive = false;
+                attacker.intercepted = true;
+                attacker.interceptedByInterceptor = interceptor.id;
+                attacker.interceptedAtStep = currentStep;
+                interceptor.recordIntercept(attacker.id, currentStep);
+                break;
+            } else {
+                std::cout << "  Step " << currentStep
+                          << ": Interceptor " << interceptor.id
+                          << " missed Attacker " << attacker.id
+                          << " (" << attacker.specs.agentType << ")"
+                          << " [dist=" << std::fixed << std::setprecision(1)
+                          << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
+            }
+        }
     }
 }
 
@@ -491,7 +515,6 @@ void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
 
 SimResult Simulation::run() {
     std::cout << "\n--- Simulation starting ---\n";
-
     Pathfinding pf(m_map.getGrid());
     assignTargets(pf);
 
@@ -501,7 +524,13 @@ SimResult Simulation::run() {
 
     while (step < m_maxSteps && !allTargetsDead && !allSeekersFinished) {
         step++;
-
+        
+        // ── HEARTBEAT LOG ──
+        if (step % 20 == 0) {
+        std::cout << "[HEARTBEAT] Step: " << step 
+                << " | Active Attackers: " << m_attackers.size() 
+                << " | Targets Left: " << m_targets.size() << std::endl;
+        }
         // ── 1. Move ──
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
@@ -586,6 +615,20 @@ SimResult Simulation::run() {
 
     std::cout << "--- Simulation finished at step " << step << " ---\n";
 
+    // ── MISSION FINAL REPORT ──
+    std::cout << "\n\n==========================================" << std::endl;
+    std::cout << "           MISSION FINAL REPORT           " << std::endl;
+    std::cout << "==========================================" << std::endl;
+    std::cout << "Total Steps: " << step << std::endl;
+    std::cout << "Active Attackers: " << m_attackers.size() << std::endl;
+
+    for (const auto& a : m_attackers) {
+        std::cout << "Agent " << a.id << " (" << a.specs.agentType << ") " 
+                << "Result: " << (a.missionSuccess ? "SUCCESS" : "FAILED") 
+                << " | Steps: " << a.stepsToTarget << std::endl;
+    }
+    std::cout << "==========================================\n" << std::endl;
+    
     SimResult result = buildResult(step);
 
     // Patch in destruction info on targets

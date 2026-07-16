@@ -474,7 +474,7 @@ bool MapCreation::placeUnit(int row, int col, int unitType) {
 
 bool MapCreation::removeUnit(int row, int col) {
     if (!isValid(row, col)) return false;
-    // Only remove actual units (2/3/4/5), not terrain
+    // Only remove actual units (2/3/4/5/6), not terrain
     if (isUnitCell(m_grid[row][col])) {
         m_grid[row][col] = WATER;
         return true;
@@ -502,6 +502,7 @@ int MapCreation::placeUnitsFromConfig(
         else if (type == "target")      unitType = TARGET;
         else if (type == "detector")    unitType = DETECTOR;
         else if (type == "interceptor") unitType = INTERCEPTOR;
+        else if (type == "attacker")    unitType = ATTACKER;
         else continue;
 
         if (placeUnit(pos.first, pos.second, unitType)) {
@@ -610,7 +611,8 @@ void MapCreation::printGrid() const {
                 case TARGET:      std::cout << 'T'; break;
                 case DETECTOR:    std::cout << 'D'; break;
                 case INTERCEPTOR: std::cout << 'I'; break;
-                default:          std::cout << '?'; break;
+                case ATTACKER:    std::cout << 'A'; break;
+                default:          std::cout << '?'; break;  
             }
         }
         std::cout << '\n';
