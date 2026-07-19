@@ -304,22 +304,45 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             window.draw(d);
         }
         else if (unit.type == "attacker") {
+            sf::Color attackerColor(255, 140, 60); // default: bluerov2 orange
+            if      (unit.vehicleType == "bluerov2")    attackerColor = sf::Color(255, 140, 60);  // orange
+            else if (unit.vehicleType == "riptide")     attackerColor = sf::Color(210, 255, 60);  // lime/chartreuse
+            else if (unit.vehicleType == "blueboat")    attackerColor = sf::Color(60, 220, 130);  // emerald green
+            else if (unit.vehicleType == "yuco")        attackerColor = sf::Color(0, 220, 200);   // turquoise
+            else if (unit.vehicleType == "nemosens")    attackerColor = sf::Color(255, 80, 200);  // hot pink
+            else if (unit.vehicleType == "hugin")       attackerColor = sf::Color(140, 70, 20);   // brown
+            else if (unit.vehicleType == "tb2")         attackerColor = sf::Color(0, 255, 255);   // cyan (aerial)
+            else if (unit.vehicleType == "queenhornet") attackerColor = sf::Color(200, 180, 255); // lavender (aerial)
+            else if (unit.vehicleType == "shahed")      attackerColor = sf::Color(255, 190, 220); // pale pink (aerial)
+
             sf::CircleShape tri(half, 3);
             tri.setOrigin(sf::Vector2f(half, half));
             tri.setPosition(sf::Vector2f(cx, cy));
-            tri.setFillColor(sf::Color(255, 100, 50)); // Orange-red for attacker
+            tri.setFillColor(attackerColor);
             tri.setOutlineColor(sf::Color::White);
             tri.setOutlineThickness(1.5f);
             window.draw(tri);
         }
 
         // Label letter
-        if (font != nullptr && m_cellSize >= 10.0f) {
+        if (font != nullptr && m_cellSize >= 14.0f) {
             std::string lbl;
             if      (unit.type == "seeker")      lbl = "S";
             else if (unit.type == "target")      lbl = "T";
             else if (unit.type == "detector")    lbl = "D";
             else if (unit.type == "interceptor") lbl = "I";
+            else if (unit.type == "attacker") {
+                if      (unit.vehicleType == "bluerov2")    lbl = "BR";
+                else if (unit.vehicleType == "riptide")     lbl = "RP";
+                else if (unit.vehicleType == "blueboat")    lbl = "BB";
+                else if (unit.vehicleType == "yuco")        lbl = "YU";
+                else if (unit.vehicleType == "nemosens")    lbl = "NS";
+                else if (unit.vehicleType == "hugin")       lbl = "HU";
+                else if (unit.vehicleType == "tb2")         lbl = "T2";
+                else if (unit.vehicleType == "queenhornet") lbl = "QH";
+                else if (unit.vehicleType == "shahed")      lbl = "SH";
+                else                                        lbl = "BR";
+            }
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) fs = 8;
