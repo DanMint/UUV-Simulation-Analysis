@@ -476,6 +476,7 @@ void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
             attacker.pathIndex = 0;
             attacker.fsmState = AgentFSMState::S0_IDLE;
             attacker.milestone25 = attacker.milestone50 = attacker.milestone75 = false;
+            attacker.stepDelayCounter = 0; 
         }
 
         // Find the nearest alive target.
@@ -623,9 +624,12 @@ SimResult Simulation::run() {
     std::cout << "Active Attackers: " << m_attackers.size() << std::endl;
 
     for (const auto& a : m_attackers) {
+        int displaySteps = (a.missionSuccess || a.fsmState == AgentFSMState::S5_LOG_RESULT)
+                        ? a.stepsToTarget
+                        : a.stepsTaken;
         std::cout << "Agent " << a.id << " (" << a.specs.agentType << ") " 
                 << "Result: " << (a.missionSuccess ? "SUCCESS" : "FAILED") 
-                << " | Steps: " << a.stepsToTarget << std::endl;
+                << " | Steps: " << displaySteps << std::endl;
     }
     std::cout << "==========================================\n" << std::endl;
     

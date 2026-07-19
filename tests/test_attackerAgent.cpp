@@ -176,6 +176,28 @@ void testFrequencyRangeDetection() {
     check(tb2.isInFrequencyRange(0, 999999) == false,
           "TB2 returns false for isInFrequencyRange (aerial)");
 }
+void testAerialIgnoresDetectorRegardlessOfRange() {
+    testSection("Aerial Attacker vs Detector Integration");
+
+    AttackerAgent tb2 = AttackerAgent::create("tb2", 0, 5, 5);
+
+    // Even a detector with an impossibly wide band should never catch an aerial agent
+    check(tb2.isInFrequencyRange(0, 999999999) == false,
+          "TB2 not detected even by an unbounded frequency detector");
+
+    // Confirm isDetectableByHydrophone is what's actually gating this,
+    // not a frequency-range coincidence
+    check(tb2.isDetectableByHydrophone() == false,
+          "TB2 isDetectableByHydrophone returns false independent of range");
+
+    AttackerAgent shahed = AttackerAgent::create("shahed", 1, 5, 5);
+    check(shahed.isInFrequencyRange(0, 999999999) == false,
+          "Shahed not detected even by an unbounded frequency detector");
+
+    AttackerAgent queenhornet = AttackerAgent::create("queenhornet", 2, 5, 5);
+    check(queenhornet.isInFrequencyRange(0, 999999999) == false,
+          "Queen Hornet not detected even by an unbounded frequency detector");
+}
 
 void testUnknownType() {
     testSection("Unknown Agent Type");
@@ -205,6 +227,7 @@ int main() {
     testAerialAgents();
     testUnderwaterDetectability();
     testFrequencyRangeDetection();
+    testAerialIgnoresDetectorRegardlessOfRange();
     testUnknownType();
 
     std::cout << "\n======================================\n";
