@@ -130,5 +130,7 @@ I will be going thru all my code stuff in this order and commenting to both bett
     CURRENT SAVING OF JSON AND WHATNOT IDK MAN:
     -need to add the dlivmiter of , before "patrol_defender": othersiwde code freask out its line 277 in all jsons 
     - IS THIS PROJECT A VIDEO OP PICTURE FOR VISUALIZER 
-    
+    -rm -rf runs/* use this to clear all runs 
+    -./build/uuv_sim --scenario scenario.json to then build the said scenario 
+    -python3 visulaize.py to convert to the image in the form of png in paths 
 */
