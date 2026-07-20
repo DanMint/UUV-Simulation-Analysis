@@ -53,6 +53,12 @@ private:
     int   m_windowSize;
     int   m_panelHeight;
     float m_cellSize;
+    
+//Chris Section added: 
+    bool m_patrolWaitingForB = false;
+    int  m_patrolPendingRow  = -1;
+    int  m_patrolPendingCol  = -1;
+    int  m_patrolPairCount   = 0;
 
     SpawnConfig m_config;
     std::string m_currentType;     // "seeker" | "target" | "detector" | "interceptor"

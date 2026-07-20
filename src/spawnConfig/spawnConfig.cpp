@@ -10,6 +10,10 @@ bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
     m_units.push_back({type, row, col});
     return true;
 }
+bool SpawnConfig::addUnit(const UnitSpawn& unit) {//Chris section added
+    m_units.push_back(unit);
+    return true;
+}
 
 bool SpawnConfig::removeUnit(int row, int col) {
     for (auto it = m_units.begin(); it != m_units.end(); ++it) {

@@ -313,7 +313,34 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             d.setOutlineColor(sf::Color::White);
             d.setOutlineThickness(1.5f);
             window.draw(d);
+                // Chris added: show pending point A while waiting for B click
+          // draw B diamond if waypoint exists
+                if (unit.waypointRow != -1) {
+                    float bx = (unit.waypointCol + 0.5f) * m_cellSize;
+                    float by = (unit.waypointRow + 0.5f) * m_cellSize;
+                    float s = half * 1.4f;
+                    sf::RectangleShape bd(sf::Vector2f(s, s));
+                    bd.setOrigin(sf::Vector2f(s / 2.f, s / 2.f));
+                    bd.setPosition(sf::Vector2f(bx, by));
+                    bd.setRotation(sf::degrees(45.f));
+                    bd.setFillColor(sf::Color(0, 150, 200));
+                    bd.setOutlineColor(sf::Color::White);
+                    bd.setOutlineThickness(1.5f);
+                    window.draw(bd);
+
+                    if (font && m_cellSize >= 10.0f) {
+                        unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
+                        if (fs < 8) fs = 8;
+                        sf::Text blbl(*font, "B", fs);
+                        blbl.setFillColor(sf::Color::White);
+                        blbl.setStyle(sf::Text::Bold);
+                        sf::FloatRect bb = blbl.getLocalBounds();
+                        blbl.setOrigin(sf::Vector2f(bb.position.x + bb.size.x/2.f, bb.position.y + bb.size.y/2.f));
+                        blbl.setPosition(sf::Vector2f(bx, by));
+                        window.draw(blbl);
         }
+    }
+}
 
         // Label letter
         if (font != nullptr && m_cellSize >= 10.0f) {
@@ -322,7 +349,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             else if (unit.type == "target")      lbl = "T";
             else if (unit.type == "detector")    lbl = "D";
             else if (unit.type == "interceptor") lbl = "I";
-            else if (unit.type == "patrol_defender") lbl = "P"; //Chris add
+            else if (unit.type == "patrol_defender") lbl = "A"; //Chris added: changed from P to A messing around with labels to see wahts best idk yet
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) fs = 8;
@@ -336,7 +363,10 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             window.draw(txt);
         }
     }
+
 }
+
+
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  drawHover  (zone mode suppresses cell highlight; interceptor preview added)
@@ -455,6 +485,7 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
         else if (m_currentType == "target")      { modeLabel = "TARGET (T)";      textColor = sf::Color(120, 160, 255); }
         else if (m_currentType == "detector")    { modeLabel = "DETECTOR (D)";    textColor = sf::Color(255, 200, 80);  }
         else if (m_currentType == "interceptor") { modeLabel = "INTERCEPTOR (I)"; textColor = sf::Color(200, 120, 255); }
+        else if (m_currentType == "patrol_defender") { modeLabel = "PATROL DEFENDER (P)"; textColor = sf::Color(0, 210, 255); }//Chris added this should fix the display status
 
         ss << "Mode: " << modeLabel
            << "  |  S:" << m_config.countType("seeker")
@@ -816,12 +847,42 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                             m_zoneDragging       = true;
                         }
                     } else {
-                        // Place unit (existing behaviour)
+                        // Place unit (existing behaviour) --- Chris added: the waypoint system essetnlly
                         if (m_map.isWater(clickRow, clickCol)) {
-                            if (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
-                                m_config.removeUnit(clickRow, clickCol);
-                                m_config.addUnit(m_currentType, clickRow, clickCol);
+                            if (m_currentType == "patrol_defender") {
+                                if (!m_patrolWaitingForB) {
+                                    // first click — store as pending point A
+                                    m_patrolPendingRow = clickRow;
+                                    m_patrolPendingCol = clickCol;
+                                    m_patrolWaitingForB = true;
+                                    std::cout << "Patrol P." << (m_patrolPairCount + 1) 
+                                            << " point A set at (" << clickRow << "," << clickCol << ")"
+                                            << " — now click point B\n";
+                                
                             }
+                                else {
+                                    // second click — complete the pair
+                                    // add one unit with waypoint data attached
+                                    UnitSpawn unit;
+                                    unit.type = "patrol_defender";
+                                    unit.row  = m_patrolPendingRow;
+                                    unit.col  = m_patrolPendingCol;
+                                    unit.waypointRow = clickRow;
+                                    unit.waypointCol = clickCol;
+                                    m_config.addUnit(unit);
+                                    m_patrolPairCount++;
+                                    m_patrolWaitingForB = false;
+                                    std::cout << "Patrol P." << m_patrolPairCount 
+                                            << " complete — A(" << m_patrolPendingRow << "," << m_patrolPendingCol 
+                                            << ") → B(" << clickRow << "," << clickCol << ")\n";
+                                }
+                            }
+                            else {
+                                if  (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
+                                    m_config.removeUnit(clickRow, clickCol);
+                                    m_config.addUnit(m_currentType, clickRow, clickCol);
+                                }
+                        }
                         }
                         updateTitle(window);
                     }

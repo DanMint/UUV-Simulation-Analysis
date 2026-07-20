@@ -14,7 +14,7 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_rng(std::random_device{}())
 {
-    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, patrolId = 0;
+    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, patrolId = 0; //Chris added: patrolID =0 reason being constructor and its how we create sofar 
     double detRadius = config.getDetectorRadius();
     double intRadius = config.getInterceptorRadius();
 
@@ -28,8 +28,15 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
         } else if (unit.type == "interceptor") {
             m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
         }
-        else if (unit.type == "patrol") {
-            m_patrolDefenders.emplace_back(patrolId++, unit.row, unit.col, detRadius, intRadius);
+        else if (unit.type == "patrol_defender") {
+            PatrolDefenderAgent p(patrolId++, unit.row, unit.col, detRadius, intRadius, true, 1.0f); //emplace means to create directly inside vecotr cannot modify vs p which is just a temp varibale to store it sicne i need to create add then store 
+            // if this unit has a paired waypoint, add both points as the patrol route
+            if (unit.waypointRow != -1) {
+                p.addWaypoint(unit.row, unit.col);                  // point A
+                p.addWaypoint(unit.waypointRow, unit.waypointCol);  // point B
+                p.isDynamic = true;
+            }
+            m_patrolDefenders.push_back(p);
         }
     }
 
@@ -120,7 +127,7 @@ void Simulation::updateDetectorTracks(int currentStep) {
                           << " at (" << seeker.row << "," << seeker.col << ")\n";
             }
         }
-        // NEW — patrol defenders also sense
+        // Chris added: patrol defenders also sense --- but patrol has alot more going on with it 
         for (auto& patrol : m_patrolDefenders) {
             if (!patrol.alive) continue;
             if (!patrol.isInSensingRange(seeker.row, seeker.col)) continue;
@@ -196,7 +203,7 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
                           << (ratio * 100) << "%, p=" << (pKill * 100) << "%]\n";
             }
         }
-        // NEW — patrol defenders also shoot
+        // Chris added: patrol defenders also shoot/kill probability --- 
         if (!seeker.alive) continue; // already killed above, skip
         for (auto& patrol : m_patrolDefenders) {
             if (!patrol.alive) continue;
@@ -385,6 +392,27 @@ SimResult Simulation::buildResult(int totalSteps) const {
         result.interceptorResults.push_back(ir);
     }
 
+    // ── Patrol Defenders --- Chris added: purpose is so when i do run code to packages this into teh simresults which inevitably saves to the json file in runs/
+    // this gives patrol defenders their own section in the JSON output
+    for (const auto& p : m_patrolDefenders) {
+        SimResult::PatrolDefenderResult pr;
+        pr.id = p.id;
+        pr.row = p.row;
+        pr.col = p.col;
+        pr.isDynamic = p.isDynamic;        // was it moving or static this run
+        pr.sensingRadius = p.sensingRadius; // sensing side
+        pr.sightingCount = p.sightingCount;
+        for (const auto& s : p.sightings) {
+            pr.sightings.push_back({s.seekerId, s.step});
+        }
+        pr.killRadius = p.killRadius;       // killing side
+        pr.killCount = p.killCount;
+        for (const auto& ic : p.intercepts) {
+            pr.intercepts.push_back({ic.seekerId, ic.step});
+        }
+        result.patrolDefenderResults.push_back(pr);
+    }
+
     result.computeSummary();
     return result;
 }
@@ -412,7 +440,7 @@ SimResult Simulation::run() {
             seeker.moveStep();
         }
 
-        // ── 1b. Move patrol defenders (dynamic only) ──
+        // ── Chris added: 1b. Move patrol defenders (dynamic only) ── this is the big every tick we keep calling the function to move beofre the sense 
         for (auto& patrol : m_patrolDefenders) {
             if (!patrol.alive) continue;
             if (patrol.isDynamic) patrol.moveTowardWaypoint();

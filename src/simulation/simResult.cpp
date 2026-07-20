@@ -110,6 +110,21 @@ void SimResult::print() const {
         }
     }
 
+    // Chris added: print patrol defenders separately so I can see them clearly
+    if (!patrolDefenderResults.empty()) {
+        std::cout << "\n  Patrol Defenders (Chris):" << std::endl;
+        for (const auto& p : patrolDefenderResults) {
+            std::cout << "    Patrol Defender " << p.id
+                      << " at (" << p.row << "," << p.col << ")"
+                      << (p.isDynamic ? " [DYNAMIC]" : " [STATIC]")
+                      << ", sensing radius " << p.sensingRadius
+                      << ", kill radius " << p.killRadius
+                      << ": " << p.sightingCount << " sighting(s), "
+                      << p.killCount << " kill(s)";
+            std::cout << std::endl;
+        }
+    }
+
     std::cout << "=========================\n" << std::endl;
 }
 
@@ -250,6 +265,26 @@ void SimResult::saveJSON(const std::string& filepath) const {
 
         file << "    }";
         if (i < (int)interceptorResults.size() - 1) file << ",";
+        file << "\n";
+    }
+    file << "  ]\n";
+
+
+    // Chris added: patrol defenders get their own JSON section
+    file << "  \"patrol_defenders\": [\n";
+    for (int i = 0; i < (int)patrolDefenderResults.size(); i++) {
+        const auto& p = patrolDefenderResults[i];
+        file << "    {\n";
+        file << "      \"id\": " << p.id << ",\n";
+        file << "      \"row\": " << p.row << ",\n";
+        file << "      \"col\": " << p.col << ",\n";
+        file << "      \"is_dynamic\": " << (p.isDynamic ? "true" : "false") << ",\n";
+        file << "      \"sensing_radius\": " << p.sensingRadius << ",\n";
+        file << "      \"sighting_count\": " << p.sightingCount << ",\n";
+        file << "      \"kill_radius\": " << p.killRadius << ",\n";
+        file << "      \"kill_count\": " << p.killCount << "\n";
+        file << "    }";
+        if (i < (int)patrolDefenderResults.size() - 1) file << ",";
         file << "\n";
     }
     file << "  ]\n";

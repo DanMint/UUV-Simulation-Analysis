@@ -51,6 +51,10 @@ struct UnitSpawn {
     std::string type;
     int row;
     int col;
+
+    //Chris added this section: reason being that for the planned waypoint saved system i have planned i need to save them and the -1 means no waypoints
+    int waypointRow = -1;
+    int waypointCol = -1;
 };
 
 // ─── MapInfo ──────────────────────────────────────────────────────────────────
@@ -86,6 +90,7 @@ public:
     // ─── Unit management ────────────────────────────────────────────
 
     bool addUnit(const std::string& type, int row, int col);
+    bool addUnit(const UnitSpawn& unit); //Chris added
     bool removeUnit(int row, int col);
     const UnitSpawn* getUnitAt(int row, int col) const;
     const std::vector<UnitSpawn>& getUnits() const;

@@ -23,7 +23,7 @@ add_executable(uuv_sim
     src/agents/detectorAgent.cpp
     src/agents/interceptorAgent.cpp
     src/agents/seekerAgent.cpp
-    src/agents/patrolAgent.cpp
+    src/agents/patrolAgent.cpp  
 )
 
 target_include_directories(uuv_sim PRIVATE

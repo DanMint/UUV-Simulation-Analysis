@@ -113,6 +113,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "patrol_defender") unitType = MapCreation::PATROL_DEFENDER; //Chris added: were using Interceptor as a visual/unit type since there is no patrol defender map cell 
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 
@@ -137,6 +138,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "patrol_defender") unitType = MapCreation::PATROL_DEFENDER;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
         }
@@ -223,6 +225,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "patrol_defender") unitType = MapCreation::PATROL_DEFENDER;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 

@@ -16,18 +16,18 @@
 
 struct PatrolDefenderAgent {
 
-    // ── identity ──────────────────────────────────────────────────
-    int id;
+    // ── identity --- Needed to identfy which PatrolDefende (id), where (row/col), if active )alive
+    int id; 
     int row, col;
     bool alive;
 
     // ── from DetectorAgent — sensing ──────────────────────────────
-    double sensingRadius;
-    int sightingCount;
-    struct Sighting { int seekerId; int step; };
-    std::vector<Sighting> sightings;
+    double sensingRadius; // how far out can i detect 
+    int sightingCount; // just a number count of how many times spotted
+    struct Sighting { int seekerId; int step; }; //struct bundling which seeker was spotted, when it was spotted 
+    std::vector<Sighting> sightings; // have a list that stores the spots as an entry with the info above
 
-    // ── from InterceptorAgent — killing ───────────────────────────
+    // ── from InterceptorAgent — killing, code is essentlly same as above but for if your dead 
     double killRadius;
     int killCount;
     struct Intercept { int seekerId; int step; };
@@ -40,7 +40,7 @@ struct PatrolDefenderAgent {
     bool goingForward;                           // A→B or B→A
     float speed;                                 // cells per tick
 
-    // ── constructor ───────────────────────────────────────────────
+    // ── constructor --- Think function headers/decleration
     PatrolDefenderAgent(int id, int row, int col,
                         double sensingRadius, double killRadius,
                         bool isDynamic = false, float speed = 1.0f);

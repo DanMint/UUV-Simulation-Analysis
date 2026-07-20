@@ -13,7 +13,7 @@
 #include "spawnConfig.h"
 #include "simResult.h"
 
-#include "../agents/patrolAgent.h" // Chris note: Had to add this 
+#include "patrolAgent.h" // Chris note: Added this needed to do ../agents/patrolAgents.h is where it lives --- making sure cmakelist.txt workes with the shorthand version had weird issue at one point
 
 /**
  * Simulation
@@ -56,7 +56,7 @@ private:
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
 
-    std::vector<PatrolDefenderAgent> m_patrolDefenders; //Chris added
+    std::vector<PatrolDefenderAgent> m_patrolDefenders; //Chris added: This section is essentilly hey were storing the patrolDefenders thats waht thsi section just says during sim
 
     mutable std::mt19937 m_rng;
 
@@ -91,7 +91,7 @@ private:
     /** Build the final result struct from current agent state. */
     SimResult buildResult(int totalSteps) const;
 
-    void updatePatrolDefenders(int currentStep); //Chris added
+    void updatePatrolDefenders(int currentStep); //Chris added: 
 };
 
 #endif // SIMULATION_H
