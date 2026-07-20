@@ -11,6 +11,7 @@
 const sf::Color MapVisualizer::WATER_COLOR            = sf::Color(20,  50,  120);
 const sf::Color MapVisualizer::LAND_COLOR             = sf::Color(50,  110, 50);
 const sf::Color MapVisualizer::SEEKER_COLOR           = sf::Color(220, 30,  30);
+const sf::Color MapVisualizer::HUNTER_COLOR           = sf::Color(30,  180, 70);
 const sf::Color MapVisualizer::TARGET_COLOR           = sf::Color(30,  100, 220);
 const sf::Color MapVisualizer::DETECTOR_COLOR         = sf::Color(255, 180, 0);
 const sf::Color MapVisualizer::DETECTOR_RADIUS_COLOR  = sf::Color(255, 180, 0,  40);
@@ -271,6 +272,17 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             tri.setOutlineThickness(1.5f);
             window.draw(tri);
         }
+        else if (unit.type == "hunter") {
+            float side = half * 1.4f;
+            sf::RectangleShape d(sf::Vector2f(side, side));
+            d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
+            d.setPosition(sf::Vector2f(cx, cy));
+            d.setRotation(sf::degrees(45.f));
+            d.setFillColor(HUNTER_COLOR);
+            d.setOutlineColor(sf::Color::White);
+            d.setOutlineThickness(1.5f);
+            window.draw(d);
+        }
         else if (unit.type == "target") {
             float side = half * 1.6f;
             sf::RectangleShape sq(sf::Vector2f(side, side));
@@ -308,6 +320,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
         if (font != nullptr && m_cellSize >= 10.0f) {
             std::string lbl;
             if      (unit.type == "seeker")      lbl = "S";
+            else if (unit.type == "hunter")      lbl = "H";
             else if (unit.type == "target")      lbl = "T";
             else if (unit.type == "detector")    lbl = "D";
             else if (unit.type == "interceptor") lbl = "I";
@@ -440,12 +453,14 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
         // Normal unit-placement mode
         std::string modeLabel;
         if      (m_currentType == "seeker")      { modeLabel = "SEEKER (S)";      textColor = sf::Color(255, 120, 120); }
+        else if (m_currentType == "hunter")      { modeLabel = "HUNTER (H)";      textColor = sf::Color(80, 220, 120); }
         else if (m_currentType == "target")      { modeLabel = "TARGET (T)";      textColor = sf::Color(120, 160, 255); }
         else if (m_currentType == "detector")    { modeLabel = "DETECTOR (D)";    textColor = sf::Color(255, 200, 80);  }
         else if (m_currentType == "interceptor") { modeLabel = "INTERCEPTOR (I)"; textColor = sf::Color(200, 120, 255); }
 
         ss << "Mode: " << modeLabel
            << "  |  S:" << m_config.countType("seeker")
+           << "  H:"    << m_config.countType("hunter")
            << "  T:"    << m_config.countType("target")
            << "  D:"    << m_config.countType("detector")
            << "  I:"    << m_config.countType("interceptor")
@@ -483,6 +498,8 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
     } else {
         ss << "UUV Spawn Tool  |  " << m_currentType
            << "  S:" << m_config.countType("seeker")
+           << "  H:" << m_config.countType("hunter")
+           << "  H:" << m_config.countType("hunter")
            << "  T:" << m_config.countType("target")
            << "  D:" << m_config.countType("detector")
            << "  I:" << m_config.countType("interceptor")
@@ -598,6 +615,15 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                                   << "The GA will spawn seekers within attacker zones.\n";
                     } else {
                         m_currentType = "seeker";
+                        m_zoneDrawMode = "";  m_zoneDragging = false;
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::H) {
+                    if (m_gaPrepMode) {
+                        std::cout << "Hunter placement disabled in GA prep mode.\n";
+                    } else {
+                        m_currentType = "hunter";
                         m_zoneDrawMode = "";  m_zoneDragging = false;
                         updateTitle(window);
                     }

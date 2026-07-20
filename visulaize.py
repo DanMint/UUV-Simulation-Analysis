@@ -66,10 +66,32 @@ def plot_runs():
             elif seeker.get("reached_target", False):
                 label += " reached"
 
-            ax.plot(cols, rows, linewidth=2, label=label)
+            ax.plot(cols, rows, linewidth=2, color="tab:red", label=label)
 
-            ax.scatter(cols[0], rows[0], marker="o", s=40)
-            ax.scatter(cols[-1], rows[-1], marker="x", s=60)
+            ax.scatter(cols[0], rows[0], marker="o", s=40, color="tab:red")
+            ax.scatter(cols[-1], rows[-1], marker="x", s=60, color="tab:red")
+
+        # Plot hunter paths and capture state
+        for hunter in results.get("hunters", []):
+            path = hunter.get("move_history", [])
+            if not path:
+                continue
+
+            rows = [p[0] for p in path]
+            cols = [p[1] for p in path]
+
+            label = f"Hunter {hunter['id']}"
+            if hunter.get("captured_seeker", False):
+                label += " captured"
+
+            ax.plot(cols, rows, linewidth=2, color="tab:green", label=label)
+            ax.scatter(cols[0], rows[0], marker="D", s=45, color="tab:green")
+            ax.scatter(cols[-1], rows[-1], marker="P", s=70, color="tab:green")
+
+            if hunter.get("captured_seeker", False):
+                capture_row = rows[-1]
+                capture_col = cols[-1]
+                ax.scatter(capture_col, capture_row, marker="X", s=120, color="black", zorder=5)
 
         # Plot targets
         for target in results.get("targets", []):

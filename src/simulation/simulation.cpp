@@ -13,13 +13,15 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_rng(std::random_device{}())
 {
-    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0;
+    int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, hunterId = 0;
     double detRadius = config.getDetectorRadius();
     double intRadius = config.getInterceptorRadius();
 
     for (const auto& unit : config.getUnits()) {
         if (unit.type == "seeker") {
             m_seekers.emplace_back(seekerId++, unit.row, unit.col);
+        } else if (unit.type == "hunter") {
+            m_hunters.emplace_back(hunterId++, unit.row, unit.col);
         } else if (unit.type == "target") {
             m_targets.emplace_back(targetId++, unit.row, unit.col);
         } else if (unit.type == "detector") {
@@ -31,6 +33,7 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
 
     std::cout << "Simulation created: "
               << m_seekers.size()      << " seekers, "
+              << m_hunters.size()      << " hunters, "
               << m_targets.size()      << " targets, "
               << m_detectors.size()    << " detectors (r=" << detRadius << "), "
               << m_interceptors.size() << " interceptors (r=" << intRadius << "), "
@@ -60,6 +63,7 @@ int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
     for (int i = 0; i < static_cast<int>(m_targets.size()); i++) {
         if (!m_targets[i].alive) continue;
 
+
         double dr = seeker.row - m_targets[i].row;
         double dc = seeker.col - m_targets[i].col;
         double dist = std::sqrt(dr * dr + dc * dc);
@@ -78,6 +82,14 @@ int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
 
 bool Simulation::checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const {
     return seeker.row == target.row && seeker.col == target.col;
+}
+
+bool Simulation::checkHunterCapture(const HunterAgent& hunter, const SeekerAgent& seeker) const {
+    if (!hunter.alive || !seeker.alive) return false;
+
+    bool sameCell = hunter.row == seeker.row && hunter.col == seeker.col;
+    bool adjacent = std::abs(hunter.row - seeker.row) <= 1 && std::abs(hunter.col - seeker.col) <= 1;
+    return sameCell || adjacent;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -243,7 +255,7 @@ void Simulation::assignTargets(const Pathfinding& pf) {
     for (auto& seeker : m_seekers) {
         if (!seeker.alive || seeker.reachedTarget) continue;
 
-        int bestIdx = -1;
+        int tIdx = -1;
         double bestDist = std::numeric_limits<double>::max();
 
         // Prefer an unclaimed target first; fall back to the nearest alive target
@@ -258,11 +270,11 @@ void Simulation::assignTargets(const Pathfinding& pf) {
 
             if (dist < bestDist) {
                 bestDist = dist;
-                bestIdx = i;
+                tIdx = i;
             }
         }
 
-        if (bestIdx < 0) {
+        if (tIdx < 0) {
             for (int i = 0; i < static_cast<int>(m_targets.size()); ++i) {
                 if (!m_targets[i].alive) continue;
 
@@ -272,22 +284,56 @@ void Simulation::assignTargets(const Pathfinding& pf) {
 
                 if (dist < bestDist) {
                     bestDist = dist;
-                    bestIdx = i;
+                    tIdx = i;
                 }
+            }
+        }
+
+        if (tIdx < 0) continue;
+
+        targetAssigned[tIdx] = true;
+
+        if (seeker.targetId != m_targets[tIdx].id || !seeker.hasPath()) {
+            seeker.targetId = m_targets[tIdx].id;
+            seeker.computePath(pf, m_targets[tIdx].row, m_targets[tIdx].col);
+
+            if (seeker.path.empty()) {
+                std::cout << "  Seeker " << seeker.id
+                          << ": no path to target " << tIdx << "\n";
+            }
+        }
+    }
+}
+
+void Simulation::assignHunters(const Pathfinding& pf) {
+    for (auto& hunter : m_hunters) {
+        if (!hunter.alive) continue;
+
+        int bestIdx = -1;
+        double bestDist = std::numeric_limits<double>::max();
+
+        for (int i = 0; i < static_cast<int>(m_seekers.size()); ++i) {
+            const auto& seeker = m_seekers[i];
+            if (!seeker.alive || seeker.reachedTarget) continue;
+
+            double dr = hunter.row - seeker.row;
+            double dc = hunter.col - seeker.col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = i;
             }
         }
 
         if (bestIdx < 0) continue;
 
-        targetAssigned[bestIdx] = true;
+        if (hunter.targetId != m_seekers[bestIdx].id || !hunter.hasPath()) {
+            hunter.targetId = m_seekers[bestIdx].id;
+            hunter.computePath(pf, m_seekers[bestIdx].row, m_seekers[bestIdx].col);
 
-        if (seeker.targetId != m_targets[bestIdx].id || !seeker.hasPath()) {
-            seeker.targetId = m_targets[bestIdx].id;
-            seeker.computePath(pf, m_targets[bestIdx].row, m_targets[bestIdx].col);
-
-            if (seeker.path.empty()) {
-                std::cout << "  Seeker " << seeker.id
-                          << ": no path to target " << bestIdx << "\n";
+            if (hunter.path.empty()) {
+                std::cout << "  Hunter " << hunter.id << ": no path to seeker " << bestIdx << "\n";
             }
         }
     }
@@ -325,6 +371,21 @@ SimResult Simulation::buildResult(int totalSteps) const {
         result.seekerResults.push_back(sr);
 
         if (s.alive) result.allSeekersDead = false;
+    }
+
+    // ── Hunters ──
+    for (const auto& h : m_hunters) {
+        SimResult::HunterResult hr;
+        hr.id = h.id;
+        hr.stepsTaken = h.stepsTaken;
+        hr.pathCost = h.pathCost;
+        hr.nodesExpanded = h.nodesExpanded;
+        hr.moveHistory = h.moveHistory;
+        hr.targetId = h.targetId;
+        hr.capturedSeeker = h.capturedSeeker;
+        hr.capturedSeekerId = h.capturedSeekerId;
+        hr.capturedAtStep = h.capturedAtStep;
+        result.hunterResults.push_back(hr);
     }
 
     // ── Targets ──
@@ -382,6 +443,7 @@ SimResult Simulation::run() {
 
     Pathfinding pf(m_map.getGrid());
     assignTargets(pf);
+    assignHunters(pf);
 
     int step = 0;
     bool allTargetsDead = false;
@@ -390,13 +452,41 @@ SimResult Simulation::run() {
     while (step < m_maxSteps && !allTargetsDead && !allSeekersFinished) {
         step++;
 
-        // ── 1. Move ──
+        // ── 1. Reassign hunters to the current seeker positions, then move them ──
+        assignHunters(pf);
+
+        for (auto& hunter : m_hunters) {
+            if (!hunter.alive) continue;
+            hunter.moveStep();
+        }
+
+        // Check hunter captures before seekers advance away
+        for (auto& hunter : m_hunters) {
+            if (!hunter.alive) continue;
+            for (auto& seeker : m_seekers) {
+                if (!seeker.alive || seeker.reachedTarget) continue;
+                if (checkHunterCapture(hunter, seeker)) {
+                    std::cout << "  Step " << step << ": Hunter " << hunter.id
+                              << " captured Seeker " << seeker.id
+                              << " at (" << seeker.row << "," << seeker.col << ")\n";
+                    seeker.alive = false;
+                    hunter.capturedSeeker = true;
+                    hunter.capturedSeekerId = seeker.id;
+                    hunter.capturedAtStep = step;
+                    break;
+                }
+            }
+        }
+
+        // ── 2. Move seekers and apply noise ──
         for (auto& seeker : m_seekers) {
             if (!seeker.alive || seeker.reachedTarget) continue;
             seeker.moveStep();
         }
 
-        // ── 2. Noise ──
+        // Recompute seeker targets after the seekers move so the hunter can chase their new position
+        assignTargets(pf);
+
         if (m_maxNoiseLevel > 0.0) {
             for (auto& seeker : m_seekers) applyNoise(seeker);
         }
@@ -436,6 +526,17 @@ SimResult Simulation::run() {
             if (!seeker.hasPath()) { needsRetarget = true; break; }
         }
         if (needsRetarget) assignTargets(pf);
+        bool needsHunterRetarget = false;
+        for (const auto& hunter : m_hunters) {
+            if (!hunter.alive) continue;
+            if (hunter.targetId >= 0 && hunter.targetId < static_cast<int>(m_seekers.size())) {
+                if (!m_seekers[hunter.targetId].alive || m_seekers[hunter.targetId].reachedTarget) {
+                    needsHunterRetarget = true; break;
+                }
+            }
+            if (!hunter.hasPath()) { needsHunterRetarget = true; break; }
+        }
+        if (needsHunterRetarget) assignHunters(pf);
 
         // ── 7. Termination ──
         allTargetsDead = true;
@@ -446,6 +547,15 @@ SimResult Simulation::run() {
         for (const auto& s : m_seekers) {
             if (s.alive && !s.reachedTarget && s.hasPath()) {
                 allSeekersFinished = false; break;
+            }
+        }
+        if (!allSeekersFinished) {
+            bool huntersStillActive = false;
+            for (const auto& h : m_hunters) {
+                if (h.alive && h.hasPath()) { huntersStillActive = true; break; }
+            }
+            if (!huntersStillActive && m_hunters.empty()) {
+                allSeekersFinished = true;
             }
         }
     }

@@ -184,6 +184,35 @@ void SimResult::saveJSON(const std::string& filepath) const {
     }
     file << "  ],\n";
 
+    // ── Hunters ──
+    file << "  \"hunters\": [\n";
+    for (int i = 0; i < (int)hunterResults.size(); i++) {
+        const auto& h = hunterResults[i];
+        file << "    {\n";
+        file << "      \"id\": " << h.id << ",\n";
+        file << "      \"steps_taken\": " << h.stepsTaken << ",\n";
+        file << "      \"path_cost\": " << h.pathCost << ",\n";
+        file << "      \"nodes_expanded\": " << h.nodesExpanded << ",\n";
+        file << "      \"target_id\": " << h.targetId << ",\n";
+        file << "      \"captured_seeker\": " << (h.capturedSeeker ? "true" : "false") << ",\n";
+        file << "      \"captured_seeker_id\": " << h.capturedSeekerId << ",\n";
+        file << "      \"captured_at_step\": " << h.capturedAtStep << ",\n";
+
+        file << "      \"move_history\": [\n";
+        for (int j = 0; j < (int)h.moveHistory.size(); j++) {
+            file << "        [" << h.moveHistory[j].first
+                 << ", " << h.moveHistory[j].second << "]";
+            if (j < (int)h.moveHistory.size() - 1) file << ",";
+            file << "\n";
+        }
+        file << "      ]\n";
+
+        file << "    }";
+        if (i < (int)hunterResults.size() - 1) file << ",";
+        file << "\n";
+    }
+    file << "  ],\n";
+
     // ── Targets ──
     file << "  \"targets\": [\n";
     for (int i = 0; i < (int)targetResults.size(); i++) {

@@ -44,6 +44,21 @@ struct SimResult {
         int interceptedAtStep;
     };
 
+    // ─── Per-hunter output ────────────────────────────────────────
+
+    struct HunterResult {
+        int id;
+        int stepsTaken;
+        double pathCost;
+        int nodesExpanded;
+        int targetId;
+        std::vector<std::pair<int,int>> moveHistory;
+
+        bool capturedSeeker;
+        int capturedSeekerId;
+        int capturedAtStep;
+    };
+
     // ─── Per-target output ──────────────────────────────────────────
 
     struct TargetResult {
@@ -95,6 +110,7 @@ struct SimResult {
     double maxNoiseLevel;
 
     std::vector<SeekerResult>      seekerResults;
+    std::vector<HunterResult>      hunterResults;
     std::vector<TargetResult>      targetResults;
     std::vector<DetectorResult>    detectorResults;
     std::vector<InterceptorResult> interceptorResults;

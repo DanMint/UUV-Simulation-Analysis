@@ -13,7 +13,7 @@
  * MapVisualizer (SFML 3)
  *
  * ── Unit placement ──────────────────────────────────────────────────
- *   S / T / D / I   Switch unit mode (Seeker, Target, Detector, Interceptor)
+ *   S / H / T / D / I   Switch unit mode (Seeker, Hunter, Target, Detector, Interceptor)
  *   Left click       Place unit on water cell
  *   Right click      Remove unit
  *   + / -            Adjust detector sensing radius
@@ -55,7 +55,7 @@ private:
     float m_cellSize;
 
     SpawnConfig m_config;
-    std::string m_currentType;     // "seeker" | "target" | "detector" | "interceptor"
+    std::string m_currentType;     // "seeker" | "hunter" | "target" | "detector" | "interceptor"
 
     // ── Zone draw state ──────────────────────────────────────────────
     // m_zoneDrawMode: "" = no zone mode, "attacker" or "defender"
@@ -88,6 +88,7 @@ private:
     static const sf::Color WATER_COLOR;
     static const sf::Color LAND_COLOR;
     static const sf::Color SEEKER_COLOR;
+    static const sf::Color HUNTER_COLOR;
     static const sf::Color TARGET_COLOR;
     static const sf::Color DETECTOR_COLOR;
     static const sf::Color DETECTOR_RADIUS_COLOR;

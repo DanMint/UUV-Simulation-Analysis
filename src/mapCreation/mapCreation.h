@@ -22,6 +22,7 @@ class OGRPolygon;
  *   3 = target      (defender, stationary)
  *   4 = detector    (defender sensor — sense only)
  *   5 = interceptor (defender effector — kill only)
+ *   6 = hunter      (pursuer that hunts seekers)
  */
 class MapCreation {
 public:
@@ -32,6 +33,7 @@ public:
     static constexpr int TARGET      = 3;
     static constexpr int DETECTOR    = 4;
     static constexpr int INTERCEPTOR = 5;
+    static constexpr int HUNTER      = 6;
 
     // ─── Constructor / Factory ──────────────────────────────────────
 
@@ -57,7 +59,7 @@ public:
 
     /**
      * Place a unit onto the grid. Only succeeds on water cells (0).
-     * @param unitType  SEEKER, TARGET, DETECTOR, or INTERCEPTOR
+     * @param unitType  SEEKER, TARGET, DETECTOR, INTERCEPTOR, or HUNTER
      */
     bool placeUnit(int row, int col, int unitType);
 
@@ -126,7 +128,8 @@ private:
 
     /** Helper: returns true if a cell holds any kind of unit (2/3/4/5). */
     static bool isUnitCell(int v) {
-        return v == SEEKER || v == TARGET || v == DETECTOR || v == INTERCEPTOR;
+        return v == SEEKER || v == TARGET || v == DETECTOR ||
+               v == INTERCEPTOR || v == HUNTER;
     }
 };
 

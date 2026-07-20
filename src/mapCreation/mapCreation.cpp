@@ -502,6 +502,7 @@ int MapCreation::placeUnitsFromConfig(
         else if (type == "target")      unitType = TARGET;
         else if (type == "detector")    unitType = DETECTOR;
         else if (type == "interceptor") unitType = INTERCEPTOR;
+        else if (type == "hunter")      unitType = HUNTER;
         else continue;
 
         if (placeUnit(pos.first, pos.second, unitType)) {
@@ -600,7 +601,7 @@ void MapCreation::loadCache(const std::string& cachePath) {
 void MapCreation::printGrid() const {
     std::cout << "\nGrid (" << m_cellsN << "x" << m_cellsN
               << ", . = water, # = land, S = seeker, T = target, "
-              << "D = detector, I = interceptor):\n\n";
+              << "H = hunter, D = detector, I = interceptor):\n\n";
     for (int row = 0; row < m_cellsN; row++) {
         for (int col = 0; col < m_cellsN; col++) {
             switch (m_grid[row][col]) {
@@ -608,6 +609,7 @@ void MapCreation::printGrid() const {
                 case LAND:        std::cout << '#'; break;
                 case SEEKER:      std::cout << 'S'; break;
                 case TARGET:      std::cout << 'T'; break;
+                case HUNTER:      std::cout << 'H'; break;
                 case DETECTOR:    std::cout << 'D'; break;
                 case INTERCEPTOR: std::cout << 'I'; break;
                 default:          std::cout << '?'; break;

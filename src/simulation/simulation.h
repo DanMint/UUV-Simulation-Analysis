@@ -8,6 +8,7 @@
 #include "pathfinding.h"
 #include "targetAgent.h"
 #include "seekerAgent.h"
+#include "hunterAgent.h"
 #include "detectorAgent.h"
 #include "interceptorAgent.h"
 #include "spawnConfig.h"
@@ -50,6 +51,7 @@ private:
     double m_maxNoiseLevel;
 
     std::vector<SeekerAgent>      m_seekers;
+    std::vector<HunterAgent>      m_hunters;
     std::vector<TargetAgent>      m_targets;
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
@@ -61,6 +63,9 @@ private:
 
     /** True if seeker and target occupy the same cell. */
     bool checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const;
+
+    /** True if hunter and seeker occupy the same cell. */
+    bool checkHunterCapture(const HunterAgent& hunter, const SeekerAgent& seeker) const;
 
     /**
      * Detectors look for seekers; sets `detected = true` on first sight
@@ -83,6 +88,9 @@ private:
 
     /** Re-assign each seeker to its nearest target and recompute paths. */
     void assignTargets(const Pathfinding& pf);
+
+    /** Re-assign each hunter to its nearest alive seeker and recompute paths. */
+    void assignHunters(const Pathfinding& pf);
 
     /** Build the final result struct from current agent state. */
     SimResult buildResult(int totalSteps) const;

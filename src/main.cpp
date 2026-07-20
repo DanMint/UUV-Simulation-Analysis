@@ -16,6 +16,7 @@ void printUsage(const char* progName) {
               << "  Left click   - Place unit on water cell\n"
               << "  Right click  - Remove unit\n"
               << "  S key        - Switch to Seeker mode (attacker, red triangle)\n"
+              << "  H key        - Switch to Hunter mode (pursuer, green diamond)\n"
               << "  T key        - Switch to Target mode (defender, blue square)\n"
               << "  D key        - Switch to Detector mode (sensor, orange diamond)\n"
               << "  I key        - Switch to Interceptor mode (effector, purple diamond)\n"
@@ -109,6 +110,7 @@ int main(int argc, char* argv[]) {
             for (const auto& unit : config.getUnits()) {
                 int unitType = MapCreation::WATER;
                 if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
+                if (unit.type == "hunter")   unitType = MapCreation::HUNTER;
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
@@ -133,6 +135,7 @@ int main(int argc, char* argv[]) {
             for (const auto& unit : config.getUnits()) {
                 int unitType = MapCreation::WATER;
                 if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
+                if (unit.type == "hunter")   unitType = MapCreation::HUNTER;
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
@@ -219,6 +222,7 @@ int main(int argc, char* argv[]) {
             for (const auto& unit : config.getUnits()) {
                 int unitType = MapCreation::WATER;
                 if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
+                if (unit.type == "hunter")   unitType = MapCreation::HUNTER;
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;

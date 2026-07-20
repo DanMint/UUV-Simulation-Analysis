@@ -10,5 +10,6 @@
 #include "detectorAgent.h"
 #include "interceptorAgent.h"
 #include "seekerAgent.h"
+#include "hunterAgent.h"
 
 #endif // AGENT_H
