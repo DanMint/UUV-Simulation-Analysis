@@ -22,7 +22,7 @@ class OGRPolygon;
  *   3 = target      (defender, stationary)
  *   4 = detector    (defender sensor — sense only)
  *   5 = interceptor (defender effector — kill only)
- *   6 = attacker     (offensive UUV/UAV, mobile) 
+ *   7 = attacker     (offensive UUV/UAV, mobile) 
  */
 class MapCreation {
 public:
@@ -33,7 +33,7 @@ public:
     static constexpr int TARGET      = 3;
     static constexpr int DETECTOR    = 4;
     static constexpr int INTERCEPTOR = 5;
-    static constexpr int ATTACKER    = 6;
+    static constexpr int ATTACKER    = 7;
 
     // ─── Constructor / Factory ──────────────────────────────────────
 

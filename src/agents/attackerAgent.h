@@ -81,6 +81,9 @@ struct AttackerAgent : public SeekerAgent {
         int step;
     };
     std::vector<Intercept> intercepts;
+    static constexpr int kMaxStepsBeforeAbort = 2000; // tune to map size
+    bool everSucceeded;      // sticky — set once, never cleared by enterS9()
+    int  bestStepsToTarget;  // steps for the successful run, if any
 
     // ── FSM state ─────────────────────────────────────────────────────────────
     AgentFSMState fsmState;       // current FSM state
@@ -112,8 +115,10 @@ struct AttackerAgent : public SeekerAgent {
 
     /**
      * Advance the FSM one step. Call once per simulation step.
-     * S0-S3 and S5-S9 transition immediately on the same tick.
+     * S0-S2 collapse into a single tick (idle through validate).
+     * S3 (path computation) takes its own tick before S4 begins.
      * S4 stays active across ticks while the agent moves to target.
+     * S5-S9 each take one tick apiece to fully wind down.
      * Returns true while the agent is still active (not S9/ABORT).
      */
     bool tick(int destRow, int destCol, const class Pathfinding& pf);

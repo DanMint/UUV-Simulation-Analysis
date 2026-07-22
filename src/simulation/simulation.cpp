@@ -426,7 +426,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
         ar.col = a.col;
         ar.alive = a.alive;
         ar.state = a.stateName();
-        ar.missionSuccess = a.missionSuccess;
+        ar.missionSuccess = a.everSucceeded;
         ar.stepsTaken = a.stepsTaken;
         ar.pathCost = a.pathCost;
         ar.nodesExpanded = a.nodesExpanded;
@@ -465,8 +465,20 @@ SimResult Simulation::buildResult(int totalSteps) const {
 // ════════════════════════════════════════════════════════════════════════════════
 void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
     for (auto& attacker : m_attackers) {
-        if (!attacker.alive) continue;
+        if(attacker.fsmState == AgentFSMState::S9_RESET) continue; // skip reset agents, they are done for the run
 
+        if (!attacker.alive) {
+            // Mission finished (S5-S8) or aborted, but FSM still needs to
+            // walk through its remaining terminal states — no retargeting
+            // needed, just let it keep ticking.
+            std::cout << "    state before tick: " << attacker.stateName()
+                      << " pos=(" << attacker.row << "," << attacker.col << ")\n";
+            attacker.tick(pf);
+            std::cout << "    state after tick : " << attacker.stateName()
+                      << " pos=(" << attacker.row << "," << attacker.col << ")\n";
+            continue;
+        }
+        
         // Retarget if the current target died.
         if (attacker.targetId >= 0 &&
             attacker.targetId < static_cast<int>(m_targets.size()) &&
@@ -522,8 +534,10 @@ SimResult Simulation::run() {
     int step = 0;
     bool allTargetsDead = false;
     bool allSeekersFinished = false;
+    bool allAttackersFinished = false;
 
-    while (step < m_maxSteps && !allTargetsDead && !allSeekersFinished) {
+    while (step < m_maxSteps && !allTargetsDead &&
+        !(allSeekersFinished && allAttackersFinished)) {        
         step++;
         
         // ── HEARTBEAT LOG ──
@@ -573,7 +587,7 @@ SimResult Simulation::run() {
         // FSM transitions from S4_EXECUTE toward S5_LOG_RESULT internally
         // on the next tick via the reachedTarget flag.
         for (auto& attacker : m_attackers) {
-            if (!attacker.alive || attacker.reachedTarget) continue;
+            if (!attacker.alive) continue;
             for (auto& target : m_targets) {
                 if (!target.alive) continue;
                 if (attacker.row == target.row && attacker.col == target.col) {
@@ -612,6 +626,14 @@ SimResult Simulation::run() {
                 allSeekersFinished = false; break;
             }
         }
+        allAttackersFinished = true;
+        for (const auto& a : m_attackers) {
+            if (a.fsmState != AgentFSMState::S9_RESET &&
+                a.fsmState != AgentFSMState::ABORT) {
+                allAttackersFinished = false;
+                break;
+            }
+        }
     }
 
     std::cout << "--- Simulation finished at step " << step << " ---\n";
@@ -624,11 +646,9 @@ SimResult Simulation::run() {
     std::cout << "Active Attackers: " << m_attackers.size() << std::endl;
 
     for (const auto& a : m_attackers) {
-        int displaySteps = (a.missionSuccess || a.fsmState == AgentFSMState::S5_LOG_RESULT)
-                        ? a.stepsToTarget
-                        : a.stepsTaken;
+        int displaySteps = a.everSucceeded ? a.bestStepsToTarget : a.stepsTaken;
         std::cout << "Agent " << a.id << " (" << a.specs.agentType << ") " 
-                << "Result: " << (a.missionSuccess ? "SUCCESS" : "FAILED") 
+                << "Result: " << (a.everSucceeded ? "SUCCESS" : "FAILED") 
                 << " | Steps: " << displaySteps << std::endl;
     }
     std::cout << "==========================================\n" << std::endl;

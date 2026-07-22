@@ -19,6 +19,7 @@ AttackerAgent::AttackerAgent(int id, int row, int col)
       fsmState(AgentFSMState::S0_IDLE), fallbackReason(""),
       stepDelayCounter(0),
       missionSuccess(false), stepsToTarget(0),
+      everSucceeded(false), bestStepsToTarget(0),
       milestone25(false), milestone50(false), milestone75(false)
 {
     std::cout << "[AttackerAgent id=" << id << "] S0: IDLE — awaiting spawn\n";
@@ -112,13 +113,21 @@ bool AttackerAgent::tick(int destRow, int destCol, const Pathfinding& pf) {
 
         case AgentFSMState::S4_EXECUTE: {
             runS4();
+            if (row == destRow && col == destCol) reachedTarget = true; // sync immediately, don't wait for the external collision pass
             if (reachedTarget || !hasPath()) {
                 missionSuccess = reachedTarget;
                 stepsToTarget  = stepsTaken;
+                if (reachedTarget) {
+                    everSucceeded = true;
+                    bestStepsToTarget = stepsTaken;
+                }
                 enterS5();
+            } else if (!alive) {
+                triggerFallback("killed by an interceptor");
             } else if (intercepted) {
-                triggerFallback("intercepted at step "
-                                + std::to_string(interceptedAtStep));
+                triggerFallback("intercepted at step " + std::to_string(interceptedAtStep));
+            } else if (stepsTaken >= kMaxStepsBeforeAbort) {
+                triggerFallback("exceeded max steps (" + std::to_string(kMaxStepsBeforeAbort) + ")");
             }
             break;
         }
@@ -334,6 +343,27 @@ double AttackerAgent::killProbability(int checkRow, int checkCol) const {
 void AttackerAgent::recordIntercept(int seekerId, int step) {
     intercepts.push_back({seekerId, step});
     killCount++;
+}
+
+void AttackerAgent::runFSMDemo(const std::string& type, const Pathfinding& pf,
+                                int spawnRow, int spawnCol,
+                                int targetRow, int targetCol) {
+    std::cout << "\n===== FSM DEMO: " << type << " =====\n";
+    AttackerAgent a = AttackerAgent::create(type, /*id=*/0, spawnRow, spawnCol);
+
+    a.setMissionTarget(targetRow, targetCol);
+
+    bool running = true;
+    int safetyCap = 500; // avoid an infinite loop if something's wrong
+    while (running && safetyCap-- > 0) {
+        running = a.tick(pf);
+    }
+
+    if (safetyCap <= 0) {
+        std::cout << "[runFSMDemo] WARNING: hit safety cap without reaching "
+                     "a terminal state\n";
+    }
+    std::cout << "===== END DEMO: " << type << " =====\n\n";
 }
 
 // ── isDetectableByHydrophone ──────────────────────────────────────────────────

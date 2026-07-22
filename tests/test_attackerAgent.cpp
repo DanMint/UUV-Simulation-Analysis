@@ -61,6 +61,35 @@ void testFSMInitialState() {
           "Steps taken starts at 0");
 }
 
+void testFSMTransitionOnTick() {
+    testSection("FSM Transitions via tick()");
+    std::vector<std::vector<int>> grid(30, std::vector<int>(30, 0));
+    Pathfinding pf(grid);
+
+    AttackerAgent a = AttackerAgent::create("bluerov2", 0, 5, 5);
+
+    a.tick(20, 20, pf); // S0 -> S1 -> S2 -> S3 (path computed, one tick)
+    check(a.fsmState == AgentFSMState::S3_INIT_BEHAVIOR,
+          "First tick advances S0 through S1/S2 to S3_INIT_BEHAVIOR");
+
+    a.tick(20, 20, pf); // S3 -> S4 (second tick)
+    check(a.fsmState == AgentFSMState::S4_EXECUTE,
+          "Second tick advances S3_INIT_BEHAVIOR to S4_EXECUTE");
+}
+
+void testFallbackWhenTargetEqualsSpawn() {
+    testSection("Fallback: target == spawn");
+    std::vector<std::vector<int>> grid(30, std::vector<int>(30, 0));
+    Pathfinding pf(grid);
+
+    AttackerAgent a = AttackerAgent::create("bluerov2", 0, 5, 5);
+    a.tick(5, 5, pf);
+    check(a.fsmState == AgentFSMState::FALLBACK,
+          "Target == spawn triggers FALLBACK");
+    check(a.fallbackReason == "target is same cell as spawn",
+          "Fallback reason is set correctly");
+}
+
 void testBlueROV2Specs() {
     testSection("BlueROV2 Specs");
 
@@ -149,6 +178,30 @@ void testUnderwaterDetectability() {
           "BlueBoat not detectable by hydrophone (surface)");
 }
 
+void testEverSucceededSurvivesReset() {
+    testSection("everSucceeded survives S9_RESET");
+    std::vector<std::vector<int>> grid(30, std::vector<int>(30, 0));
+    Pathfinding pf(grid);
+
+    AttackerAgent a = AttackerAgent::create("bluerov2", 0, 5, 5);
+    a.setMissionTarget(6, 5); // one cell away, fast to finish
+
+    // Drive the FSM all the way to S9_RESET
+    int safety = 100;
+    while (a.fsmState != AgentFSMState::S9_RESET && safety-- > 0) {
+        a.tick(pf);
+    }
+
+    check(a.fsmState == AgentFSMState::S9_RESET,
+          "Agent reaches S9_RESET within safety cap");
+    check(a.everSucceeded == true,
+          "everSucceeded stays true after S9_RESET wipes missionSuccess");
+    check(a.missionSuccess == false,
+          "missionSuccess correctly gets wiped by enterS9 (per-cycle field)");
+    check(a.bestStepsToTarget > 0,
+          "bestStepsToTarget retains the successful run's step count");
+}
+
 void testFrequencyRangeDetection() {
     testSection("Frequency Range Detection");
 
@@ -221,6 +274,8 @@ int main() {
     std::cout << "======================================\n";
 
     testFSMInitialState();
+    testFSMTransitionOnTick();
+    testFallbackWhenTargetEqualsSpawn();
     testBlueROV2Specs();
     testRiptideSpecs();
     testHUGINSpecs();
@@ -229,6 +284,7 @@ int main() {
     testFrequencyRangeDetection();
     testAerialIgnoresDetectorRegardlessOfRange();
     testUnknownType();
+    testEverSucceededSurvivesReset();
 
     std::cout << "\n======================================\n";
     std::cout << "  Results: " << passedTests << " / " << totalTests << " passed\n";

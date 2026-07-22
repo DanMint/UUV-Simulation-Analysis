@@ -416,10 +416,12 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             size_t colPos = content.find("\"col\"", rowPos);
             int col = static_cast<int>(extractNumber(content, "col", rowPos));
 
-            // Optional vehicleType field
+            // Optional vehicleType field — bound the search to this unit's own object,
+            // not an arbitrary character offset that can bleed into the next entry.
             std::string vehicleType = "";
+            size_t objEnd = content.find("}", colPos); // end of this unit's { ... }
             size_t vPos = content.find("\"vehicle_type\"", colPos);
-            if (vPos != std::string::npos && vPos < content.find(",", colPos) + 50) {
+            if (vPos != std::string::npos && objEnd != std::string::npos && vPos < objEnd) {
                 size_t vStart = content.find("\"", content.find(":", vPos) + 1) + 1;
                 size_t vEnd   = content.find("\"", vStart);
                 vehicleType = content.substr(vStart, vEnd - vStart);
