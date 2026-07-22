@@ -38,15 +38,24 @@ MapCreation::MapCreation(const std::string& shpPath, int cellsN,
 }
 
 MapCreation MapCreation::fromCache(const std::string& cachePath) {
-    // Create a "blank" object then fill it from cache
-    // We use a private helper, so we construct with dummy values
-    // and immediately overwrite from cache
-    MapCreation obj("", 0, 0, 0);  // won't actually load anything since cellsN=0
-    // Clear the failed state from the dummy constructor
-    obj.m_grid.clear();
-    obj.m_polygons.clear();
+    // Use a fully initialized default object, then overwrite from cache
+    // The empty shpPath + 0 cellsN avoids loading any shapefile data,
+    // and loadCache() immediately replaces all member values.
+    MapCreation obj;
     obj.loadCache(cachePath);
     return obj;
+}
+
+MapCreation::MapCreation()
+    : m_cellsN(0),
+      m_canvasWidth(700),
+      m_canvasHeight(700),
+      m_colSpace(0.0),
+      m_rowSpace(0.0),
+      m_cellSize(0),
+      m_minDepth(0.0),
+      m_maxDepth(0.0)
+{
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

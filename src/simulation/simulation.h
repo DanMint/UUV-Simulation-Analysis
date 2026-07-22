@@ -83,6 +83,10 @@ private:
      */
     bool applyNoise(SeekerAgent& seeker);
 
+    /** Templated noise implementation (works with SeekerAgent and AttackerAgent). */
+    template <typename Agent>
+    bool applyNoiseImpl(Agent& agent);
+
     /** Re-assign each seeker to its nearest target and recompute paths. */
     void assignTargets(const Pathfinding& pf);
 

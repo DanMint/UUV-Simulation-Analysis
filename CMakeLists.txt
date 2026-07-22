@@ -19,7 +19,6 @@ add_executable(uuv_sim
     src/pathfinding/pathfinding.cpp
     src/simulation/simulation.cpp
     src/simulation/simResult.cpp
-    src/agents/vehicleSpecs.cpp
     src/agents/targetAgent.cpp
     src/agents/seekerAgent.cpp
     src/agents/attackerAgent.cpp

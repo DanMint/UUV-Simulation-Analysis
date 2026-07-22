@@ -8,6 +8,30 @@
 #include <sstream>
 #include <cstdlib>
 #include <limits>
+#include <string_view>
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════════════════════
+
+[[nodiscard]] static constexpr int unitTypeFromString(std::string_view type) noexcept {
+    using namespace std::string_view_literals;
+    if (type == "seeker"sv)      return MapCreation::SEEKER;
+    if (type == "target"sv)      return MapCreation::TARGET;
+    if (type == "detector"sv)    return MapCreation::DETECTOR;
+    if (type == "interceptor"sv) return MapCreation::INTERCEPTOR;
+    if (type == "attacker"sv)    return MapCreation::ATTACKER;
+    return MapCreation::WATER;
+}
+
+static void stampUnitsOnGrid(MapCreation& map, const SpawnConfig& config) {
+    for (const auto& unit : config.getUnits()) {
+        int unitType = unitTypeFromString(unit.type);
+        if (unitType != MapCreation::WATER) {
+            map.placeUnit(unit.row, unit.col, unitType);
+        }
+    }
+}
 
 void printUsage(const char* progName) {
     std::cout << "Usage:\n"
@@ -112,15 +136,7 @@ int main(int argc, char* argv[]) {
             }
 
             // Stamp units onto grid
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                if (unit.type == "attacker") unitType = MapCreation::ATTACKER;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            stampUnitsOnGrid(map, config);
 
             // Attach map data and save scenario
             MapInfo info;
@@ -137,15 +153,7 @@ int main(int argc, char* argv[]) {
         }
         else {
             // Stamp units from loaded scenario onto grid
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                if (unit.type == "attacker") unitType = MapCreation::ATTACKER;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            stampUnitsOnGrid(map, config);
         }
 
         config.printSummary();
@@ -224,15 +232,7 @@ int main(int argc, char* argv[]) {
             // Reset the grid: clear all units, then re-stamp them
             // This ensures each iteration starts from the same state
             map.clearAllUnits();
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                if (unit.type == "attacker")    unitType = MapCreation::ATTACKER;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            stampUnitsOnGrid(map, config);
 
             // Run the simulation
             Simulation sim(map, config, 2000);

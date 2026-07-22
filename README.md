@@ -63,13 +63,16 @@ This is the tightest admissible heuristic for 8-way grids. It never overestimate
 
 ### Grid Cell Values
 
-| Value | Type     | Passable |
-|-------|----------|----------|
-| 0     | Water    | Yes      |
-| 1     | Land     | No       |
-| 2     | Seeker   | Yes      |
-| 3     | Target   | Yes      |
-| 4     | Detector | Yes      |
+| Value | Type       | Passable |
+|-------|------------|----------|
+| 0     | Water      | Yes      |
+| 1     | Land       | No       |
+| 2     | Seeker     | Yes      |
+| 3     | Target     | Yes      |
+| 4     | Detector   | Yes      |
+| 5     | Interceptor| Yes      |
+| 6     | ATK Zone   | No       |
+| 7     | Attacker   | Yes      |
 
 ## Noise Model
 

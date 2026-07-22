@@ -3,10 +3,13 @@
 
 #include <vector>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
+#include <concepts>
 
 /**
  * SimResult
@@ -19,6 +22,10 @@
  *
  * Does NOT run the simulation (that is Simulation's job) and does NOT
  * own map/spawn data (that is SpawnConfig's job).
+ *
+ * Performance: saveJSON() uses an ostringstream buffer to build the entire
+ * JSON document before writing to disk in a single I/O operation. This is
+ * significantly faster than hundreds of individual file << calls.
  */
 struct SimResult {
 

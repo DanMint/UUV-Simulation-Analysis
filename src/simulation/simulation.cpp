@@ -269,12 +269,33 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  APPLY NOISE  (unchanged from the previous version)
+//  BRESENHAM LINE-OF-SIGHT  (shared utility)
 // ════════════════════════════════════════════════════════════════════════════════
 
-bool Simulation::applyNoise(SeekerAgent& seeker) {
+[[nodiscard]] static bool bresenhamLOS(const MapCreation& map, int r0, int c0, int r1, int c1) {
+    int dr = std::abs(r1 - r0);
+    int dc = std::abs(c1 - c0);
+    int sr = (r0 < r1) ? 1 : -1;
+    int sc = (c0 < c1) ? 1 : -1;
+    int err = dc - dr;
+    int r = r0, c = c0;
+    while (r != r1 || c != c1) {
+        int e2 = 2 * err;
+        if (e2 > -dr) { err -= dr; c += sc; }
+        if (e2 < dc)  { err += dc; r += sr; }
+        if (!map.isValid(r, c) || !map.isPassable(r, c)) return false;
+    }
+    return true;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  APPLY NOISE  — templated to work with both SeekerAgent and AttackerAgent
+// ════════════════════════════════════════════════════════════════════════════════
+
+template <typename Agent>
+bool Simulation::applyNoiseImpl(Agent& agent) {
     if (m_maxNoiseLevel <= 0.0) return false;
-    if (!seeker.alive || seeker.reachedTarget) return false;
+    if (!agent.alive || agent.reachedTarget) return false;
 
     std::uniform_real_distribution<double> dist(-m_maxNoiseLevel, m_maxNoiseLevel);
     int rx = static_cast<int>(std::round(dist(m_rng)));
@@ -282,42 +303,27 @@ bool Simulation::applyNoise(SeekerAgent& seeker) {
 
     if (rx == 0 && ry == 0) return false;
 
-    int newRow = seeker.row + ry;
-    int newCol = seeker.col + rx;
+    int newRow = agent.row + ry;
+    int newCol = agent.col + rx;
 
     if (!m_map.isValid(newRow, newCol)) return false;
     if (!m_map.isPassable(newRow, newCol)) return false;
+    if (!bresenhamLOS(m_map, agent.row, agent.col, newRow, newCol)) return false;
 
-    // ── Bresenham line-of-sight check: reject if any cell along the
-    //    displacement is blocked (prevents teleporting over land). ──
-    {
-        int r0 = seeker.row, c0 = seeker.col;
-        int r1 = newRow, c1 = newCol;
-        int dr = std::abs(r1 - r0);
-        int dc = std::abs(c1 - c0);
-        int sr = (r0 < r1) ? 1 : -1;
-        int sc = (c0 < c1) ? 1 : -1;
-        int err = dc - dr;
-
-        int r = r0, c = c0;
-        while (r != r1 || c != c1) {
-            int e2 = 2 * err;
-            if (e2 > -dr) { err -= dr; c += sc; }
-            if (e2 < dc) { err += dc; r += sr; }
-
-            if (!m_map.isValid(r, c) || !m_map.isPassable(r, c)) {
-                return false;
-            }
-        }
-    }
-
-    seeker.row = newRow;
-    seeker.col = newCol;
-    seeker.moveHistory.push_back({newRow, newCol});
-
-    seeker.path.clear();
-    seeker.pathIndex = 0;
+    agent.row = newRow;
+    agent.col = newCol;
+    agent.moveHistory.push_back({newRow, newCol});
+    agent.path.clear();
+    agent.pathIndex = 0;
     return true;
+}
+
+// Explicit instantiation for the agent types using it
+template bool Simulation::applyNoiseImpl<SeekerAgent>(SeekerAgent&);
+template bool Simulation::applyNoiseImpl<AttackerAgent>(AttackerAgent&);
+
+[[maybe_unused]] bool Simulation::applyNoise(SeekerAgent& seeker) {
+    return applyNoiseImpl(seeker);
 }
 
 void Simulation::assignTargets(const Pathfinding& pf) {
@@ -558,6 +564,7 @@ SimResult Simulation::run() {
         // ── 2. Noise ──
         if (m_maxNoiseLevel > 0.0) {
             for (auto& seeker : m_seekers) applyNoise(seeker);
+            for (auto& attacker : m_attackers) applyNoiseImpl(attacker);
         }
 
         // ── 3. SENSE: detectors update tracks ──
@@ -615,23 +622,28 @@ SimResult Simulation::run() {
         }
         if (needsRetarget) assignTargets(pf);
 
-        // ── 7. Termination ──
-        allTargetsDead = true;
-        for (const auto& t : m_targets) {
-            if (t.alive) { allTargetsDead = false; break; }
-        }
-        allSeekersFinished = true;
-        for (const auto& s : m_seekers) {
-            if (s.alive && !s.reachedTarget && s.hasPath()) {
-                allSeekersFinished = false; break;
+        // ── 7. Termination (optimized with early-exit flags) ──
+        {
+            int aliveTargets = 0;
+            for (const auto& t : m_targets) if (t.alive) { aliveTargets++; break; }
+            allTargetsDead = (aliveTargets == 0);
+
+            if (allTargetsDead) break; // fast-path: no targets left
+
+            allSeekersFinished = true;
+            for (const auto& s : m_seekers) {
+                if (s.alive && !s.reachedTarget) {
+                    if (s.hasPath()) { allSeekersFinished = false; break; }
+                }
             }
-        }
-        allAttackersFinished = true;
-        for (const auto& a : m_attackers) {
-            if (a.fsmState != AgentFSMState::S9_RESET &&
-                a.fsmState != AgentFSMState::ABORT) {
-                allAttackersFinished = false;
-                break;
+
+            allAttackersFinished = true;
+            for (const auto& a : m_attackers) {
+                if (a.fsmState != AgentFSMState::S9_RESET &&
+                    a.fsmState != AgentFSMState::ABORT) {
+                    allAttackersFinished = false;
+                    break;
+                }
             }
         }
     }
