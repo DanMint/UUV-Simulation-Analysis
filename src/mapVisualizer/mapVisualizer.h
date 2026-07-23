@@ -56,7 +56,11 @@ private:
 
     SpawnConfig m_config;
     std::string m_currentType;     // "seeker" | "target" | "detector" | "interceptor"
-
+    std::vector<std::string> m_droneTiers = {
+        "HSU-001","UUV-300","705 Institute",
+    };
+    int m_currentTierIndex=0;
+    
     // ── Zone draw state ──────────────────────────────────────────────
     // m_zoneDrawMode: "" = no zone mode, "attacker" or "defender"
     std::string m_zoneDrawMode;

@@ -30,6 +30,9 @@ struct SeekerAgent {
     int spawnCol;
     bool alive;
     bool reachedTarget;
+    std::string droneType;  // e.g. "705 Institute", "HSU-001"
+
+    SeekerAgent(int id, int row, int col, std::string droneType = "unknown");
 
     // A* path
     std::vector<Pathfinding::Pos> path;
@@ -55,8 +58,6 @@ struct SeekerAgent {
     bool intercepted;               // killed by an interceptor?
     int interceptedByInterceptor;   // id of the killing interceptor (-1)
     int interceptedAtStep;          // step of the kill (-1)
-
-    SeekerAgent(int id, int row, int col);
 
     /** Compute A* path to a target. Updates path, pathCost, nodesExpanded. */
     void computePath(const Pathfinding& pf, int destRow, int destCol);

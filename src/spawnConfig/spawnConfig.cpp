@@ -4,10 +4,10 @@
 //  UNIT MANAGEMENT  (unchanged)
 // ════════════════════════════════════════════════════════════════════════════════
 
-bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
+bool SpawnConfig::addUnit(const std::string& type, int row, int col, const std::string& droneType) {
     for (const auto& u : m_units)
         if (u.row == row && u.col == col) return false;
-    m_units.push_back({type, row, col});
+    m_units.push_back({type, droneType , row, col});
     return true;
 }
 
@@ -284,6 +284,7 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     for (int i = 0; i < (int)m_units.size(); i++) {
         const auto& u = m_units[i];
         file << "    { \"type\": \"" << u.type
+             << "\", \"drone_type\": \"" << u.droneType
              << "\", \"row\": "      << u.row
              << ", \"col\": "        << u.col << " }";
         if (i < (int)m_units.size() - 1) file << ",";
@@ -399,6 +400,14 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             size_t tStart = content.find("\"", content.find(":", pos) + 1) + 1;
             size_t tEnd   = content.find("\"", tStart);
             std::string type = content.substr(tStart, tEnd - tStart);
+
+            std::string droneType = "unknown";
+            size_t dtPos = content.find("\"drone_type\"", tEnd);
+            size_t nextTypePos = content.find("\"type\"", tEnd);
+            if (dtPos != std::string::npos && 
+                (nextTypePos == std::string::npos || dtPos < nextTypePos)) {
+                droneType = extractString(content, "drone_type", tEnd);
+                }
 
             size_t rowPos = content.find("\"row\"", tEnd);
             int row = static_cast<int>(extractNumber(content, "row", tEnd));

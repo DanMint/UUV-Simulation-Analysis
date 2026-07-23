@@ -19,13 +19,13 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
 
     for (const auto& unit : config.getUnits()) {
         if (unit.type == "seeker") {
-            m_seekers.emplace_back(seekerId++, unit.row, unit.col);
+            m_seekers.emplace_back(seekerId++, unit.row, unit.col,unit.droneType);
         } else if (unit.type == "target") {
             m_targets.emplace_back(targetId++, unit.row, unit.col);
         } else if (unit.type == "detector") {
             m_detectors.emplace_back(detectorId++, unit.row, unit.col, detRadius);
         } else if (unit.type == "interceptor") {
-            m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
+            m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius, unit.droneType);
         }
     }
 
@@ -271,6 +271,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
     for (const auto& s : m_seekers) {
         SimResult::SeekerResult sr;
         sr.id = s.id;
+        sr.droneType = s.droneType; // <-- new field
         sr.stepsTaken = s.stepsTaken;
         sr.pathCost = s.pathCost;
         sr.nodesExpanded = s.nodesExpanded;
@@ -322,6 +323,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
     for (const auto& i : m_interceptors) {
         SimResult::InterceptorResult ir;
         ir.id = i.id;
+        ir.droneType = i.droneType; // <-- new field
         ir.row = i.row;
         ir.col = i.col;
         ir.killRadius = i.killRadius;

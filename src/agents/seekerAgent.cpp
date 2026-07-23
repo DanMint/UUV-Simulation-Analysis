@@ -1,6 +1,6 @@
 #include "seekerAgent.h"
 
-SeekerAgent::SeekerAgent(int id, int row, int col)
+SeekerAgent::SeekerAgent(int id, int row, int col, std::string droneType ) 
     : id(id), row(row), col(col),
       spawnRow(row), spawnCol(col),
       alive(true), reachedTarget(false),

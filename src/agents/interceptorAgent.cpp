@@ -1,11 +1,12 @@
 #include "interceptorAgent.h"
 #include <cmath>
 
-InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius)
+InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius, std::string droneType)
     : id(id), row(row), col(col),
       killRadius(killRadius),
       alive(true),
-      killCount(0) {}
+      killCount(0),
+      droneType(std::move(droneType)) {}
 
 bool InterceptorAgent::isInRange(int checkRow, int checkCol) const {
     double dr = row - checkRow;

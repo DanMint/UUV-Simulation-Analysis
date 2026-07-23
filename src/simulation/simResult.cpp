@@ -1,4 +1,7 @@
 #include "simResult.h"
+#include <map>
+#include <fstream>
+#include <iostream>
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  COMPUTE SUMMARY
@@ -253,7 +256,34 @@ void SimResult::saveJSON(const std::string& filepath) const {
         file << "\n";
     }
     file << "  ]\n";
-
+// ---- Metrics: losses/intercepts tallied by drone type, for CBA ---
+    std::map<std:: string, int>losses, intercepts;
+    for (const auto& s : seekerResults) 
+        if (s.intercepted) losses[s.droneType]++;
+    for (const auto& it : interceptorResults)
+        intercepts[it.droneType] += it.killCount;
+    file << "  ,\"metrics\": {\n";
+    file << "    \"losses\": {\n";
+    {
+        int i =0;
+        for (const auto&[name, count]: losses) {
+            file << "      \"" << name << "\": " << count;
+            if (++i < (int)losses.size()) file << ",";
+            file << "\n";
+        }
+    }
+    file << "},\n";
+    file << "    \"intercepts\": {\n";
+    {
+        int i =0;
+        for (const auto&[name, count]: intercepts) {
+            file << "      \"" << name << "\": " << count;
+            if (++i < (int)intercepts.size()) file << ",";
+            file << "\n";
+        }
+    }
+    file << "    }\n";
+    file << "  }\n";
     file << "}\n";
     file.close();
 

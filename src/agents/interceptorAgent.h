@@ -2,6 +2,7 @@
 #define INTERCEPTOR_AGENT_H
 
 #include <vector>
+#include <string>
 
 /**
  * InterceptorAgent
@@ -27,7 +28,8 @@ struct InterceptorAgent {
     int col;
     double killRadius;     // engagement range in cells (Euclidean)
     bool alive;
-    int killCount;         // total successful kills
+    int killCount; 
+    std::string droneType;  // total successful kills
 
     struct Intercept {
         int seekerId;
@@ -35,7 +37,7 @@ struct InterceptorAgent {
     };
     std::vector<Intercept> intercepts;
 
-    InterceptorAgent(int id, int row, int col, double killRadius);
+    InterceptorAgent(int id, int row, int col, double killRadius, std::string droneType = "unknown");
 
     /** True if a position is within this interceptor's kill radius. */
     bool isInRange(int checkRow, int checkCol) const;
