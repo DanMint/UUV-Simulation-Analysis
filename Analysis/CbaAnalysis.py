@@ -10,12 +10,6 @@ from dotenv import load_dotenv
 # Must run before anything below tries to read os.environ.
 load_dotenv()
 
-# NOTE: this assumes drone_values.py sits in the SAME folder as this file.
-# If it's actually in a subfolder (e.g. Analysis/data/drone_values.py), change
-# this to: from data.drone_values import DroneValueTable
-# (and make sure that folder has an __init__.py file in it)
-from drone_values import DroneValueTable
-
 
 class ProjectData:
     def __init__(self, initial_investment, annual_costs, annual_benefits, discount_rate, project_lifespan, intangible_factors=None):
@@ -40,7 +34,7 @@ class CBAResults:
 
 def parse_money(value):
     """
-    Convert messy spreadsheet cost cells into a float.
+    Convert messy cost values into a float.
     Handles: plain numbers, None, "$40,000+reload", "$1.4 million", "$1.4M", etc.
     Returns None if no numeric value could be recovered.
     """
@@ -64,12 +58,65 @@ def parse_money(value):
     return None
 
 
+class DroneValueTable:
+    """
+    Per-drone-type cost data (cost to produce / cost to intercept),
+    hardcoded directly here -- no spreadsheet, no separate file needed.
+    Add new drones by adding a row to _RAW_ROWS below.
+    """
+
+    # Each row: (name, size, cost_to_produce, cost_to_intercept)
+    _RAW_ROWS = [
+        ("HSU-001",       "5m",  20000,      10000),
+        ("UUV-300",       "13m", 40000,      10000),
+        ("HSU-100",       "16m", 300000,     10000),
+        ("705 Institute", "17m", 400000,     40000),
+        ("AJX-002",       "18m", 500000,     40000),
+        ("705 Institute", "45m", 5000000,    1400000),
+        ("Second 705",    "45m", 5000000,    1400000),
+    ]
+
+    def __init__(self):
+        self.table = {}  # name -> {"cost_to_produce": float, "cost_to_intercept": float, "size": str}
+        self._build_table()
+
+    def _build_table(self):
+        seen_names = set()
+        for name, size, produce, intercept in self._RAW_ROWS:
+            key = f"{name} ({size})" if name in seen_names else name
+
+            if name in seen_names and name in self.table:
+                # Rename the earlier entry too, now that we know it collides
+                old_entry = self.table.pop(name)
+                self.table[f"{name} ({old_entry['size']})"] = old_entry
+
+            seen_names.add(name)
+            self.table[key] = {
+                "cost_to_produce": parse_money(produce),
+                "cost_to_intercept": parse_money(intercept),
+                "size": size,
+            }
+        print(f"[CBA Agent] Loaded {len(self.table)} hardcoded drone entries")
+
+    def cost_to_produce(self, name, default=0.0):
+        entry = self.table.get(name)
+        if entry and entry["cost_to_produce"] is not None:
+            return entry["cost_to_produce"]
+        return default
+
+    def cost_to_intercept(self, name, default=0.0):
+        entry = self.table.get(name)
+        if entry and entry["cost_to_intercept"] is not None:
+            return entry["cost_to_intercept"]
+        return default
+
+
 class CostBenefitAnalysisAgent:
     def __init__(self, results_json_path="tests/fixtures/results.json"):
         self.results_json_path = results_json_path
-        # Securely pull the token from the environment (now loaded via .env above)
+        # Securely pull the token from the environment (loaded via .env above)
         self.hf_token = os.environ.get("HF_TOKEN", "")
-        # Per-drone-type cost lookup — hardcoded module, no spreadsheet needed
+        # Per-drone-type cost lookup -- hardcoded, no file dependency
         self.drone_values = DroneValueTable()
 
     def gather_project_data(self, user_prompt: str) -> ProjectData:
@@ -93,7 +140,7 @@ class CostBenefitAnalysisAgent:
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "meta-llama/Llama-3.2-3B-Instruct:fastest",
+                "model": "deepseek-ai/DeepSeek-V3-0324:fastest",
                 "messages": [
                     {"role": "system", "content": system_instructions},
                     {"role": "user", "content": user_prompt}
