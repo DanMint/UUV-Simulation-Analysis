@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 echo 
 rm -rf output/
 rm -rf runs/*

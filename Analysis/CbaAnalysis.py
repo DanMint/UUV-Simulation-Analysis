@@ -4,7 +4,17 @@ import re
 import ast
 import urllib.request
 
-import openpyxl
+from dotenv import load_dotenv
+
+# Loads HF_TOKEN (and anything else) from your .env file into the environment.
+# Must run before anything below tries to read os.environ.
+load_dotenv()
+
+# NOTE: this assumes drone_values.py sits in the SAME folder as this file.
+# If it's actually in a subfolder (e.g. Analysis/data/drone_values.py), change
+# this to: from data.drone_values import DroneValueTable
+# (and make sure that folder has an __init__.py file in it)
+from drone_values import DroneValueTable
 
 
 class ProjectData:
@@ -54,81 +64,13 @@ def parse_money(value):
     return None
 
 
-class DroneValueTable:
-    """
-    Loads per-drone-type cost data (cost to produce / cost to intercept)
-    from a spreadsheet so it can be tuned without touching code.
-    """
-    def __init__(self, spreadsheet_path="data/drone_values.xlsx"):
-        self.spreadsheet_path = spreadsheet_path
-        self.table = {}  # name -> {"cost_to_produce": float|None, "cost_to_intercept": float|None}
-        self._load()
-
-    def _load(self):
-        if not os.path.exists(self.spreadsheet_path):
-            print(f"[CBA Agent] Drone value spreadsheet not found at {self.spreadsheet_path}, skipping.")
-            return
-
-        try:
-            wb = openpyxl.load_workbook(self.spreadsheet_path, data_only=True)
-            ws = wb.active
-            rows = list(ws.iter_rows(values_only=True))
-
-            header = [str(h).strip().lower() if h else "" for h in rows[0]]
-            name_idx = header.index("drone names")
-            size_idx = header.index("size")
-            produce_idx = header.index("cost to produce")
-            intercept_idx = header.index("cost to intercept")
-
-            seen_names = set()
-            for row in rows[1:]:
-                name = row[name_idx]
-                if not name:
-                    continue
-                if str(name).strip().lower() == "sources":
-                    break  # everything after this is source links, not drone rows
-
-                name = str(name).strip()
-                size = str(row[size_idx]).strip() if row[size_idx] else ""
-                # Key on name+size: some sheets reuse a name (e.g. two "705 Institute"
-                # rows for different hull sizes) which would otherwise overwrite each other.
-                key = f"{name} ({size})" if name in seen_names else name
-                if name in seen_names and name in self.table:
-                    # Rename the earlier entry too, now that we know it collides
-                    old_entry = self.table.pop(name)
-                    self.table[f"{name} ({old_entry['size']})"] = old_entry
-                seen_names.add(name)
-
-                self.table[key] = {
-                    "cost_to_produce": parse_money(row[produce_idx]),
-                    "cost_to_intercept": parse_money(row[intercept_idx]),
-                    "size": size,
-                }
-            print(f"[CBA Agent] Loaded {len(self.table)} drone entries from {self.spreadsheet_path}")
-
-        except Exception as e:
-            print(f"[CBA Agent] Failed to load drone value spreadsheet: {e}")
-
-    def cost_to_produce(self, name, default=0.0):
-        entry = self.table.get(name)
-        if entry and entry["cost_to_produce"] is not None:
-            return entry["cost_to_produce"]
-        return default
-
-    def cost_to_intercept(self, name, default=0.0):
-        entry = self.table.get(name)
-        if entry and entry["cost_to_intercept"] is not None:
-            return entry["cost_to_intercept"]
-        return default
-
-
 class CostBenefitAnalysisAgent:
-    def __init__(self, results_json_path="tests/fixtures/results.json", drone_values_path="data/drone_values.xlsx"):
+    def __init__(self, results_json_path="tests/fixtures/results.json"):
         self.results_json_path = results_json_path
-        # Securely pull the token from the environment variable
+        # Securely pull the token from the environment (now loaded via .env above)
         self.hf_token = os.environ.get("HF_TOKEN", "")
-        # Per-drone-type cost lookup, loaded once at startup
-        self.drone_values = DroneValueTable(drone_values_path)
+        # Per-drone-type cost lookup — hardcoded module, no spreadsheet needed
+        self.drone_values = DroneValueTable()
 
     def gather_project_data(self, user_prompt: str) -> ProjectData:
         print("[CBA Agent] Connecting natively to Hugging Face AI router...")
@@ -151,7 +93,7 @@ class CostBenefitAnalysisAgent:
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "meta-llama/Llama-3.2-3B-Instruct",
+                "model": "meta-llama/Llama-3.2-3B-Instruct:fastest",
                 "messages": [
                     {"role": "system", "content": system_instructions},
                     {"role": "user", "content": user_prompt}

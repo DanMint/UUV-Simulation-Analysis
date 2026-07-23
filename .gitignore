@@ -7,4 +7,4 @@ paths/
 scenario.json
 grid_cache.txt
 output/
-echo ".env" >> .gitignore
+.env
