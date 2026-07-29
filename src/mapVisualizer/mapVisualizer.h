@@ -65,6 +65,7 @@ private:
     int  m_zoneDragStartCol;
     int  m_zoneDragCurrentRow;
     int  m_zoneDragCurrentCol;
+    std::string m_vehicleType = "bluerov2";
 
     // ── GA-prep mode ─────────────────────────────────────────────────
     // When true, the seeker / detector / interceptor keys are inert.

@@ -1,17 +1,44 @@
 #include "mapCreation.h"
 #include "spawnConfig.h"
 #include "mapVisualizer.h"
+#include "simulationVisualizer.h"
 #include "simulation.h"
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <cstdlib>
+#include <limits>
+#include <string_view>
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════════════════════
+
+[[nodiscard]] static constexpr int unitTypeFromString(std::string_view type) noexcept {
+    using namespace std::string_view_literals;
+    if (type == "seeker"sv)      return MapCreation::SEEKER;
+    if (type == "target"sv)      return MapCreation::TARGET;
+    if (type == "detector"sv)    return MapCreation::DETECTOR;
+    if (type == "interceptor"sv) return MapCreation::INTERCEPTOR;
+    if (type == "attacker"sv)    return MapCreation::ATTACKER;
+    return MapCreation::WATER;
+}
+
+static void stampUnitsOnGrid(MapCreation& map, const SpawnConfig& config) {
+    for (const auto& unit : config.getUnits()) {
+        int unitType = unitTypeFromString(unit.type);
+        if (unitType != MapCreation::WATER) {
+            map.placeUnit(unit.row, unit.col, unitType);
+        }
+    }
+}
 
 void printUsage(const char* progName) {
     std::cout << "Usage:\n"
               << "  " << progName << " <shapefile.shp> [cells_n]\n"
               << "  " << progName << " --cache <cache_file.txt>\n"
-              << "  " << progName << " --scenario <scenario.json>\n"
+              << "  " << progName << " --scenario <scenario.json> [--visualize]\n"
               << "\nSpawn Tool Controls:\n"
               << "  Left click   - Place unit on water cell\n"
               << "  Right click  - Remove unit\n"
@@ -27,7 +54,17 @@ void printUsage(const char* progName) {
               << "  [ / ] keys   - Adjust noise level (wave/wind)\n"
               << "  C key        - Clear all units (zones preserved)\n"
               << "  Enter        - Save scenario and run simulation\n"
-              << "  Escape       - Close without saving\n";
+              << "  Escape       - Close without saving\n"
+              << "  A key        - Switch to Attacker mode (red triangle)\n"
+              << "                  1=BlueROV2  2=Riptide  3=BlueBoat\n"
+              << "                  4=YUCO  5=NemoSens  6=HUGIN\n"
+              << "                  7=TB2  8=QueenHornet  9=Shahed\n"
+              << "\nLive Visualization (requires --scenario):\n"
+              << "  " << progName << " --scenario scenario.json --visualize\n"
+              << "  Controls:\n"
+              << "    Space  - Pause/Resume  |  +/-  - Speed\n"
+              << "    Enter  - Step (paused)  |  L    - Toggle legend\n"
+              << "    Esc    - Skip to end\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -42,11 +79,20 @@ int main(int argc, char* argv[]) {
         std::string shpPath = "";
         std::string firstArg = argv[1];
         bool needSpawnTool = true;
+        bool visualize = false;
 
-        // ── Load map ─────────────────────────────────────────────────
+        // Check for --visualize flag (can be at any position)
+        for (int i = 1; i < argc; i++) {
+            if (std::string(argv[i]) == "--visualize") {
+                visualize = true;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  LOAD MAP
+        // ═══════════════════════════════════════════════════════════════
 
         if (firstArg == "--scenario") {
-            // Load a complete scenario (map + grid + units)
             if (argc < 3) {
                 std::cerr << "Error: --scenario requires a file path\n";
                 return 1;
@@ -59,9 +105,10 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
 
-            // Build a MapCreation from the cached grid in the config
+            // Reconstruct map from embedded grid data instead of grid_cache.txt
             const MapInfo& info = config.getMapInfo();
-            static MapCreation scenarioMap = MapCreation::fromCache("grid_cache.txt");
+            static MapCreation scenarioMap = MapCreation::fromGridData(
+                config.getGrid(), info.cellsN, info.canvasWidth, info.canvasHeight);
             mapPtr = &scenarioMap;
             shpPath = info.shpPath;
             needSpawnTool = false;
@@ -90,7 +137,9 @@ int main(int argc, char* argv[]) {
         MapCreation& map = *mapPtr;
         map.printStats();
 
-        // ── Spawn tool (if not loading a scenario) ───────────────────
+        // ═══════════════════════════════════════════════════════════════
+        //  SPAWN TOOL (if not loading a scenario)
+        // ═══════════════════════════════════════════════════════════════
 
         if (needSpawnTool) {
             std::cout << "Opening spawn tool...\n";
@@ -105,17 +154,8 @@ int main(int argc, char* argv[]) {
                 return 0;
             }
 
-            // Stamp units onto grid
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            stampUnitsOnGrid(map, config);
 
-            // Attach map data and save scenario
             MapInfo info;
             info.shpPath      = shpPath;
             info.cellsN       = map.getCellsN();
@@ -129,25 +169,16 @@ int main(int argc, char* argv[]) {
             config.saveJSON("scenario.json");
         }
         else {
-            // Stamp units from loaded scenario onto grid
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            stampUnitsOnGrid(map, config);
         }
 
         config.printSummary();
         map.printGrid();
 
-        // ── Run simulation ───────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════
+        //  RUN SIMULATION
+        // ═══════════════════════════════════════════════════════════════
 
-        // ── GA-prep scenario: no seekers placed but zones exist ──────
-        // This is intentional: the user is preparing a scenario for the
-        // Python GA to fill in. Save and exit cleanly — no simulation runs.
         if (config.countType("seeker") == 0 && config.hasAttackerZones()) {
             std::cout << "\n=== GA Preparation Scenario ===\n";
             std::cout << "  Targets:         " << config.countType("target") << "\n";
@@ -155,11 +186,9 @@ int main(int argc, char* argv[]) {
             std::cout << "  Interceptors:    " << config.countType("interceptor") << "\n";
             std::cout << "  Attacker zones:  " << config.getAttackerZones().size() << "\n";
             std::cout << "  Defender zones:  " << config.getDefenderZones().size() << "\n";
-            std::cout << "\nScenario saved to scenario.json — no simulation run.\n";
+            std::cout << "\nScenario saved to scenario.json - no simulation run.\n";
             std::cout << "Hand this scenario to the Python GA to optimise attacker positions.\n";
-
-            // Create empty runs/ so downstream visualize.py doesn't crash
-            std::system("mkdir -p runs");
+            std::filesystem::create_directories("runs");
             return 0;
         }
 
@@ -172,91 +201,87 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        // ── Iteration setup ──────────────────────────────────────────
+        Simulation sim(map, config, 2000);
 
-        int numIterations = 1;
-        double noiseIncrement = 0.0;
-        double startingNoise = config.getMaxNoiseLevel();
+        if (visualize) {
+            std::cout << "\nOpening live visualizer...\n";
+            std::cout << "Controls: Space=pause  +/-=speed  Enter=step  L=legend  Esc=skip\n\n";
 
-        std::cout << "\n── Iteration Configuration ──\n";
-        std::cout << "Starting noise level: " << startingNoise << "\n";
-        std::cout << "Number of iterations (1 = single run): ";
-        std::cin >> numIterations;
-        if (numIterations < 1) numIterations = 1;
-
-        if (numIterations > 1) {
-            std::cout << "Noise increment per iteration: ";
-            std::cin >> noiseIncrement;
-            if (noiseIncrement < 0.0) noiseIncrement = 0.0;
-        }
-
-        // Create runs/ directory
-        std::string runsDir = "runs";
-        std::system(("mkdir -p " + runsDir).c_str());
-
-        std::cout << "\n── Running " << numIterations << " iteration(s) ──\n";
-        if (numIterations > 1) {
-            std::cout << "  Noise range: " << startingNoise
-                      << " → " << (startingNoise + noiseIncrement * (numIterations - 1))
-                      << " (step " << noiseIncrement << ")\n";
-        }
-        std::cout << "  Results will be saved to " << runsDir << "/\n\n";
-
-        // ── Iteration loop ───────────────────────────────────────────
-
-        for (int iter = 0; iter < numIterations; iter++) {
-            double currentNoise = startingNoise + noiseIncrement * iter;
-            config.setMaxNoiseLevel(currentNoise);
-
-            std::cout << "\n════════════════════════════════════════════\n";
-            std::cout << "  Iteration " << (iter + 1) << " / " << numIterations
-                      << "  |  Noise: " << currentNoise << "\n";
-            std::cout << "════════════════════════════════════════════\n";
-
-            // Reset the grid: clear all units, then re-stamp them
-            // This ensures each iteration starts from the same state
-            map.clearAllUnits();
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
-
-            // Run the simulation
-            Simulation sim(map, config, 2000);
-            SimResult result = sim.run();
+            SimulationVisualizer vis(map, sim);
+            SimResult result = vis.run();
             result.print();
 
-            // Build filename from noise level: e.g. "runs/0.5.json"
-            // Use a consistent format to avoid floating point weirdness
-            std::ostringstream filename;
-            filename << runsDir << "/";
-
-            // Format noise level: remove trailing zeros for clean filenames
-            std::ostringstream noiseStr;
-            noiseStr << currentNoise;
-            std::string noiseLabel = noiseStr.str();
-
-            filename << noiseLabel << ".json";
-            result.saveJSON(filename.str());
+            std::filesystem::create_directories("runs");
+            result.saveJSON("runs/visualized_result.json");
         }
+        else {
+            int numIterations = 1;
+            double noiseIncrement = 0.0;
+            double startingNoise = config.getMaxNoiseLevel();
 
-        // ── Summary ──────────────────────────────────────────────────
+            std::cout << "\n-- Iteration Configuration --\n";
+            std::cout << "Starting noise level: " << startingNoise << "\n";
+            std::cout << "Number of iterations (1 = single run): ";
+            std::cin >> numIterations;
+            if (numIterations < 1) numIterations = 1;
 
-        if (numIterations > 1) {
-            std::cout << "\n════════════════════════════════════════════\n";
-            std::cout << "  All " << numIterations << " iterations complete.\n";
-            std::cout << "  Results saved to " << runsDir << "/\n";
-            std::cout << "════════════════════════════════════════════\n\n";
+            if (numIterations > 1) {
+                std::cout << "Noise increment per iteration: ";
+                std::cin >> noiseIncrement;
+                if (noiseIncrement < 0.0) noiseIncrement = 0.0;
+            }
+
+            std::string runsDir = "runs";
+            std::filesystem::create_directories(runsDir);
+
+            std::cout << "\n-- Running " << numIterations << " iteration(s) --\n";
+            if (numIterations > 1) {
+                std::cout << "  Noise range: " << startingNoise
+                          << " -> " << (startingNoise + noiseIncrement * (numIterations - 1))
+                          << " (step " << noiseIncrement << ")\n";
+            }
+            std::cout << "  Results saved to " << runsDir << "/\n\n";
+
+            for (int iter = 0; iter < numIterations; iter++) {
+                double currentNoise = startingNoise + noiseIncrement * iter;
+                config.setMaxNoiseLevel(currentNoise);
+
+                std::cout << "\n========================================\n";
+                std::cout << "  Iteration " << (iter + 1) << " / " << numIterations
+                          << "  |  Noise: " << currentNoise << "\n";
+                std::cout << "========================================\n";
+
+                map.clearAllUnits();
+                stampUnitsOnGrid(map, config);
+
+                Simulation iterSim(map, config, 2000);
+                SimResult result = iterSim.run();
+                result.print();
+
+                std::ostringstream filename;
+                filename << runsDir << "/";
+                std::ostringstream noiseStr;
+                noiseStr << currentNoise;
+                filename << noiseStr.str() << ".json";
+                result.saveJSON(filename.str());
+            }
+
+            if (numIterations > 1) {
+                std::cout << "\n========================================\n";
+                std::cout << "  All " << numIterations << " iterations complete.\n";
+                std::cout << "  Results saved to " << runsDir << "/\n";
+                std::cout << "========================================\n\n";
+            }
         }
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
+
+    std::cout << "\nPress Enter to exit and review logs...";
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cin.get();
 
     return 0;
 }

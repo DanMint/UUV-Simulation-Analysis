@@ -22,6 +22,7 @@ class OGRPolygon;
  *   3 = target      (defender, stationary)
  *   4 = detector    (defender sensor — sense only)
  *   5 = interceptor (defender effector — kill only)
+ *   7 = attacker     (offensive UUV/UAV, mobile) 
  */
 class MapCreation {
 public:
@@ -32,13 +33,22 @@ public:
     static constexpr int TARGET      = 3;
     static constexpr int DETECTOR    = 4;
     static constexpr int INTERCEPTOR = 5;
+    static constexpr int ATTACKER    = 7;
 
     // ─── Constructor / Factory ──────────────────────────────────────
 
     MapCreation(const std::string& shpPath, int cellsN = 100,
                 int canvasWidth = 700, int canvasHeight = 700);
+    MapCreation();  // default constructor for fromCache() / fromGridData()
 
     static MapCreation fromCache(const std::string& cachePath);
+
+    /**
+     * Reconstruct a MapCreation directly from grid data loaded from a scenario JSON.
+     * This avoids the brittle grid_cache.txt dependency in the --scenario path.
+     */
+    static MapCreation fromGridData(const std::vector<std::vector<int>>& grid,
+                                     int cellsN, int canvasWidth = 700, int canvasHeight = 700);
 
     ~MapCreation() = default;
 
@@ -64,7 +74,7 @@ public:
     /** Remove a unit (resets cell back to water). */
     bool removeUnit(int row, int col);
 
-    /** Clear ALL units from the grid (resets every 2/3/4/5 back to 0). */
+    /** Clear ALL units from the grid (resets every 2/3/4/5/7 back to 0). */
     void clearAllUnits();
 
     int placeUnitsFromConfig(
@@ -124,9 +134,9 @@ private:
                         double depth1, double depth2,
                         double minX, double maxY, double scale);
 
-    /** Helper: returns true if a cell holds any kind of unit (2/3/4/5). */
+    /** Helper: returns true if a cell holds any kind of unit (2/3/4/5/7). */
     static bool isUnitCell(int v) {
-        return v == SEEKER || v == TARGET || v == DETECTOR || v == INTERCEPTOR;
+        return v == SEEKER || v == TARGET || v == DETECTOR || v == INTERCEPTOR || v == ATTACKER;
     }
 };
 

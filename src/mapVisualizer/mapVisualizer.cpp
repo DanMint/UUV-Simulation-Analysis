@@ -303,14 +303,46 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             d.setOutlineThickness(1.5f);
             window.draw(d);
         }
+        else if (unit.type == "attacker") {
+            sf::Color attackerColor(255, 140, 60); // default: bluerov2 orange
+            if      (unit.vehicleType == "bluerov2")    attackerColor = sf::Color(255, 140, 60);  // orange
+            else if (unit.vehicleType == "riptide")     attackerColor = sf::Color(210, 255, 60);  // lime/chartreuse
+            else if (unit.vehicleType == "blueboat")    attackerColor = sf::Color(60, 220, 130);  // emerald green
+            else if (unit.vehicleType == "yuco")        attackerColor = sf::Color(0, 220, 200);   // turquoise
+            else if (unit.vehicleType == "nemosens")    attackerColor = sf::Color(255, 80, 200);  // hot pink
+            else if (unit.vehicleType == "hugin")       attackerColor = sf::Color(140, 70, 20);   // brown
+            else if (unit.vehicleType == "tb2")         attackerColor = sf::Color(0, 255, 255);   // cyan (aerial)
+            else if (unit.vehicleType == "queenhornet") attackerColor = sf::Color(200, 180, 255); // lavender (aerial)
+            else if (unit.vehicleType == "shahed")      attackerColor = sf::Color(255, 190, 220); // pale pink (aerial)
+
+            sf::CircleShape tri(half, 3);
+            tri.setOrigin(sf::Vector2f(half, half));
+            tri.setPosition(sf::Vector2f(cx, cy));
+            tri.setFillColor(attackerColor);
+            tri.setOutlineColor(sf::Color::White);
+            tri.setOutlineThickness(1.5f);
+            window.draw(tri);
+        }
 
         // Label letter
-        if (font != nullptr && m_cellSize >= 10.0f) {
+        if (font != nullptr && m_cellSize >= 14.0f) {
             std::string lbl;
             if      (unit.type == "seeker")      lbl = "S";
             else if (unit.type == "target")      lbl = "T";
             else if (unit.type == "detector")    lbl = "D";
             else if (unit.type == "interceptor") lbl = "I";
+            else if (unit.type == "attacker") {
+                if      (unit.vehicleType == "bluerov2")    lbl = "BR";
+                else if (unit.vehicleType == "riptide")     lbl = "RP";
+                else if (unit.vehicleType == "blueboat")    lbl = "BB";
+                else if (unit.vehicleType == "yuco")        lbl = "YU";
+                else if (unit.vehicleType == "nemosens")    lbl = "NS";
+                else if (unit.vehicleType == "hugin")       lbl = "HU";
+                else if (unit.vehicleType == "tb2")         lbl = "T2";
+                else if (unit.vehicleType == "queenhornet") lbl = "QH";
+                else if (unit.vehicleType == "shahed")      lbl = "SH";
+                else                                        lbl = "BR";
+            }
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) fs = 8;
@@ -753,6 +785,26 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     window.close();
                     return SpawnConfig();
                 }
+                else if (k->code == sf::Keyboard::Key::A) {
+                    m_currentType = "attacker";
+                    m_vehicleType = "bluerov2"; // default
+                    m_zoneDrawMode = "";
+                    m_zoneDragging = false;
+                    updateTitle(window);
+                }
+                // while in attacker mode, 1-6 selects vehicle type
+                else if (m_currentType == "attacker") {
+                    if (k->code == sf::Keyboard::Key::Num1) m_vehicleType = "bluerov2";
+                    if (k->code == sf::Keyboard::Key::Num2) m_vehicleType = "riptide";
+                    if (k->code == sf::Keyboard::Key::Num3) m_vehicleType = "blueboat";
+                    if (k->code == sf::Keyboard::Key::Num4) m_vehicleType = "yuco";
+                    if (k->code == sf::Keyboard::Key::Num5) m_vehicleType = "nemosens";
+                    if (k->code == sf::Keyboard::Key::Num6) m_vehicleType = "hugin";
+                    if (k->code == sf::Keyboard::Key::Num7) m_vehicleType = "tb2";
+                    if (k->code == sf::Keyboard::Key::Num8) m_vehicleType = "queenhornet";
+                    if (k->code == sf::Keyboard::Key::Num9) m_vehicleType = "shahed";
+                    updateTitle(window);
+                }
             }
 
             // ── Text input (for digits while collecting zone counts) ──────────
@@ -799,9 +851,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     } else {
                         // Place unit (existing behaviour)
                         if (m_map.isWater(clickRow, clickCol)) {
-                            if (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
+                            if (!m_config.addUnit(m_currentType, clickRow, clickCol, m_vehicleType)) {
                                 m_config.removeUnit(clickRow, clickCol);
-                                m_config.addUnit(m_currentType, clickRow, clickCol);
+                                m_config.addUnit(m_currentType, clickRow, clickCol, m_vehicleType);
                             }
                         }
                         updateTitle(window);

@@ -12,6 +12,7 @@
 #include "interceptorAgent.h"
 #include "spawnConfig.h"
 #include "simResult.h"
+#include "attackerAgent.h"
 
 /**
  * Simulation
@@ -30,31 +31,81 @@
  *   7. Loop until all targets dead, all seekers dead/reached, or
  *      maxSteps reached
  *
+ * Supports both batch (run()) and step-by-step (stepOnce()) execution
+ * modes. Step-by-step is used by SimulationVisualizer for live animation.
+ *
  * Doctrine: SENSE-THEN-SHOOT.
  *   - A lone detector sees but cannot kill.
- *   - A lone interceptor cannot fire — no tracks, no shots.
+ *   - A lone interceptor cannot fire - no tracks, no shots.
  *
- * Produces a SimResult when finished. Does NOT save the result file —
+ * Produces a SimResult when finished. Does NOT save the result file -
  * that is SimResult's responsibility.
  */
 class Simulation {
 public:
     Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000);
+    ~Simulation() { delete m_pf; }
 
-    /** Run to completion. Returns results. */
+    Simulation(const Simulation&) = delete;
+    Simulation& operator=(const Simulation&) = delete;
+
+    /** Run to completion from a clean state. Re-allocates m_pf every call. */
     SimResult run();
+
+    /**
+     * Run to completion from current state, reusing existing m_pf if one exists.
+     * Does NOT reset m_step or m_finished. Safely callable multiple times
+     * without leaking m_pf. Used internally by finishFromCurrentState().
+     */
+    SimResult runFromCurrentState();
+
+    /**
+     * Continue stepping from current state until finished (no reset).
+     * Uses existing m_pf, does NOT reset m_step or m_finished,
+     * does NOT call assignTargets() again.
+     * Safe to call mid-visualization as "skip to end".
+     */
+    void finishFromCurrentState();
+
+    // -- Step-by-step API (used by SimulationVisualizer) --
+
+    /** Advance one simulation step. Returns false if simulation ended. */
+    bool stepOnce();
+
+    /** True if simulation has finished. */
+    bool isFinished() const { return m_finished; }
+
+    /** Current step number (0-based). */
+    int getStep() const { return m_step; }
+
+    int getMaxSteps() const { return m_maxSteps; }
+
+    /** Build the final result struct from current agent state. Public for visualizer. */
+    SimResult buildResult(int totalSteps) const;
+
+    // Const accessors for visualizer
+    const std::vector<SeekerAgent>&      getSeekers()      const { return m_seekers; }
+    const std::vector<TargetAgent>&      getTargets()      const { return m_targets; }
+    const std::vector<DetectorAgent>&    getDetectors()    const { return m_detectors; }
+    const std::vector<InterceptorAgent>& getInterceptors()  const { return m_interceptors; }
+    const std::vector<AttackerAgent>&    getAttackers()    const { return m_attackers; }
 
 private:
     MapCreation& m_map;
     int m_maxSteps;
     double m_maxNoiseLevel;
+    bool m_finished;
+    int  m_step;
 
     std::vector<SeekerAgent>      m_seekers;
     std::vector<TargetAgent>      m_targets;
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
+    std::vector<AttackerAgent>     m_attackers;
 
     mutable std::mt19937 m_rng;
+
+    Pathfinding* m_pf;  // persistent pathfinder (reused across steps)
 
     /** Nearest living target to a seeker (Euclidean). -1 if none. */
     int findNearestTarget(const SeekerAgent& seeker) const;
@@ -81,11 +132,17 @@ private:
      */
     bool applyNoise(SeekerAgent& seeker);
 
+    /** Templated noise implementation (works with SeekerAgent and AttackerAgent). */
+    template <typename Agent>
+    bool applyNoiseImpl(Agent& agent);
+
     /** Re-assign each seeker to its nearest target and recompute paths. */
     void assignTargets(const Pathfinding& pf);
 
-    /** Build the final result struct from current agent state. */
-    SimResult buildResult(int totalSteps) const;
+    void updateAttackerStates(int currentStep, const Pathfinding& pf);
+
+    // Internal: one step of the main loop, used by both run() and stepOnce()
+    void executeOneStepInternal(int step, bool verbose);
 };
 
 #endif // SIMULATION_H

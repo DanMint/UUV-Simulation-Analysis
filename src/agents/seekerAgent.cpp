@@ -1,9 +1,12 @@
 #include "seekerAgent.h"
+#include "vehicleSpecs.h"
+#include <stdexcept>
 
 SeekerAgent::SeekerAgent(int id, int row, int col)
     : id(id), row(row), col(col),
       spawnRow(row), spawnCol(col),
       alive(true), reachedTarget(false),
+      specs(getVehicleSpecs("bluerov2")),  // default specs
       pathIndex(0), targetId(-1),
       stepsTaken(0), pathCost(0.0), nodesExpanded(0),
       detected(false),
@@ -44,4 +47,14 @@ bool SeekerAgent::moveStep() {
 
 bool SeekerAgent::hasPath() const {
     return !path.empty() && pathIndex < static_cast<int>(path.size());
+}
+
+SeekerAgent SeekerAgent::create(const std::string& type, int id, int row, int col) {
+    SeekerAgent seeker(id, row, col);
+    try {
+        seeker.specs = getVehicleSpecs(type);
+    } catch (const std::invalid_argument& e) {
+        // Use default (bluerov2) if type is invalid
+    }
+    return seeker;
 }

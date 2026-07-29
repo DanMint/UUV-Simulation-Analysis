@@ -3,10 +3,13 @@
 
 #include <vector>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
+#include <concepts>
 
 /**
  * SimResult
@@ -19,6 +22,10 @@
  *
  * Does NOT run the simulation (that is Simulation's job) and does NOT
  * own map/spawn data (that is SpawnConfig's job).
+ *
+ * Performance: saveJSON() uses an ostringstream buffer to build the entire
+ * JSON document before writing to disk in a single I/O operation. This is
+ * significantly faster than hundreds of individual file << calls.
  */
 struct SimResult {
 
@@ -87,6 +94,34 @@ struct SimResult {
         std::vector<Intercept> intercepts;
     };
 
+    struct AttackerResult {
+        int id;
+        int row;
+        int col;
+        bool alive;
+        std::string state;
+        bool missionSuccess;
+        int stepsTaken;
+        double pathCost;
+        int nodesExpanded;
+        int targetId;
+        int killCount;
+
+        struct Sighting {
+            int seekerId;
+            int step;
+        };
+        std::vector<Sighting> sightings;
+
+        struct Intercept {
+            int seekerId;
+            int step;
+        };
+        std::vector<Intercept> intercepts;
+
+        std::vector<std::pair<int,int>> moveHistory;
+    };
+
     // ─── Run-level data ─────────────────────────────────────────────
 
     int totalSteps;
@@ -98,6 +133,7 @@ struct SimResult {
     std::vector<TargetResult>      targetResults;
     std::vector<DetectorResult>    detectorResults;
     std::vector<InterceptorResult> interceptorResults;
+    std::vector<AttackerResult>    attackerResults;
 
     // ─── Summary statistics (filled by computeSummary) ──────────────
 
@@ -105,6 +141,7 @@ struct SimResult {
     int seekersThatReached;
     int seekersDetected;     // ever tracked
     int seekersIntercepted;  // killed by an interceptor
+    int attackersAlive;
     double avgStepsToTarget;
 
     // ─── Methods ────────────────────────────────────────────────────

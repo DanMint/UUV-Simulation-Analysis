@@ -6,4 +6,6 @@ runs/
 paths/
 scenario.json
 grid_cache.txt
-output/
+windows_build/
+TODO.md
+GUIDE.md

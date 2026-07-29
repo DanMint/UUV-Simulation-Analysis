@@ -7,7 +7,14 @@
 bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
     for (const auto& u : m_units)
         if (u.row == row && u.col == col) return false;
-    m_units.push_back({type, row, col});
+    m_units.push_back({type, row, col, ""});  // empty vehicleType by default
+    return true;
+}
+
+bool SpawnConfig::addUnit(const std::string& type, int row, int col, const std::string& vehicleType) {
+    for (const auto& u : m_units)
+        if (u.row == row && u.col == col) return false;
+    m_units.push_back({type, row, col, vehicleType});
     return true;
 }
 
@@ -284,8 +291,12 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     for (int i = 0; i < (int)m_units.size(); i++) {
         const auto& u = m_units[i];
         file << "    { \"type\": \"" << u.type
-             << "\", \"row\": "      << u.row
-             << ", \"col\": "        << u.col << " }";
+            << "\", \"row\": "      << u.row
+            << ", \"col\": "        << u.col;
+        if (!u.vehicleType.empty()) {
+            file << ", \"vehicle_type\": \"" << u.vehicleType << "\"";
+        }
+        file << " }";
         if (i < (int)m_units.size() - 1) file << ",";
         file << "\n";
     }
@@ -405,7 +416,22 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             size_t colPos = content.find("\"col\"", rowPos);
             int col = static_cast<int>(extractNumber(content, "col", rowPos));
 
-            config.addUnit(type, row, col);
+            // Optional vehicleType field — bound the search to this unit's own object,
+            // not an arbitrary character offset that can bleed into the next entry.
+            std::string vehicleType = "";
+            size_t objEnd = content.find("}", colPos); // end of this unit's { ... }
+            size_t vPos = content.find("\"vehicle_type\"", colPos);
+            if (vPos != std::string::npos && objEnd != std::string::npos && vPos < objEnd) {
+                size_t vStart = content.find("\"", content.find(":", vPos) + 1) + 1;
+                size_t vEnd   = content.find("\"", vStart);
+                vehicleType = content.substr(vStart, vEnd - vStart);
+            }
+
+            if (!vehicleType.empty()) {
+                config.addUnit(type, row, col, vehicleType);
+            } else {
+                config.addUnit(type, row, col);
+            }
             pos = colPos + 1;
         }
     }

@@ -45,18 +45,23 @@ struct SpawnZone {
 // ─── UnitSpawn ────────────────────────────────────────────────────────────────
 
 /** A single unit placement on the grid.
- *  type in { "seeker", "target", "detector", "interceptor" }
+ *  type in { "seeker", "target", "detector", "interceptor", "attacker" }
+ *  vehicleType optional: specifies the vehicle model (e.g., "bluerov2", "tb2")
+ *               If absent, defaults to generic or a sensible default.
  */
 struct UnitSpawn {
     std::string type;
     int row;
     int col;
+    std::string vehicleType;  // optional: e.g., "bluerov2", "tb2", "queenhornet"
 };
 
 // ─── MapInfo ──────────────────────────────────────────────────────────────────
 
 struct MapInfo {
     std::string shpPath;
+    int width;
+    int height;
     int cellsN;
     int canvasWidth;
     int canvasHeight;
@@ -86,6 +91,7 @@ public:
     // ─── Unit management ────────────────────────────────────────────
 
     bool addUnit(const std::string& type, int row, int col);
+    bool addUnit(const std::string& type, int row, int col, const std::string& vehicleType);
     bool removeUnit(int row, int col);
     const UnitSpawn* getUnitAt(int row, int col) const;
     const std::vector<UnitSpawn>& getUnits() const;
