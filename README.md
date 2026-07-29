@@ -1,181 +1,181 @@
-# UUV Simulation
+# UUV Simulation — Sense-Then-Shoot Naval Engagement Simulator
 
-A C++ simulation of Unmanned Underwater Vehicles (UUVs) navigating nautical environments. Seekers pathfind toward targets using A* search while detectors attempt to intercept them. Environmental noise simulates real-world conditions like waves and wind.
+A grid-based simulation of autonomous underwater/aerial vehicles using a **sense-then-shoot** doctrine. Built with SFML 3, GDAL, and C++20.
 
-## Overview
+## Quick Start
 
-The simulation reads a NOAA nautical shapefile, converts it into a water/land grid, and lets the user place units on the map. Seekers use A* with an Octile heuristic to find optimal paths to targets. Detectors act as stationary interceptors that destroy seekers within a configurable radius. A noise parameter displaces seekers from their planned paths each step, simulating environmental interference.
+```powershell
+# Configure (one-time)
+cd windows_build
+cmake -B build -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-The system supports batch runs where noise increases with each iteration, producing a set of JSON result files for analysis.
+# Build
+cmake --build build --config Release --target uuv_sim
 
-## Project Structure
-
-```
-UUV-Simulation-With-Steps/
-├── src/
-│   ├── main.cpp                    # Entry point, iteration loop, terminal prompts
-│   ├── agents/
-│   │   └── agent.h                 # SeekerAgent, TargetAgent, DetectorAgent structs
-│   ├── mapCreation/
-│   │   ├── mapCreation.h/cpp       # Shapefile → grid conversion (GDAL/OGR)
-│   │   └── Readme.md
-│   ├── mapVisualizer/
-│   │   └── mapVisualizer.h/cpp     # SFML spawn tool for placing units
-│   ├── pathfinding/
-│   │   └── pathfinding.h/cpp       # A* search with Octile heuristic
-│   ├── simulation/
-│   │   ├── simulation.h/cpp        # Simulation loop, noise, detector checks
-│   │   └── simResult.h/cpp         # Results storage, JSON export, console print
-│   └── spawnConfig/
-│       └── spawnConfig.h/cpp       # Scenario serialization (units, grid, settings)
-├── Maps/                           # NOAA shapefiles
-├── runs/                           # Output JSON results per iteration
-├── tests/
-│   └── test_simulation.cpp
-├── CMakeLists.txt
-├── run.sh                          # Build + run + visualize
-└── visulaize.py                    # Python visualization of results
+# Run with a shapefile
+cd build/Release
+uuv_sim.exe path/to/bathymetry.shp
 ```
 
-## Pipeline
+## All Controls (Cheat Sheet)
 
-1. **Shapefile Ingestion** — `MapCreation` reads a `.shp` file using GDAL/OGR, scales polygon geometry to a virtual canvas, and rasterizes it into an N×N grid. Each cell is classified as water or land using 9-point sampling with a seam gap cleanup pass.
+### Spawn Tool (placing units on the map)
 
-2. **Spawn Tool** — `MapVisualizer` opens an SFML window where the user places seekers, targets, and detectors on water cells. Detector radius and noise level are adjusted with keyboard controls.
+| Key | Action |
+|-----|--------|
+| **S** | Place **Seeker** (attacker, red circle) |
+| **T** | Place **Target** (defender, blue square) |
+| **D** | Place **Detector** (sensor, orange circle) |
+| **I** | Place **Interceptor** (effector, purple circle) |
+| **A** | Place **Attacker** (vehicle, type-coloured) then **1-9** for vehicle |
+| **Z** | Draw **ATTACKER spawn zone** (for GA) |
+| **X** | Draw **DEFENDER spawn zone** (for GA) |
+| **Q** | Toggle **GA-prep mode** (targets + zones only) |
+| **Left click** | Place selected unit on a water cell |
+| **Right click** | Remove unit from cell |
+| **+ / -** | Adjust detector sensing radius |
+| **{ / }** | Adjust interceptor kill radius |
+| **[ / ]** | Adjust noise level (wave/wind) |
+| **C** | Clear all units (preserves zones) |
+| **Enter** | Save scenario & run simulation |
+| **Escape** | Close without saving |
 
-3. **Simulation** — `Simulation` runs a step-based loop. Each step: seekers move one cell along their A* path, noise displaces them, detectors check for interceptions, and target collisions are evaluated.
+### Attacker vehicles (press A then a number)
 
-4. **Results** — `SimResult` stores per-agent outcomes and summary statistics, exports to JSON, and prints to console.
+| Key | Vehicle | Type |
+|-----|---------|------|
+| **1** | BlueROV2 | Underwater ROV |
+| **2** | Riptide | Autonomous underwater vehicle |
+| **3** | BlueBoat | Unmanned surface vessel |
+| **4** | YUCO | Underwater glider |
+| **5** | NemoSens | Sensor platform |
+| **6** | HUGIN | Military AUV |
+| **7** | TB2 | Aerial drone (UAV) |
+| **8** | QueenHornet | Aerial drone |
+| **9** | Shahed | One-way attack drone |
 
-## A* Pathfinding
+### Live Visualizer (watching the simulation)
 
-Seekers find optimal paths using A* search with 8-directional movement on the grid. Cardinal moves (up, down, left, right) cost 1.0 and diagonal moves cost √2 ≈ 1.414.
+| Key | Action |
+|-----|--------|
+| **Space** | Pause / Resume |
+| **+** | Speed up (600ms → 5ms per step) |
+| **-** | Slow down (5ms → 2000ms per step) |
+| **Enter** | Step once (while paused) |
+| **L** | Toggle legend overlay |
+| **Escape** | Skip to end & close |
 
-### Octile Heuristic
+### Command-line flags
 
-The heuristic function estimates the remaining cost from any cell to the destination. For 8-directional movement, the optimal open-field strategy is to move diagonally for `min(dx, dy)` steps, then move straight for the remaining `|dx - dy|` steps. This gives:
-
-```
-h = max(dx, dy) + (√2 - 1) × min(dx, dy)
-```
-
-This is the tightest admissible heuristic for 8-way grids. It never overestimates the true cost, so A* is guaranteed to find the optimal path. A tighter heuristic means fewer nodes are expanded, making the search faster.
-
-### Grid Cell Values
-
-| Value | Type       | Passable |
-|-------|------------|----------|
-| 0     | Water      | Yes      |
-| 1     | Land       | No       |
-| 2     | Seeker     | Yes      |
-| 3     | Target     | Yes      |
-| 4     | Detector   | Yes      |
-| 5     | Interceptor| Yes      |
-| 6     | ATK Zone   | No       |
-| 7     | Attacker   | Yes      |
-
-## Noise Model
-
-The simulation has a **Max Noise Level** parameter `N` that simulates environmental factors like waves and wind. Noise is not added inside the A* algorithm. A* always computes the optimal path. Noise is applied after A* has decided the next position.
-
-Each simulation step follows this sequence:
-
-1. A* computes the optimal path from the seeker's current position to the target.
-2. The seeker moves one cell along the path to position `(x2, y2)`.
-3. Two random numbers `rx, ry` are drawn uniformly from `[-N, N]`.
-4. The seeker's actual position becomes `(x2 + rx, y2 + ry)`.
-5. If the displaced position is out of bounds, on land, or the line between the old and new position crosses land (Bresenham's line check), the displacement is discarded.
-6. The pre-computed A* path is invalidated since the seeker is no longer on it.
-7. A* recomputes a new path from the displaced position on the next step.
-
-This creates a feedback loop: A* plans the optimal route, noise knocks the seeker off course, A* replans, noise displaces again. Seekers still converge toward the target but follow a noisy, zigzagging trajectory.
-
-## Detectors
-
-Detectors are stationary interceptors placed on the defender side.
-
-- **Persistent** — can intercept unlimited seekers
-- **Invisible** — seekers are unaware of detectors and do not path around them
-- **Radius-based** — any seeker within Euclidean distance of the detector's radius is destroyed
-- **Priority** — detector interception is checked before target collision each step
-
-## Iteration Runs
-
-After placing units in the spawn tool, the terminal prompts for the number of iterations and a noise increment. The simulation runs multiple times with increasing noise, saving each result to `runs/<noise_level>.json`. The grid and unit positions reset between iterations so each run starts from the same initial state.
-
-Example with 5 iterations, starting noise 0.0, increment 0.5:
-
-```
-runs/
-├── 0.json
-├── 0.5.json
-├── 1.json
-├── 1.5.json
-└── 2.json
+```powershell
+uuv_sim.exe map.shp              # Load shapefile → spawn tool → simulate
+uuv_sim.exe --cache cache.txt    # Load cached grid
+uuv_sim.exe --scenario scenario.json              # Load saved scenario
+uuv_sim.exe --scenario scenario.json --visualize  # With live visualizer
+uuv_sim.exe --cache cache.txt --visualize         # Visualization from cache
 ```
 
-## Spawn Tool Controls
+## Architecture
 
-| Key         | Action                              |
-|-------------|-------------------------------------|
-| Left click  | Place unit on water cell            |
-| Right click | Remove unit                         |
-| S           | Switch to Seeker mode               |
-| T           | Switch to Target mode               |
-| D           | Switch to Detector mode             |
-| + / -       | Adjust detector radius (±0.5 cells) |
-| [ / ]       | Adjust noise level (±0.1)           |
-| C           | Clear all units                     |
-| Enter       | Save scenario and run               |
-| Escape      | Close without saving                |
+```
+src/
+├── main.cpp                 — Entry point: loads map, runs spawn tool or sim
+├── mapCreation/             — Reads shapefiles (GDAL), classifies water/land
+│   ├── mapCreation.h
+│   └── mapCreation.cpp
+├── agents/                  — Agent types with A* pathfinding
+│   ├── seekerAgent.cpp      — Chases targets (A* pathfinding)
+│   ├── targetAgent.cpp      — Flees from seekers (evasive)
+│   ├── detectorAgent.cpp    — Detects seekers in range (sense!)
+│   ├── interceptorAgent.cpp — Kills detected attackers (shoot!)
+│   ├── attackerAgent.cpp    — Vehicle with specs (BlueROV2, TB2, etc.)
+│   └── vehicleSpecs.cpp     — Vehicle performance profiles
+├── simulation/              — Core simulation loop
+│   ├── simulation.h         — Simulation class, stepOnce(), run()
+│   ├── simulation.cpp       — The "sense-then-shoot" logic
+│   ├── simResult.h/cpp      — JSON-serialisable results
+│   └── pathfinding/         — A* implementation
+├── spawnConfig/             — Scenario I/O (JSON save/load)
+├── mapVisualizer/           — SFML spawn tool (place units on map)
+├── simulationVisualizer/    — SFML live simulation viewer
+└── scripts/
+    └── visualize.py         — Python analysis of results (matplotlib)
 
-## Build and Run
+tests/
+├── test_simulation.cpp
+└── test_attacker.cpp
 
-### Dependencies
+windows_build/
+└── CMakeLists.txt           — Windows-specific CMake with vcpkg
+```
 
-- C++17 compiler
-- CMake 3.14+
-- SFML 3.x (or 2.x fallback)
-- GDAL/OGR
-- Python 3 with matplotlib (for visualization)
+## Agent Types
 
-### Quick Start
+| Agent | Color | Shape | Role |
+|-------|-------|-------|------|
+| **Seeker** | Red | Circle | Finds and hits targets using A* pathfinding. Must detect target first (sense-then-shoot). |
+| **Target** | Blue | Square | Defensive asset that tries to evade seekers. Moves away when a seeker is detected. |
+| **Detector** | Orange | Circle | Senses seekers within its **sensing radius** (adjustable). If a seeker is in range, detectors notify interceptors. |
+| **Interceptor** | Purple | Circle | Kills any `attacker` (seeker) within its **kill radius**. Only activates when detector spots someone. |
+| **Attacker** | Varies | Circle (larger) | Vehicle with unique specs (speed, endurance, payload). Detected attackers glow with red outline. |
+
+## The Doctrine: Sense-Then-Shoot
+
+This is the core military doctrine the simulation models:
+
+1. **Seekers** roam the map using A* pathfinding toward their assigned target
+2. **Detectors** sense a circular area. If a seeker enters this radius → the seeker is **detected**
+3. **Interceptors** guard the area. If a seeker is detected AND in kill range → the seeker is **killed**
+4. **Seekers** that survive detection AND reach their target → **hit** the target
+
+This forces the simulation to answer: *"How many seekers can get through the defence?"*
+
+## Batch Mode (Multiple Noise Levels)
+
+When running without `--visualize`, you get an interactive prompt:
+
+```
+Starting noise level: 0.5
+Number of iterations (1 = single run): 5
+Noise increment per iteration: 0.2
+
+-- Running 5 iterations --
+  Noise range: 0.5 -> 1.3 (step 0.2)
+  Results saved to runs/
+```
+
+Each iteration runs independently with increasing noise. Results saved as JSON to `runs/`.
+
+## Analysing Results
 
 ```bash
-chmod +x run.sh
-./run.sh
+cd UUV-Simulation-Analysis
+python scripts/visualize.py runs/
 ```
 
-Or manually:
+This prints a table and generates `analysis_plots.png` with 4 charts:
+- Steps to completion vs noise
+- Seeker success rate vs noise
+- Target loss rate vs noise
+- Attacker loss rate vs noise
 
-```bash
-cmake -S . -B build
-cmake --build build -j
-./build/uuv_sim Maps/test1/Harbour_Depth_Area.shp 100
-./myEnv/bin/python3 visulaize.py
-```
+Requires `matplotlib`. Without it, only text output is shown.
 
-### Loading a Saved Scenario
+## GA Zone System
 
-```bash
-./build/uuv_sim --scenario scenario.json
-```
+The spawn tool supports drawing **zones** (rectangular areas):
+- **Z key**: Draw ATTACKER zones — the Python GA will place seekers inside these
+- **X key**: Draw DEFENDER zones — the GA places detectors/interceptors inside these
 
-This skips the spawn tool and runs the simulation directly with the saved unit positions and settings.
+Save the scenario with **Enter**, then give `scenario.json` to the Python GA script.
 
-## Attacker Agents (Nadeem — Nadeem-Branch)
+## Build Status
 
-Adds a multi-platform attacker agent system to the simulation. Press **A** in the spawn tool to enter attacker mode, then **1-9** to select a vehicle type before clicking to place.
+[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
 
-Supported platforms:
-- **1** BlueROV2 — 1-3 kn, $6k, 300k-450k Hz
-- **2** Riptide Micro — 2-5 kn, $15k-45k, 200k-400k Hz
-- **3** BlueBoat — 2-6 kn, $5k, 450k-650k Hz (surface)
-- **4** YUCO Carrier — 2-6 kn, $50k-100k, 300k-600k Hz
-- **5** NemoSens — 2-4 kn, $60k-115k, 200k-500k Hz
-- **6** HUGIN Superior — 2-5 kn, $2M-4M, 200k-400k Hz
-- **7** Bayraktar TB2 — 90-110 kn, $2M-5M, aerial
-- **8** Queen Hornet — 38-43 kn, $1k-5k, aerial
-- **9** Shahed 136 — 90-100 kn, $20k-50k, aerial
+- `uuv_sim` → ✅ Builds, links, and runs
+- `test_simulation` → ✅ Passes
+- `test_attacker` → ✅ Passes
+- SFML 3 API (all `setPosition(Vector2f)`, `font.openFromFile()`, `event->is<T>()`)
 
-Each agent runs a full FSM lifecycle (S0-S9) with terminal output showing state transitions, path cost, detection status, and mission outcome. Aerial agents are not detectable by hydrophone arrays.
+All VSCode IntelliSense errors in `simulationVisualizer.cpp` and `mapVisualizer.cpp` are **false positives** — the IDE cannot resolve `#include <SFML/Graphics.hpp>` because vcpkg include paths aren't configured in VSCode's `c_cpp_properties.json`. The actual build succeeds.

@@ -39,9 +39,16 @@ public:
 
     MapCreation(const std::string& shpPath, int cellsN = 100,
                 int canvasWidth = 700, int canvasHeight = 700);
-    MapCreation();  // default constructor for fromCache()
+    MapCreation();  // default constructor for fromCache() / fromGridData()
 
     static MapCreation fromCache(const std::string& cachePath);
+
+    /**
+     * Reconstruct a MapCreation directly from grid data loaded from a scenario JSON.
+     * This avoids the brittle grid_cache.txt dependency in the --scenario path.
+     */
+    static MapCreation fromGridData(const std::vector<std::vector<int>>& grid,
+                                     int cellsN, int canvasWidth = 700, int canvasHeight = 700);
 
     ~MapCreation() = default;
 

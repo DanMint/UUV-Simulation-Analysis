@@ -16,6 +16,7 @@ add_executable(uuv_sim
     src/mapCreation/mapCreation.cpp
     src/spawnConfig/spawnConfig.cpp
     src/mapVisualizer/mapVisualizer.cpp
+    src/simulationVisualizer/simulationVisualizer.cpp
     src/pathfinding/pathfinding.cpp
     src/simulation/simulation.cpp
     src/simulation/simResult.cpp
@@ -32,6 +33,7 @@ target_include_directories(uuv_sim PRIVATE
     src/mapCreation
     src/spawnConfig
     src/mapVisualizer
+    src/simulationVisualizer
     src/pathfinding
     src/simulation
 )
@@ -83,4 +85,3 @@ target_link_libraries(uuv_sim PRIVATE gdal)
 if (APPLE)
     message(STATUS "CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}")
 endif()
-
