@@ -133,6 +133,9 @@ void SimResult::print() const {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void SimResult::saveJSON(const std::string& filepath) const {
+
+    std::cout << "DEBUG: saveJSON with waypoints support is running\n"; // added this casue i was trouible shooting the json stuff turned into a nightmare to sovle for soem reason 
+
     std::ofstream file(filepath);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open results file: " + filepath);
@@ -267,10 +270,10 @@ void SimResult::saveJSON(const std::string& filepath) const {
         if (i < (int)interceptorResults.size() - 1) file << ",";
         file << "\n";
     }
-    file << "  ]\n";
+    file << "  ],\n";
 
 
-    // Chris added: patrol defenders get their own JSON section
+    // Chris added: patrol defenders get their own JSON section --- Note need to add the , in the file line above otherwise wont get the png and would need to go in to idnividual json files and solve 
     file << "  \"patrol_defenders\": [\n";
     for (int i = 0; i < (int)patrolDefenderResults.size(); i++) {
         const auto& p = patrolDefenderResults[i];
@@ -282,7 +285,25 @@ void SimResult::saveJSON(const std::string& filepath) const {
         file << "      \"sensing_radius\": " << p.sensingRadius << ",\n";
         file << "      \"sighting_count\": " << p.sightingCount << ",\n";
         file << "      \"kill_radius\": " << p.killRadius << ",\n";
-        file << "      \"kill_count\": " << p.killCount << "\n";
+        file << "      \"kill_count\": " << p.killCount << ",\n";
+ //this section was just to save all the waypoint and hsitroy for when we get to json/png stuff had to add later commenting just so i dont forget in case i need to edit        
+        file << "      \"waypoints\": [\n";
+        for (int j = 0; j < (int)p.waypoints.size(); j++) {
+            file << "        [" << p.waypoints[j].first << ", " << p.waypoints[j].second << "]";
+            if (j < (int)p.waypoints.size() - 1) file << ",";
+            file << "\n";
+        }
+        file << "      ],\n";
+
+        file << "      \"move_history\": [\n";
+        for (int j = 0; j < (int)p.moveHistory.size(); j++) {
+            file << "        [" << p.moveHistory[j].first << ", " << p.moveHistory[j].second << "]";
+            if (j < (int)p.moveHistory.size() - 1) file << ",";
+            file << "\n";
+        }
+        file << "      ]\n";
+
+        //this was orignally below the interceptor logic thats patrols has 
         file << "    }";
         if (i < (int)patrolDefenderResults.size() - 1) file << ",";
         file << "\n";

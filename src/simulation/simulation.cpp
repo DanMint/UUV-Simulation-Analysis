@@ -410,6 +410,10 @@ SimResult Simulation::buildResult(int totalSteps) const {
         for (const auto& ic : p.intercepts) {
             pr.intercepts.push_back({ic.seekerId, ic.step});
         }
+
+        pr.waypoints = p.waypoints;
+        pr.moveHistory = p.moveHistory;
+
         result.patrolDefenderResults.push_back(pr);
     }
 

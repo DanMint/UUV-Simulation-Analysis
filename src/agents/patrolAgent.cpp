@@ -59,6 +59,8 @@ void PatrolDefenderAgent::addWaypoint(int r, int c) {
 }
 
 void PatrolDefenderAgent::moveTowardWaypoint() {
+    moveHistory.push_back({row, col});
+    
     // need at least 2 waypoints to patrol --- if i dont have the 2 waypoints dont move
     if (waypoints.size() < 2) return;
 
@@ -111,26 +113,45 @@ I will be going thru all my code stuff in this order and commenting to both bett
     -do i need to look into main or really any iother fuile 
     -mapcreation.h - needed to add cell type 6 
 
-    To do the A adn B and set number for each patrol group think map visual and need the actula logi of heres A and B and actully know casue apparently it doenst know i set all the foundation and did most of it ahhhhhhhhhhhhhhhh
 
-    ctrl+k then S to save all the file changes 
 
-    to build when done use this not just build then uuv 
-    ./build/uuv_sim maps/pearlHarbour/harbour_Depth_Area.shp
 
-    new issue for later has it all but doesnt show wher the first A and B is on the map just the coords but the patrol peiece is in the middle and then figure out hwo to have it say patrol when pressing p in the bottom left
+    For actully running the program:
+    1. use      cd build
+    2. use      cmake ..
+    3. use      make 
+    4. use      cd ..
+    5. use      ./build/uuv_sim maps/pearlHarbour/harbour_Depth_Area.shp
 
-    -currently its all nice it shows the coords in the terminal still kinda iffy on how to display it fully casue stil a bunch of diamonds
-    -deletion of a patrol just get rid of A 
-    -Code wise it "inherits" but its really copy paste code of detection of code why not have that ghost circle in the map when placing various simulation tools idk what to call them "yo bout to drop some seekers????"
 
-    Load a Json:
-    ./build/uuv_sim --scenario scenario.json
+    From doing map to getting vidsual:
+    1. use      rm -f paths/*.png       to clear all prior pngs also      rm -rf runs/*     Clear runs
+    2. use      ./build/uuv_sim --scenario scenario.json        to build the last scenario you will need to re input the values ig
+    3. use      python3 visulaize.py    to actully take the jsons and turn into the pngs 
 
-    CURRENT SAVING OF JSON AND WHATNOT IDK MAN:
-    -need to add the dlivmiter of , before "patrol_defender": othersiwde code freask out its line 277 in all jsons 
-    - IS THIS PROJECT A VIDEO OP PICTURE FOR VISUALIZER 
-    -rm -rf runs/* use this to clear all runs 
-    -./build/uuv_sim --scenario scenario.json to then build the said scenario 
-    -python3 visulaize.py to convert to the image in the form of png in paths 
+
+    What this code agent features:
+        -The main goal was to be able to place 2 points (A and B) of which would go back and forth between the two whilst aslo acting as a mobile detector at the same time 
+    
+
+    Neat Features and parts of the code include:
+        - being able to see a path from out two placed points via a --- doted line 
+        - The location for them is also there but its just in the terminal ie (A is place at 43, 38) 
+        - Also feature a "safety net" in the form of "waiting for placement point B" or "You placed B on on land try again"
+        - the deltion process of a path/agent in the map phase of code just right click the first point (A)
+    
+
+    Semi Imporatnt things to make this project easier:
+        - use       Ctrl + K then S to save all files rather than one at a time
+        - as per my notes of what each section does above and how to sorta know where to look use Ctrl + F then "Chris added: " as  I had done this for all my parts of code since there is so much in all these current .cpp and .h files
+
+    
+
+    
+
+    - IS THIS PROJECT A VIDEO OP PICTURE FOR VISUALIZER its odd its liek it runs then it takes pictures at points and thats where we get the json images in the form of pngs 
+
+
+
+
 */

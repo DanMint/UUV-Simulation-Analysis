@@ -57,6 +57,9 @@ struct PatrolDefenderAgent {
     // ── movement — NEW ────────────────────────────────────────────
     void addWaypoint(int row, int col);
     void moveTowardWaypoint();
+
+    // -- Keeping track of the history so in the visualizer I can see something
+    std::vector<std::pair<int,int>> moveHistory;
 };
 
 #endif // PATROL_AGENT_H

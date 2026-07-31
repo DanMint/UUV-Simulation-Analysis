@@ -71,6 +71,32 @@ def plot_runs():
             ax.scatter(cols[0], rows[0], marker="o", s=40)
             ax.scatter(cols[-1], rows[-1], marker="x", s=60)
 
+        # Chris added: Plot patrol defenders
+        for patrol in results.get("patrol_defenders", []):
+
+            waypoints = patrol.get("waypoints", [])
+            path = patrol.get("move_history", [])
+
+            label = f"Patrol {patrol['id']}"
+
+            # dotted trail showing where it actually moved
+            if path:
+                rows = [p[0] for p in path]
+                cols = [p[1] for p in path]
+                ax.plot(cols, rows, linestyle=":", linewidth=2, label=label)
+
+            # waypoint A and B as fixed markers
+            if waypoints:
+                wrows = [p[0] for p in waypoints]
+                wcols = [p[1] for p in waypoints]
+                ax.scatter(wcols, wrows, marker="D", s=60, label=f"Patrol {patrol['id']} waypoints")
+
+            # current position
+            ax.scatter(patrol["col"], patrol["row"], marker="^", s=80,
+                       label=f"Patrol {patrol['id']} current")
+            
+            
+            
         # Plot targets
         for target in results.get("targets", []):
 

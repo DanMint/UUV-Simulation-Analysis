@@ -340,7 +340,35 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
                         window.draw(blbl);
         }
     }
-}
+
+            // Chris added: draw dotted line between A and B for each patrol pair
+        for (const auto& unit : m_config.getUnits()) {
+            if (unit.type != "patrol_defender") continue;
+            if (unit.waypointRow == -1) continue;
+
+            float ax = (unit.col + 0.5f) * m_cellSize;
+            float ay = (unit.row + 0.5f) * m_cellSize;
+            float bx = (unit.waypointCol + 0.5f) * m_cellSize;
+            float by = (unit.waypointRow + 0.5f) * m_cellSize;
+
+            // draw dotted line as small rectangles along the path
+            float dx = bx - ax;
+            float dy = by - ay;
+            float len = std::sqrt(dx*dx + dy*dy);
+            int dots = static_cast<int>(len / (m_cellSize * 0.6f));
+
+            for (int i = 1; i < dots; i++) {
+                float t = static_cast<float>(i) / dots;
+                float px = ax + dx * t;
+                float py = ay + dy * t;
+                sf::CircleShape dot(2.f);
+                dot.setOrigin(sf::Vector2f(2.f, 2.f));
+                dot.setPosition(sf::Vector2f(px, py));
+                dot.setFillColor(sf::Color(0, 210, 255, 150));
+                window.draw(dot);
+            }
+        }
+    }//there was a } idk what for tho I migfht need to go back and comment what closses what cause now confused
 
         // Label letter
         if (font != nullptr && m_cellSize >= 10.0f) {
@@ -365,7 +393,6 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
     }
 
 }
-
 
 
 // ════════════════════════════════════════════════════════════════════════════════

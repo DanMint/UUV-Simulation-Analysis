@@ -108,6 +108,10 @@ struct SimResult {
         int killCount;
         struct Intercept { int seekerId; int step; };
         std::vector<Intercept> intercepts;
+
+        // Movement --- used this section to track the history so when we get to json/pngs we can pass along information 
+        std::vector<std::pair<int,int>> waypoints;
+        std::vector<std::pair<int,int>> moveHistory;
     };
 
     // ─── Run-level data ─────────────────────────────────────────────
@@ -123,6 +127,7 @@ struct SimResult {
     std::vector<InterceptorResult> interceptorResults;
 
     std::vector<PatrolDefenderResult> patrolDefenderResults; // Chris added: need this to store
+    
     // ─── Summary statistics (filled by computeSummary) ──────────────
 
     int targetsDestroyed;
