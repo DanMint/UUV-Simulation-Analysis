@@ -238,19 +238,56 @@ bool Simulation::applyNoise(SeekerAgent& seeker) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void Simulation::assignTargets(const Pathfinding& pf) {
+    std::vector<bool> targetAssigned(m_targets.size(), false);
+
     for (auto& seeker : m_seekers) {
         if (!seeker.alive || seeker.reachedTarget) continue;
 
-        int tIdx = findNearestTarget(seeker);
-        if (tIdx < 0) continue;
+        int bestIdx = -1;
+        double bestDist = std::numeric_limits<double>::max();
 
-        if (seeker.targetId != m_targets[tIdx].id || !seeker.hasPath()) {
-            seeker.targetId = m_targets[tIdx].id;
-            seeker.computePath(pf, m_targets[tIdx].row, m_targets[tIdx].col);
+        // Prefer an unclaimed target first; fall back to the nearest alive target
+        // if every live target is already assigned to another seeker.
+        for (int i = 0; i < static_cast<int>(m_targets.size()); ++i) {
+            if (!m_targets[i].alive) continue;
+            if (targetAssigned[i]) continue;
+
+            double dr = seeker.row - m_targets[i].row;
+            double dc = seeker.col - m_targets[i].col;
+            double dist = std::sqrt(dr * dr + dc * dc);
+
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = i;
+            }
+        }
+
+        if (bestIdx < 0) {
+            for (int i = 0; i < static_cast<int>(m_targets.size()); ++i) {
+                if (!m_targets[i].alive) continue;
+
+                double dr = seeker.row - m_targets[i].row;
+                double dc = seeker.col - m_targets[i].col;
+                double dist = std::sqrt(dr * dr + dc * dc);
+
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestIdx = i;
+                }
+            }
+        }
+
+        if (bestIdx < 0) continue;
+
+        targetAssigned[bestIdx] = true;
+
+        if (seeker.targetId != m_targets[bestIdx].id || !seeker.hasPath()) {
+            seeker.targetId = m_targets[bestIdx].id;
+            seeker.computePath(pf, m_targets[bestIdx].row, m_targets[bestIdx].col);
 
             if (seeker.path.empty()) {
                 std::cout << "  Seeker " << seeker.id
-                          << ": no path to target " << tIdx << "\n";
+                          << ": no path to target " << bestIdx << "\n";
             }
         }
     }
