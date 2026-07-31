@@ -136,34 +136,85 @@ def build_seeker_table(iterations):
 
 def build_detector_table(iterations):
     det_stats = defaultdict(lambda: {
-        'row': 0, 'col': 0, 'radius': 0,
-        'total_intercepts': 0, 'active_iterations': 0
+        'row': 0,
+        'col': 0,
+        'sensing_radius': 0,
+        'total_sightings': 0,
+        'active_iterations': 0,
+        'unique_seekers_detected': set(),
     })
+
     for it in iterations:
-        for d in it['detectors']:
+        for d in it.get('detectors', []):
             did = d['id']
+
             det_stats[did]['row'] = d['row']
             det_stats[did]['col'] = d['col']
-            det_stats[did]['radius'] = d['radius']
-            det_stats[did]['total_intercepts'] += d['intercept_count']
-            if d['intercept_count'] > 0:
+            det_stats[did]['sensing_radius'] = d.get(
+                'sensing_radius',
+                d.get('radius', 0),
+            )
+
+            sightings = d.get('sightings', [])
+            sighting_count = d.get(
+                'sighting_count',
+                len(sightings),
+            )
+
+            det_stats[did]['total_sightings'] += sighting_count
+
+            if sighting_count > 0:
                 det_stats[did]['active_iterations'] += 1
 
-    n = len(iterations)
+            for sighting in sightings:
+                seeker_id = sighting.get('seeker_id')
+
+                if seeker_id is not None:
+                    det_stats[did]['unique_seekers_detected'].add(
+                        seeker_id
+                    )
+
+    n_iterations = len(iterations)
     rows = []
+
     for did in sorted(det_stats):
         ds = det_stats[did]
+
         rows.append({
             'detector_id': did,
             'row': ds['row'],
             'col': ds['col'],
-            'radius': ds['radius'],
-            'total_intercepts': ds['total_intercepts'],
+            'sensing_radius': ds['sensing_radius'],
+            'total_sightings': ds['total_sightings'],
+            'unique_seekers_detected': len(
+                ds['unique_seekers_detected']
+            ),
             'active_iterations': ds['active_iterations'],
-            'utilization_rate': round(ds['active_iterations'] / max(n, 1), 4),
-            'avg_intercepts_per_iter': round(ds['total_intercepts'] / max(n, 1), 2),
+            'utilization_rate': round(
+                ds['active_iterations'] /
+                max(n_iterations, 1),
+                4,
+            ),
+            'avg_sightings_per_iter': round(
+                ds['total_sightings'] /
+                max(n_iterations, 1),
+                2,
+            ),
         })
-    return pd.DataFrame(rows)
+
+    columns = [
+        'detector_id',
+        'row',
+        'col',
+        'sensing_radius',
+        'total_sightings',
+        'unique_seekers_detected',
+        'active_iterations',
+        'utilization_rate',
+        'avg_sightings_per_iter',
+    ]
+
+    return pd.DataFrame(rows, columns=columns)
 
 
 def chokepoint_analysis(iterations):
@@ -384,9 +435,9 @@ def generate_dashboard(summary_df, seeker_df, detector_df, chokepoint_df, output
 
     # Panel 7 — Detector Utilization Bar Chart
     ax = fig.add_subplot(gs[2, 0])
-    det_sorted = detector_df.sort_values('total_intercepts', ascending=True)
-    colors = ['#e74c3c' if v > 0 else '#d5d8dc' for v in det_sorted['total_intercepts']]
-    ax.barh(det_sorted['detector_id'].astype(str), det_sorted['total_intercepts'],
+    det_sorted = detector_df.sort_values('total_sightings', ascending=True)
+    colors = ['#e74c3c' if v > 0 else '#d5d8dc' for v in det_sorted['total_sightings']]
+    ax.barh(det_sorted['detector_id'].astype(str), det_sorted['total_sightings'],
             color=colors, edgecolor='black', lw=0.3)
     ax.set(xlabel='Total Intercepts (all iterations)', ylabel='Detector ID')
     ax.set_title('Detector Intercept Count', fontsize=11, fontweight='bold')
@@ -401,8 +452,8 @@ def generate_dashboard(summary_df, seeker_df, detector_df, chokepoint_df, output
                     s=top_cp['visit_count'] * (300 / max(top_cp['visit_count'].max(), 1)),
                     cmap='YlOrRd', edgecolors='black', lw=0.3, alpha=0.7, zorder=1)
     # Plot detectors
-    active_det = detector_df[detector_df['total_intercepts'] > 0]
-    idle_det = detector_df[detector_df['total_intercepts'] == 0]
+    active_det = detector_df[detector_df['total_sightings'] > 0]
+    idle_det = detector_df[detector_df['total_sightings'] == 0]
     if len(idle_det) > 0:
         ax.scatter(idle_det['col'], idle_det['row'], marker='^', s=100,
                    c='#d5d8dc', edgecolors='black', lw=0.8, zorder=3, label='Idle detectors')
@@ -439,13 +490,13 @@ def generate_dashboard(summary_df, seeker_df, detector_df, chokepoint_df, output
 
     # Panel 10 — Intercept rate by detector (who's doing the work)
     ax = fig.add_subplot(gs[3, 1])
-    active_only = detector_df[detector_df['total_intercepts'] > 0].copy()
+    active_only = detector_df[detector_df['total_sightings'] > 0].copy()
     if len(active_only) > 0:
-        active_only = active_only.sort_values('total_intercepts', ascending=False)
-        total_all = detector_df['total_intercepts'].sum()
-        active_only['share'] = active_only['total_intercepts'] / max(total_all, 1)
+        active_only = active_only.sort_values('total_sightings', ascending=False)
+        total_all = detector_df['total_sightings'].sum()
+        active_only['share'] = active_only['total_sightings'] / max(total_all, 1)
         wedges, texts, autotexts = ax.pie(
-            active_only['total_intercepts'],
+            active_only['total_sightings'],
             labels=[f'Det {int(d)}' for d in active_only['detector_id']],
             autopct='%1.1f%%', startangle=90,
             colors=plt.cm.Set2(np.linspace(0, 1, len(active_only))),
@@ -462,7 +513,7 @@ def generate_dashboard(summary_df, seeker_df, detector_df, chokepoint_df, output
     n_total = len(summary_df)
     n_perfect = (summary_df['intercept_rate'] == 1.0).sum()
     n_failed = (summary_df['target_destruction_rate'] > 0).sum()
-    n_active_det = (detector_df['total_intercepts'] > 0).sum()
+    n_active_det = (detector_df['total_sightings'] > 0).sum()
     n_total_det = len(detector_df)
     avg_ir = summary_df['intercept_rate'].mean()
     avg_td = summary_df['target_destruction_rate'].mean()
@@ -533,17 +584,17 @@ def write_report(stats, summary_df, detector_df, noise_df, chokepoint_df, seeker
     # ── Section 3: Detector Utilization ──
     L.append("\n\n## 3. Detector Utilization\n")
     L.append(detector_df.to_markdown(index=False))
-    active = detector_df[detector_df['total_intercepts'] > 0]
-    idle = detector_df[detector_df['total_intercepts'] == 0]
+    active = detector_df[detector_df['total_sightings'] > 0]
+    idle = detector_df[detector_df['total_sightings'] == 0]
     L.append(f"\n- **Active detectors:** {len(active)} / {len(detector_df)} "
              f"({len(active)/max(len(detector_df),1):.0%})")
     L.append(f"- **Idle detectors (reposition candidates):** "
              f"{[int(x) for x in idle['detector_id'].values]}")
     if len(active) > 0:
-        top_det = active.sort_values('total_intercepts', ascending=False).iloc[0]
+        top_det = active.sort_values('total_sightings', ascending=False).iloc[0]
         L.append(f"- **Most effective detector:** #{int(top_det['detector_id'])} "
                  f"at row={int(top_det['row'])}, col={int(top_det['col'])} "
-                 f"with {int(top_det['total_intercepts'])} total intercepts")
+                 f"with {int(top_det['total_sightings'])} total intercepts")
 
     # ── Section 4: Noise Impact ──
     if noise_df is not None:
