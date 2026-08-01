@@ -1,4 +1,5 @@
 #!/bin/bash
+./clean.sh
 set -e
 
 # Clean stale CMake cache
