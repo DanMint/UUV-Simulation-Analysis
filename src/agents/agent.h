@@ -11,4 +11,5 @@
 #include "interceptorAgent.h"
 #include "seekerAgent.h"
 
-#endif // AGENT_H
+#include "patrolAgent.h" //Chris note: need to add my new given agent header file 
+

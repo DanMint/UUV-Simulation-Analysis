@@ -23,6 +23,7 @@ add_executable(uuv_sim
     src/agents/detectorAgent.cpp
     src/agents/interceptorAgent.cpp
     src/agents/seekerAgent.cpp
+    src/agents/patrolAgent.cpp  
 )
 
 add_executable(test_target_assignment

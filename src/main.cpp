@@ -27,7 +27,8 @@ void printUsage(const char* progName) {
               << "  [ / ] keys   - Adjust noise level (wave/wind)\n"
               << "  C key        - Clear all units (zones preserved)\n"
               << "  Enter        - Save scenario and run simulation\n"
-              << "  Escape       - Close without saving\n";
+              << "  Escape       - Close without saving\n"
+              << "  P            - Chris attempted to add the patrol as a seperate option\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -112,6 +113,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "patrol_defender") unitType = MapCreation::PATROL_DEFENDER; //Chris added: were using Interceptor as a visual/unit type since there is no patrol defender map cell 
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 
@@ -136,6 +138,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "patrol_defender") unitType = MapCreation::PATROL_DEFENDER;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
         }
@@ -222,6 +225,7 @@ int main(int argc, char* argv[]) {
                 if (unit.type == "target")   unitType = MapCreation::TARGET;
                 if (unit.type == "detector") unitType = MapCreation::DETECTOR;
                 if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
+                if (unit.type == "patrol_defender") unitType = MapCreation::PATROL_DEFENDER;
                 map.placeUnit(unit.row, unit.col, unitType);
             }
 

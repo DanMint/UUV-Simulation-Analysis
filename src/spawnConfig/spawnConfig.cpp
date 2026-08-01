@@ -10,6 +10,10 @@ bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
     m_units.push_back({type, row, col});
     return true;
 }
+bool SpawnConfig::addUnit(const UnitSpawn& unit) {//Chris section added
+    m_units.push_back(unit);
+    return true;
+}
 
 bool SpawnConfig::removeUnit(int row, int col) {
     for (auto it = m_units.begin(); it != m_units.end(); ++it) {
@@ -285,7 +289,12 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         const auto& u = m_units[i];
         file << "    { \"type\": \"" << u.type
              << "\", \"row\": "      << u.row
-             << ", \"col\": "        << u.col << " }";
+             << ", \"col\": "        << u.col //<< " }"; //chris curretnlyu messing around wiht how patrols get saved
+
+             // Chris added: save waypoint fields so patrol defender routes survive to disk
+             << ", \"waypoint_row\": " << u.waypointRow
+             << ", \"waypoint_col\": " << u.waypointCol << " }";
+
         if (i < (int)m_units.size() - 1) file << ",";
         file << "\n";
     }
@@ -405,7 +414,21 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             size_t colPos = content.find("\"col\"", rowPos);
             int col = static_cast<int>(extractNumber(content, "col", rowPos));
 
-            config.addUnit(type, row, col);
+
+            // Chris added: read waypoint fields back in (defaults to -1 / no waypoint if absent)
+            UnitSpawn u;
+            u.type = type;
+            u.row = row;
+            u.col = col;
+            u.waypointRow = -1;
+            u.waypointCol = -1;
+            if (content.find("\"waypoint_row\"", colPos) != std::string::npos) {
+                u.waypointRow = static_cast<int>(extractNumber(content, "waypoint_row", colPos));
+                u.waypointCol = static_cast<int>(extractNumber(content, "waypoint_col", colPos));
+            }
+
+            config.addUnit(u);
+            //config.addUnit(type, row, col);
             pos = colPos + 1;
         }
     }
