@@ -222,7 +222,7 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     if (m_hasMapData) {
         file << "  \"map\": {\n";
         file << "    \"shp_path\": \""    << m_mapInfo.shpPath    << "\",\n";
-        file << "    \"cells_n\": "       << m_mapInfo.cellsN     << ",\n";
+        file << "    \"cells_n\": "       << m_mapInfo.cellsInARow     << ",\n";
         file << "    \"canvas_width\": "  << m_mapInfo.canvasWidth  << ",\n";
         file << "    \"canvas_height\": " << m_mapInfo.canvasHeight << ",\n";
         file << "    \"min_depth\": "     << m_mapInfo.minDepth   << ",\n";
@@ -295,7 +295,7 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     file.close();
 
     std::cout << "Scenario saved to " << filepath << " (";
-    if (m_hasMapData) std::cout << m_mapInfo.cellsN << "x" << m_mapInfo.cellsN << " grid + ";
+    if (m_hasMapData) std::cout << m_mapInfo.cellsInARow << "x" << m_mapInfo.cellsInARow << " grid + ";
     std::cout << m_units.size()       << " units, "
               << m_attackerZones.size() << " ATK zones, "
               << m_defenderZones.size() << " DEF zones)\n";
@@ -321,7 +321,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
         size_t ms = content.find("\"map\"");
         MapInfo info;
         info.shpPath      = extractString(content, "shp_path",      ms);
-        info.cellsN       = static_cast<int>(extractNumber(content, "cells_n",       ms));
+        info.cellsInARow       = static_cast<int>(extractNumber(content, "cells_n",       ms));
         info.canvasWidth  = static_cast<int>(extractNumber(content, "canvas_width",  ms));
         info.canvasHeight = static_cast<int>(extractNumber(content, "canvas_height", ms));
         info.minDepth     = extractNumber(content, "min_depth",  ms);
@@ -331,10 +331,10 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
 
         std::vector<std::vector<int>> grid;
         size_t gridPos = content.find("\"grid\"");
-        if (gridPos != std::string::npos && info.cellsN > 0) {
+        if (gridPos != std::string::npos && info.cellsInARow > 0) {
             size_t gStart = content.find("[", gridPos);
             size_t pos    = gStart + 1;
-            for (int r = 0; r < info.cellsN; r++) {
+            for (int r = 0; r < info.cellsInARow; r++) {
                 size_t rowS = content.find("[", pos);
                 size_t rowE = content.find("]", rowS);
                 std::string rowStr = content.substr(rowS + 1, rowE - rowS - 1);
@@ -351,7 +351,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             }
         }
         config.setMapData(info, grid);
-        std::cout << "Loaded map: " << info.cellsN << "x" << info.cellsN
+        std::cout << "Loaded map: " << info.cellsInARow << "x" << info.cellsInARow
                   << " (" << info.waterCount << " water, " << info.landCount << " land)\n";
     }
 
@@ -423,7 +423,7 @@ void SpawnConfig::printSummary() const {
 
     if (m_hasMapData) {
         std::cout << "  Map source:   " << m_mapInfo.shpPath << std::endl;
-        std::cout << "  Grid size:    " << m_mapInfo.cellsN << " x " << m_mapInfo.cellsN << std::endl;
+        std::cout << "  Grid size:    " << m_mapInfo.cellsInARow << " x " << m_mapInfo.cellsInARow << std::endl;
         std::cout << "  Depth range:  [" << m_mapInfo.minDepth << ", " << m_mapInfo.maxDepth << "]" << std::endl;
         std::cout << "  Water cells:  " << m_mapInfo.waterCount << std::endl;
         std::cout << "  Land cells:   " << m_mapInfo.landCount  << std::endl;

@@ -31,6 +31,7 @@ void printUsage(const char* progName) {
 }
 
 int main(int argc, char* argv[]) {
+    // receive arguments from user
     if (argc < 2) {
         printUsage(argv[0]);
         return 1;
@@ -77,12 +78,13 @@ int main(int argc, char* argv[]) {
             shpPath = "(from cache)";
         }
         else {
-            int cellsN = (argc >= 3) ? std::stoi(argv[2]) : 100;
+            int cellsInARow = (argc >= 3) ? std::stoi(argv[2]) : 100;
             shpPath = firstArg;
             std::cout << "Loading shapefile: " << firstArg << "\n";
-            std::cout << "Grid resolution: " << cellsN << "x" << cellsN << "\n\n";
+            std::cout << "Grid resolution: " << cellsInARow << "x" << cellsInARow << "\n\n";
 
-            static MapCreation shpMap(firstArg, cellsN);
+            // shpMap lives until the program ends
+            static MapCreation shpMap(firstArg, cellsInARow);
             mapPtr = &shpMap;
             shpMap.saveCache("grid_cache.txt");
         }
@@ -118,7 +120,7 @@ int main(int argc, char* argv[]) {
             // Attach map data and save scenario
             MapInfo info;
             info.shpPath      = shpPath;
-            info.cellsN       = map.getCellsN();
+            info.cellsInARow       = map.getCellsN();
             info.canvasWidth   = map.getCanvasWidth();
             info.canvasHeight  = map.getCanvasHeight();
             info.minDepth     = map.getMinDepth();

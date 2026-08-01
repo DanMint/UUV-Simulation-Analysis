@@ -57,7 +57,7 @@ struct UnitSpawn {
 
 struct MapInfo {
     std::string shpPath;
-    int cellsN;
+    int cellsInARow;
     int canvasWidth;
     int canvasHeight;
     double minDepth;

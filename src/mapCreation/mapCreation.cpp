@@ -1,5 +1,7 @@
 #include "mapCreation.h"
 
+// GDAL = translator library for raster and vector geospatial data formats
+
 // GDAL/OGR headers for reading shapefiles
 #include <ogrsf_frmts.h>
 
@@ -10,22 +12,27 @@
 #include <limits>
 #include <stdexcept>
 
-// ════════════════════════════════════════════════════════════════════════════════
-//  CONSTRUCTORS
-// ════════════════════════════════════════════════════════════════════════════════
 
-MapCreation::MapCreation(const std::string& shpPath, int cellsN,
-                         int canvasWidth, int canvasHeight)
-    : m_cellsN(cellsN),
+/**
+ * Default constructor that reads a .shp file and translates it to a grid (std::vector<std::vector<int>> m_grid)
+ * 
+ * @param shpPath - path to the .shp file
+ * @param cellsN - number of cells inside the 
+ * @param canvasWidth
+ * @param canvasHeight 
+ * 
+ */
+MapCreation::MapCreation(const std::string& shpPath, int cellsInARow, int canvasWidth, int canvasHeight)
+    : m_cellsInARow(cellsInARow),
       m_canvasWidth(canvasWidth),
       m_canvasHeight(canvasHeight),
       m_minDepth(0.0),
       m_maxDepth(0.0)
 {
-    // Calculate cell spacing (same math as the Python version)
-    m_colSpace = static_cast<double>(m_canvasWidth) / m_cellsN;
-    m_rowSpace = static_cast<double>(m_canvasHeight) / m_cellsN;
-    m_cellSize = m_canvasWidth / m_cellsN;
+    // cell spacing calculation
+    m_colSpace = static_cast<double>(m_canvasWidth) / m_cellsInARow;
+    m_rowSpace = static_cast<double>(m_canvasHeight) / m_cellsInARow;
+    m_cellSize = m_canvasWidth / m_cellsInARow;
 
     // Step 1: Read the shapefile and build scaled polygons
     loadShapefile(shpPath);
@@ -111,14 +118,14 @@ void MapCreation::loadShapefile(const std::string& shpPath) {
         throw std::runtime_error("Failed to open shapefile: " + shpPath);
     }
 
-    // ── Get the first (and usually only) layer ──
+    // Get the first (and usually only) layer
     OGRLayer* layer = dataset->GetLayer(0);
     if (layer == nullptr) {
         GDALClose(dataset);
         throw std::runtime_error("No layers found in shapefile: " + shpPath);
     }
 
-    // ── First pass: find geographic bounding box and depth range ──
+    // First pass: find geographic bounding box and depth range
     OGREnvelope envelope;
     layer->GetExtent(&envelope);
 
@@ -143,6 +150,7 @@ void MapCreation::loadShapefile(const std::string& shpPath) {
     layer->ResetReading();
     OGRFeature* feature = nullptr;
 
+    // loop goes through every GDAL/OGR layer, reads the DRYVAL2 and updated min and max depth values
     while ((feature = layer->GetNextFeature()) != nullptr) {
         // Read depth columns
         int drval2Idx = feature->GetFieldIndex("DRVAL2");
@@ -201,15 +209,7 @@ void MapCreation::loadShapefile(const std::string& shpPath) {
 //  POINT-IN-POLYGON (Ray Casting Algorithm)
 // ════════════════════════════════════════════════════════════════════════════════
 
-/**
- * Classic ray casting algorithm:
- * Cast a horizontal ray from the point to the right.
- * Count how many polygon edges it crosses.
- * If odd → inside. If even → outside.
- */
-bool MapCreation::pointInPolygon(double px, double py,
-                                  const std::vector<std::pair<double, double>>& vertices)
-{
+bool MapCreation::pointInPolygon(double px, double py, const std::vector<std::pair<double, double>>& vertices) {
     bool inside = false;
     int n = static_cast<int>(vertices.size());
 
@@ -224,17 +224,16 @@ bool MapCreation::pointInPolygon(double px, double py,
         // Check if the ray crosses this edge
         // Condition 1: the point's Y is between the edge's Y range
         // Condition 2: the point's X is to the left of the edge intersection
-        if ((yi > py) != (yj > py) &&
-            (px < (xj - xi) * (py - yi) / (yj - yi) + xi))
-        {
-            inside = !inside;  // flip: each crossing toggles inside/outside
+        if ((yi > py) != (yj > py) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+            // flip each crossing toggles inside/outside
+            inside = !inside;  
         }
     }
     return inside;
 }
 
 bool MapCreation::isPointInWater(double px, double py) const {
-    // Check against every water polygon — if point is inside any, it's water
+    // Check against every water polygon. if point is inside any its water
     for (const auto& poly : m_polygons) {
         if (pointInPolygon(px, py, poly.vertices)) {
             return true;
@@ -248,8 +247,8 @@ bool MapCreation::isPointInWater(double px, double py) const {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void MapCreation::classifyCells() {
-    // Allocate the grid: m_cellsN rows, each with m_cellsN columns
-    m_grid.resize(m_cellsN, std::vector<int>(m_cellsN, 1));  // default to land (1)
+    // Allocate the grid: m_cellsInARow rows, each with m_cellsInARow columns
+    m_grid.resize(m_cellsInARow, std::vector<int>(m_cellsInARow, 1));  // default to land (1)
 
     int waterCount = 0;
     int landCount  = 0;
@@ -258,8 +257,8 @@ void MapCreation::classifyCells() {
     // floating-point ray casting is unreliable
     double inset = 0.05;
 
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
+    for (int row = 0; row < m_cellsInARow; row++) {
+        for (int col = 0; col < m_cellsInARow; col++) {
             // Calculate the top-left pixel position of this cell
             double posX = col * m_colSpace;
             double posY = row * m_rowSpace;
@@ -300,7 +299,7 @@ void MapCreation::classifyCells() {
         }
     }
 
-    std::cout << "Grid classified: " << m_cellsN << "x" << m_cellsN
+    std::cout << "Grid classified: " << m_cellsInARow << "x" << m_cellsInARow
               << " = " << waterCount << " water, " << landCount << " land"
               << std::endl;
 }
@@ -347,8 +346,8 @@ void MapCreation::cleanupSeamGaps() {
         // Snapshot so reads and writes don't interfere within a pass
         std::vector<std::vector<int>> snap = m_grid;
 
-        for (int row = 0; row < m_cellsN; row++) {
-            for (int col = 0; col < m_cellsN; col++) {
+        for (int row = 0; row < m_cellsInARow; row++) {
+            for (int col = 0; col < m_cellsInARow; col++) {
                 if (snap[row][col] != LAND) continue;
 
                 // Count water neighbors
@@ -357,7 +356,7 @@ void MapCreation::cleanupSeamGaps() {
                 for (int d = 0; d < 8; d++) {
                     int nr = row + dr[d];
                     int nc = col + dc[d];
-                    if (nr < 0 || nr >= m_cellsN || nc < 0 || nc >= m_cellsN)
+                    if (nr < 0 || nr >= m_cellsInARow || nc < 0 || nc >= m_cellsInARow)
                         continue;
                     totalNeighbors++;
                     if (snap[nr][nc] == WATER)
@@ -431,12 +430,14 @@ const std::vector<std::vector<int>>& MapCreation::getGrid() const {
 }
 
 int MapCreation::getCell(int row, int col) const {
-    if (!isValid(row, col)) return -1;
+    if (!isValid(row, col)) 
+        return -1;
+
     return m_grid[row][col];
 }
 
 bool MapCreation::isValid(int row, int col) const {
-    return row >= 0 && row < m_cellsN && col >= 0 && col < m_cellsN;
+    return row >= 0 && row < m_cellsInARow && col >= 0 && col < m_cellsInARow;
 }
 
 bool MapCreation::isWater(int row, int col) const {
@@ -450,8 +451,8 @@ bool MapCreation::isPassable(int row, int col) const {
 
 std::vector<std::pair<int, int>> MapCreation::getAllWaterCells() const {
     std::vector<std::pair<int, int>> waterCells;
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
+    for (int row = 0; row < m_cellsInARow; row++) {
+        for (int col = 0; col < m_cellsInARow; col++) {
             if (m_grid[row][col] == WATER) {
                 waterCells.push_back({col, row});
             }
@@ -483,8 +484,8 @@ bool MapCreation::removeUnit(int row, int col) {
 }
 
 void MapCreation::clearAllUnits() {
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
+    for (int row = 0; row < m_cellsInARow; row++) {
+        for (int col = 0; col < m_cellsInARow; col++) {
             if (isUnitCell(m_grid[row][col])) {
                 m_grid[row][col] = WATER;
             }
@@ -498,18 +499,25 @@ int MapCreation::placeUnitsFromConfig(
     int placed = 0;
     for (const auto& [type, pos] : units) {
         int unitType = WATER; // fallback
-        if      (type == "seeker")      unitType = SEEKER;
-        else if (type == "target")      unitType = TARGET;
-        else if (type == "detector")    unitType = DETECTOR;
-        else if (type == "interceptor") unitType = INTERCEPTOR;
+        if(type == "seeker")      
+            unitType = SEEKER;
+
+        else if (type == "target")
+            unitType = TARGET;
+
+        else if (type == "detector")
+            unitType = DETECTOR;
+
+        else if (type == "interceptor") 
+            unitType = INTERCEPTOR;
+
         else continue;
 
-        if (placeUnit(pos.first, pos.second, unitType)) {
+        if (placeUnit(pos.first, pos.second, unitType)) 
             placed++;
-        }
+        
     }
-    std::cout << "Placed " << placed << " / " << units.size()
-              << " units on grid\n";
+    std::cout << "Placed " << placed << " / " << units.size() << " units on grid\n";
     return placed;
 }
 
@@ -517,12 +525,29 @@ int MapCreation::placeUnitsFromConfig(
 //  GRID INFO
 // ════════════════════════════════════════════════════════════════════════════════
 
-int MapCreation::getCellsN() const       { return m_cellsN; }
-int MapCreation::getCanvasWidth() const  { return m_canvasWidth; }
-int MapCreation::getCanvasHeight() const { return m_canvasHeight; }
-int MapCreation::getCellSize() const     { return m_cellSize; }
-double MapCreation::getMinDepth() const  { return m_minDepth; }
-double MapCreation::getMaxDepth() const  { return m_maxDepth; }
+int MapCreation::getCellsN() const { 
+    return m_cellsInARow; 
+}
+
+int MapCreation::getCanvasWidth() const {
+     return m_canvasWidth; 
+}
+
+int MapCreation::getCanvasHeight() const { 
+    return m_canvasHeight; 
+}
+
+int MapCreation::getCellSize() const { 
+    return m_cellSize; 
+}
+
+double MapCreation::getMinDepth() const { 
+    return m_minDepth; 
+}
+
+double MapCreation::getMaxDepth() const { 
+    return m_maxDepth; 
+}
 
 int MapCreation::getWaterCount() const {
     int count = 0;
@@ -533,7 +558,7 @@ int MapCreation::getWaterCount() const {
 }
 
 int MapCreation::getLandCount() const {
-    int total = m_cellsN * m_cellsN;
+    int total = m_cellsInARow * m_cellsInARow;
     return total - getWaterCount();
 }
 
@@ -548,12 +573,12 @@ void MapCreation::saveCache(const std::string& filepath) const {
     }
 
     // Header line: cellsN canvasWidth canvasHeight minDepth maxDepth
-    file << m_cellsN << " " << m_canvasWidth << " " << m_canvasHeight
+    file << m_cellsInARow << " " << m_canvasWidth << " " << m_canvasHeight
          << " " << m_minDepth << " " << m_maxDepth << "\n";
 
     // Grid data: one row per line, space-separated 0s and 1s
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
+    for (int row = 0; row < m_cellsInARow; row++) {
+        for (int col = 0; col < m_cellsInARow; col++) {
             if (col > 0) file << " ";
             file << m_grid[row][col];
         }
@@ -571,17 +596,17 @@ void MapCreation::loadCache(const std::string& cachePath) {
     }
 
     // Read header
-    file >> m_cellsN >> m_canvasWidth >> m_canvasHeight >> m_minDepth >> m_maxDepth;
+    file >> m_cellsInARow >> m_canvasWidth >> m_canvasHeight >> m_minDepth >> m_maxDepth;
 
     // Recalculate spacing
-    m_colSpace = static_cast<double>(m_canvasWidth) / m_cellsN;
-    m_rowSpace = static_cast<double>(m_canvasHeight) / m_cellsN;
-    m_cellSize = m_canvasWidth / m_cellsN;
+    m_colSpace = static_cast<double>(m_canvasWidth) / m_cellsInARow;
+    m_rowSpace = static_cast<double>(m_canvasHeight) / m_cellsInARow;
+    m_cellSize = m_canvasWidth / m_cellsInARow;
 
     // Read grid
-    m_grid.resize(m_cellsN, std::vector<int>(m_cellsN, 1));
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
+    m_grid.resize(m_cellsInARow, std::vector<int>(m_cellsInARow, 1));
+    for (int row = 0; row < m_cellsInARow; row++) {
+        for (int col = 0; col < m_cellsInARow; col++) {
             file >> m_grid[row][col];
         }
     }
@@ -589,7 +614,7 @@ void MapCreation::loadCache(const std::string& cachePath) {
     file.close();
 
     int water = getWaterCount();
-    std::cout << "Grid loaded from cache: " << m_cellsN << "x" << m_cellsN
+    std::cout << "Grid loaded from cache: " << m_cellsInARow << "x" << m_cellsInARow
               << ", " << water << " water cells" << std::endl;
 }
 
@@ -598,19 +623,32 @@ void MapCreation::loadCache(const std::string& cachePath) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void MapCreation::printGrid() const {
-    std::cout << "\nGrid (" << m_cellsN << "x" << m_cellsN
+    std::cout << "\nGrid (" << m_cellsInARow << "x" << m_cellsInARow
               << ", . = water, # = land, S = seeker, T = target, "
               << "D = detector, I = interceptor):\n\n";
-    for (int row = 0; row < m_cellsN; row++) {
-        for (int col = 0; col < m_cellsN; col++) {
+    for (int row = 0; row < m_cellsInARow; row++) {
+        for (int col = 0; col < m_cellsInARow; col++) {
             switch (m_grid[row][col]) {
-                case WATER:       std::cout << '.'; break;
-                case LAND:        std::cout << '#'; break;
-                case SEEKER:      std::cout << 'S'; break;
-                case TARGET:      std::cout << 'T'; break;
-                case DETECTOR:    std::cout << 'D'; break;
-                case INTERCEPTOR: std::cout << 'I'; break;
-                default:          std::cout << '?'; break;
+                case WATER:       
+                    std::cout << '.'; break;
+
+                case LAND:        
+                    std::cout << '#'; break;
+
+                case SEEKER:      
+                    std::cout << 'S'; break;
+
+                case TARGET:      
+                    std::cout << 'T'; break;
+
+                case DETECTOR:      
+                    std::cout << 'D'; break;
+
+                case INTERCEPTOR: 
+                    std::cout << 'I'; break;
+
+                default:          
+                    std::cout << '?'; break;
             }
         }
         std::cout << '\n';
@@ -620,11 +658,11 @@ void MapCreation::printGrid() const {
 
 void MapCreation::printStats() const {
     int water = getWaterCount();
-    int total = m_cellsN * m_cellsN;
+    int total = m_cellsInARow * m_cellsInARow;
     int land  = total - water;
 
     std::cout << "\n=== Map Statistics ===" << std::endl;
-    std::cout << "  Grid size:    " << m_cellsN << " x " << m_cellsN << std::endl;
+    std::cout << "  Grid size:    " << m_cellsInARow << " x " << m_cellsInARow << std::endl;
     std::cout << "  Cell size:    " << m_cellSize << " px" << std::endl;
     std::cout << "  Total cells:  " << total << std::endl;
     std::cout << "  Water cells:  " << water
@@ -633,4 +671,13 @@ void MapCreation::printStats() const {
               << " (" << (100.0 * land / total) << "%)" << std::endl;
     std::cout << "  Depth range:  [" << m_minDepth << ", " << m_maxDepth << "]" << std::endl;
     std::cout << "=====================\n" << std::endl;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  HELPER 
+// ════════════════════════════════════════════════════════════════════════════════
+
+bool MapCreation::isUnitCell(int v) {
+    return v == SEEKER || v == TARGET || v == DETECTOR || v == INTERCEPTOR;
+
 }
