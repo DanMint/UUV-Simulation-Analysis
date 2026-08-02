@@ -43,8 +43,18 @@
  */
 class Simulation {
 public:
-    Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000);
+    /**
+     * @param map       Map reference (must outlive the simulation)
+     * @param config    Scenario configuration
+     * @param maxSteps  Step limit before forced termination
+     * @param seed      RNG seed for reproducible runs (default: random_device)
+     */
+    Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000,
+               unsigned seed = std::random_device{}());
     ~Simulation() { delete m_pf; }
+
+    /** Retrieve the RNG seed used for this run (for reproducibility/replay). */
+    unsigned getSeed() const { return m_seed; }
 
     Simulation(const Simulation&) = delete;
     Simulation& operator=(const Simulation&) = delete;
@@ -103,6 +113,7 @@ private:
     std::vector<InterceptorAgent> m_interceptors;
     std::vector<AttackerAgent>     m_attackers;
 
+    unsigned m_seed;            ///< RNG seed used for this run (reproducible)
     mutable std::mt19937 m_rng;
 
     Pathfinding* m_pf;  // persistent pathfinder (reused across steps)

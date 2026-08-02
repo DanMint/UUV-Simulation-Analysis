@@ -64,7 +64,13 @@ void printUsage(const char* progName) {
               << "  Controls:\n"
               << "    Space  - Pause/Resume  |  +/-  - Speed\n"
               << "    Enter  - Step (paused)  |  L    - Toggle legend\n"
-              << "    Esc    - Skip to end\n";
+              << "    Esc    - Skip to end\n"
+              << "\nOptional Flags:\n"
+              << "  --iterations N     Batch mode: run N iterations\n"
+              << "  --noise-step D     Batch mode: add D noise per iteration\n"
+              << "  --seed S           Fixed RNG seed (0 = auto-random per run)\n"
+              << "  --max-steps N      Override max simulation steps (default 2000)\n"
+              << "  --no-prompt        Do not wait for Enter on exit (headless/batch)\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -80,11 +86,27 @@ int main(int argc, char* argv[]) {
         std::string firstArg = argv[1];
         bool needSpawnTool = true;
         bool visualize = false;
+        int batchIterations = 1;
+        double batchNoiseStep = 0.0;
+        unsigned seedOverride = 0;   // 0 = auto-randomize (default)
+        bool noPrompt = false;
+        int maxSteps = 2000;
 
-        // Check for --visualize flag (can be at any position)
+        // Parse optional flags (can be at any position)
         for (int i = 1; i < argc; i++) {
-            if (std::string(argv[i]) == "--visualize") {
+            std::string arg = argv[i];
+            if (arg == "--visualize") {
                 visualize = true;
+            } else if (arg == "--iterations" && i + 1 < argc) {
+                batchIterations = std::max(1, std::stoi(argv[++i]));
+            } else if (arg == "--noise-step" && i + 1 < argc) {
+                batchNoiseStep = std::max(0.0, std::stod(argv[++i]));
+            } else if (arg == "--seed" && i + 1 < argc) {
+                seedOverride = std::stoul(argv[++i]);
+            } else if (arg == "--no-prompt") {
+                noPrompt = true;
+            } else if (arg == "--max-steps" && i + 1 < argc) {
+                maxSteps = std::max(1, std::stoi(argv[++i]));
             }
         }
 
@@ -201,7 +223,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        Simulation sim(map, config, 2000);
+        Simulation sim(map, config, maxSteps, seedOverride);
 
         if (visualize) {
             std::cout << "\nOpening live visualizer...\n";
@@ -218,6 +240,8 @@ int main(int argc, char* argv[]) {
             int numIterations = 1;
             double noiseIncrement = 0.0;
             double startingNoise = config.getMaxNoiseLevel();
+            bool useBatchFlags = (batchIterations > 1 || batchNoiseStep > 0.0);
+            if (useBatchFlags) { numIterations = batchIterations; noiseIncrement = batchNoiseStep; } else {
 
             std::cout << "\n-- Iteration Configuration --\n";
             std::cout << "Starting noise level: " << startingNoise << "\n";
@@ -229,6 +253,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "Noise increment per iteration: ";
                 std::cin >> noiseIncrement;
                 if (noiseIncrement < 0.0) noiseIncrement = 0.0;
+            }
             }
 
             std::string runsDir = "runs";
@@ -246,15 +271,20 @@ int main(int argc, char* argv[]) {
                 double currentNoise = startingNoise + noiseIncrement * iter;
                 config.setMaxNoiseLevel(currentNoise);
 
+                // Fixed seed: derive per-iteration seeds so batch runs
+                // are deterministic but still distinct. Seed 0 = auto-random.
+                unsigned iterSeed = (seedOverride != 0) ? seedOverride + static_cast<unsigned>(iter) : 0;
+
                 std::cout << "\n========================================\n";
                 std::cout << "  Iteration " << (iter + 1) << " / " << numIterations
                           << "  |  Noise: " << currentNoise << "\n";
+                std::cout << "             Seed: " << iterSeed << "\n";
                 std::cout << "========================================\n";
 
                 map.clearAllUnits();
                 stampUnitsOnGrid(map, config);
 
-                Simulation iterSim(map, config, 2000);
+                Simulation iterSim(map, config, maxSteps, iterSeed);
                 SimResult result = iterSim.run();
                 result.print();
 
@@ -264,6 +294,10 @@ int main(int argc, char* argv[]) {
                 noiseStr << currentNoise;
                 filename << noiseStr.str() << ".json";
                 result.saveJSON(filename.str());
+
+                // Append one cost-benefit row to the shared summary CSV
+                // (one row per run, header auto-created on first call).
+                result.saveCSV(runsDir + "/summary.csv", iter);
             }
 
             if (numIterations > 1) {
@@ -274,14 +308,17 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        if (!noPrompt) {
+            std::cout << "\nPress Enter to exit and review logs...";
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cin.get();
+        }
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
 
-    std::cout << "\nPress Enter to exit and review logs...";
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    std::cin.get();
-
     return 0;
 }
+

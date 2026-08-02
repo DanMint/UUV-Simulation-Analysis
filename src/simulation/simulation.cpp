@@ -4,11 +4,12 @@
 #include <limits>
 #include <iostream>
 
-Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps)
+Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps,
+                       unsigned seed)
     : m_map(map), m_maxSteps(maxSteps),
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_finished(false), m_step(0), m_pf(nullptr),
-      m_rng(std::random_device{}())
+      m_seed(seed), m_rng(seed)
 {
     int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, attackerId = 0;
     double detRadius = config.getDetectorRadius();
@@ -92,6 +93,8 @@ void Simulation::updateDetectorTracks(int currentStep) {
             if (!detector.alive) continue;
             if (!detector.isInRange(attacker.row, attacker.col)) continue;
             if (!attacker.isInFrequencyRange(detector.freqLowHz, detector.freqHighHz)) continue;
+            // Log every sighting (including repeats) — same as for seekers.
+            detector.recordSighting(attacker.id, currentStep);
             if (!attacker.detected) {
                 attacker.detected = true;
                 attacker.firstDetectedAtStep = currentStep;
@@ -213,6 +216,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
         sr.firstDetectedByDetector = s.firstDetectedByDetector;
         sr.intercepted = s.intercepted; sr.interceptedByInterceptor = s.interceptedByInterceptor;
         sr.interceptedAtStep = s.interceptedAtStep;
+        sr.unitCostMin = s.specs.unitCostMin;
         result.seekerResults.push_back(sr);
         if (s.alive) result.allSeekersDead = false;
     }
@@ -240,12 +244,14 @@ SimResult Simulation::buildResult(int totalSteps) const {
     for (const auto& a : m_attackers) {
         SimResult::AttackerResult ar;
         ar.id = a.id; ar.row = a.row; ar.col = a.col; ar.alive = a.alive;
-        ar.state = a.stateName(); ar.missionSuccess = a.everSucceeded;
+        ar.state = a.stateName(); ar.agentType = a.specs.agentType;
+        ar.missionSuccess = a.everSucceeded;
         ar.stepsTaken = a.stepsTaken; ar.pathCost = a.pathCost;
         ar.nodesExpanded = a.nodesExpanded; ar.targetId = a.targetId; ar.killCount = a.killCount;
         for (const auto& s : a.sightings) ar.sightings.push_back({s.seekerId, s.step});
         for (const auto& ic : a.intercepts) ar.intercepts.push_back({ic.seekerId, ic.step});
         ar.moveHistory = a.moveHistory;
+        ar.unitCostMin = a.specs.unitCostMin;
         result.attackerResults.push_back(ar);
     }
     result.computeSummary();
@@ -410,6 +416,8 @@ SimResult Simulation::run() {
     std::cout << "\n--- Simulation starting (headless) ---\n";
     m_finished = false;
     m_step = 0;
+    // Prevent a leak if run() is called more than once on the same object.
+    delete m_pf;
     m_pf = new Pathfinding(m_map.getGrid());
     assignTargets(*m_pf);
 

@@ -73,7 +73,28 @@ uuv_sim.exe --cache cache.txt    # Load cached grid
 uuv_sim.exe --scenario scenario.json              # Load saved scenario
 uuv_sim.exe --scenario scenario.json --visualize  # With live visualizer
 uuv_sim.exe --cache cache.txt --visualize         # Visualization from cache
+uuv_sim.exe --scenario scenario.json --iterations 10 --noise-step 0.1  # Non-interactive batch
+uuv_sim.exe --scenario scenario.json --seed 42                        # Deterministic run
+uuv_sim.exe --scenario scenario.json --max-steps 5000                 # Extend step budget
+uuv_sim.exe --scenario scenario.json --no-prompt                      # No press-Enter on exit
+uuv_sim.exe --scenario scenario.json --seed 42 --iterations 5 --no-prompt  # Reproducible batch
 ```
+
+### Flags
+
+| Flag | Effect |
+|------|--------|
+| `--visualize` | Open the SFML live visualizer |
+| `--iterations N` | Run `N` batch iterations non-interactively |
+| `--noise-step S` | Increment noise level by `S` per batch iteration |
+| `--seed S` | Fixed RNG seed for reproducible results. `0` (default) = auto-random. In batch mode each iteration uses `seed + iteration`. |
+| `--max-steps N` | Override the default 2000-step simulation budget |
+| `--no-prompt` | Skip the "Press Enter to exit" prompt (headless automation) |
+
+The `--iterations N --noise-step S` flags run `N` simulations non-interactively
+(skipping the prompt), incrementing the noise level by `S` each run. Each run is
+saved as JSON to `runs/` and one cost-benefit row is appended to `runs/summary.csv`.
+With `--seed S`, batch runs are deterministic and reproducible.
 
 ## Architecture
 
@@ -150,16 +171,23 @@ Each iteration runs independently with increasing noise. Results saved as JSON t
 
 ```bash
 cd UUV-Simulation-Analysis
-python scripts/visualize.py runs/
+python scripts/visualize.py runs/          # Plots seeker/attacker paths per run
+python scripts/analyze_costs.py runs/      # Cost-benefit charts from summary.csv
 ```
 
-This prints a table and generates `analysis_plots.png` with 4 charts:
-- Steps to completion vs noise
-- Seeker success rate vs noise
-- Target loss rate vs noise
-- Attacker loss rate vs noise
+`scripts/visualize.py` plots one figure per run JSON: water/land grid, seeker
+paths (red), attacker paths (dashed, colour-coded by vehicle type), targets,
+detectors and interceptors. Outputs PNGs to `paths/`.
 
-Requires `matplotlib`. Without it, only text output is shown.
+`scripts/analyze_costs.py` reads `runs/summary.csv` (one row per batch run, written
+by `SimResult::saveCSV`) and prints a cost-benefit summary (blue cost = defender
+losses, red cost = attacker waste, loss-exchange ratio, mission success rate) plus
+three plots:
+- Cost trade-off (blue vs red, colour = success rate) → `runs/cost_tradeoff.png`
+- Mission success vs sim length → `runs/success_vs_steps.png`
+- Loss-exchange-ratio histogram → `runs/loss_exchange_ratio.png`
+
+Requires `numpy` and `matplotlib`.
 
 ## GA Zone System
 

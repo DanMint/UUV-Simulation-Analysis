@@ -97,6 +97,17 @@ void SimResult::computeSummary() {
     for (const auto& a : attackerResults) {
         if (a.alive) attackersAlive++;
     }
+
+    // ── Cost-benefit summary ─────────────────────────────────────────
+    blueCost = 0.0f;
+    for (const auto& s : seekerResults) {
+        if (s.intercepted) blueCost += s.unitCostMin;
+    }
+    redCost = 0.0f;
+    for (const auto& a : attackerResults) {
+        if (!a.missionSuccess) redCost += a.unitCostMin;
+    }
+    lossExchangeRatio = (blueCost > 0.0f) ? redCost / blueCost : 0.0f;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -118,6 +129,9 @@ void SimResult::print() const {
     std::cout << "  Attackers active:    " << attackersAlive
               << " / " << attackerResults.size() << std::endl;
     std::cout << "  Avg steps to target: " << avgStepsToTarget << std::endl;
+    std::cout << "  Blue cost (lost):    $" << static_cast<long long>(blueCost) << std::endl;
+    std::cout << "  Red cost (wasted):   $" << static_cast<long long>(redCost) << std::endl;
+    std::cout << "  Loss exchange ratio: " << lossExchangeRatio << std::endl;
 
     std::cout << "\n  Seekers:" << std::endl;
     for (const auto& s : seekerResults) {
@@ -242,7 +256,10 @@ void SimResult::saveJSON(const std::string& filepath) const {
     jsonKey(buf, 2, "total_interceptors",        static_cast<int>(interceptorResults.size())); buf << ",\n";
     jsonKey(buf, 2, "total_attackers",           static_cast<int>(attackerResults.size()));  buf << ",\n";
     jsonKey(buf, 2, "attackers_alive",           attackersAlive);                     buf << ",\n";
-    jsonKey(buf, 2, "avg_steps_to_target",        avgStepsToTarget);                  buf << "\n";
+    jsonKey(buf, 2, "avg_steps_to_target",        avgStepsToTarget);                  buf << ",\n";
+    jsonKey(buf, 2, "blue_cost",                  blueCost);                           buf << ",\n";
+    jsonKey(buf, 2, "red_cost",                   redCost);                            buf << ",\n";
+    jsonKey(buf, 2, "loss_exchange_ratio",        lossExchangeRatio);                  buf << "\n";
     buf << "  },\n";
 
     // ── Seekers ──
@@ -262,6 +279,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
         jsonKeyBool(buf, 3, "intercepted",                s.intercepted);           buf << ",\n";
         jsonKey(buf, 3, "intercepted_by_interceptor",     s.interceptedByInterceptor); buf << ",\n";
         jsonKey(buf, 3, "intercepted_at_step",            s.interceptedAtStep);        buf << ",\n";
+        jsonKey(buf, 3, "unit_cost_min",           s.unitCostMin);                    buf << ",\n";
         jsonPosArray(buf, 3, "move_history", s.moveHistory); buf << "\n";
         buf << "    }";
         if (i < seekerResults.size() - 1) buf << ",";
@@ -330,12 +348,14 @@ void SimResult::saveJSON(const std::string& filepath) const {
         jsonKey(buf, 3, "col",             a.col);                            buf << ",\n";
         jsonKeyBool(buf, 3, "alive",       a.alive);                          buf << ",\n";
         jsonKeyStr(buf, 3, "state",        a.state);                          buf << ",\n";
+        jsonKeyStr(buf, 3, "agent_type",   a.agentType);                      buf << ",\n";
         jsonKeyBool(buf, 3, "mission_success", a.missionSuccess);             buf << ",\n";
         jsonKey(buf, 3, "steps_taken",     a.stepsTaken);                     buf << ",\n";
         jsonKey(buf, 3, "path_cost",       a.pathCost);                       buf << ",\n";
         jsonKey(buf, 3, "nodes_expanded",  a.nodesExpanded);                  buf << ",\n";
         jsonKey(buf, 3, "target_id",       a.targetId);                       buf << ",\n";
         jsonKey(buf, 3, "kill_count",      a.killCount);                      buf << ",\n";
+        jsonKey(buf, 3, "unit_cost_min",   a.unitCostMin);                    buf << ",\n";
         jsonSightingArray(buf, 3, "sightings",  a.sightings);                 buf << ",\n";
         jsonSightingArray(buf, 3, "intercepts", a.intercepts);                buf << ",\n";
         jsonPosArray(buf, 3, "move_history", a.moveHistory);                  buf << "\n";
@@ -357,5 +377,83 @@ void SimResult::saveJSON(const std::string& filepath) const {
 
     std::cout << "Results saved to " << filepath << " ("
               << buf.str().size() << " bytes)\n";
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  SAVE CSV  —  One row per run, appending to a shared summary file
+// ════════════════════════════════════════════════════════════════════════════════
+//
+//  Cost-benefit row layout:
+//    run_id, blue_cost, red_cost, targets_destroyed, total_targets,
+//    critical_asset_reached, total_steps, mission_success_rate
+//
+//  FIRST-DRAFT cost definitions (placeholder — team to confirm):
+//    - blue_cost = sum of unitCostMin over seekers that were intercepted.
+//                  NOTE: only seekers/attackers carry VehicleSpecs cost in
+//                  this codebase today; targets/detectors/interceptors have
+//                  no cost data yet, so this is a proxy for defender-side loss.
+//    - red_cost  = sum of unitCostMin over attackers that did NOT achieve
+//                  missionSuccess (their procurement cost was "wasted").
+//    - critical_asset_reached = targetResults[0].destroyed (simplification;
+//                  no dedicated critical-asset flag exists yet).
+//
+// ════════════════════════════════════════════════════════════════════════════════
+
+void SimResult::saveCSV(const std::string& filepath, int runId) const {
+    // ── Compute per-run cost columns ─────────────────────────────────
+    float blueCost = 0.0f;
+    for (const auto& s : seekerResults) {
+        // "Lost" = intercepted by the defence (killed before reaching target)
+        if (s.intercepted) blueCost += s.unitCostMin;
+    }
+
+    float redCost = 0.0f;
+    for (const auto& a : attackerResults) {
+        // "Wasted" = did not achieve mission success
+        if (!a.missionSuccess) redCost += a.unitCostMin;
+    }
+
+    int totalTargets = static_cast<int>(targetResults.size());
+    bool criticalAssetReached = false;
+    if (!targetResults.empty()) {
+        criticalAssetReached = targetResults[0].destroyed;
+    }
+
+    float missionSuccessRate = 0.0f;
+    if (!attackerResults.empty()) {
+        int successes = 0;
+        for (const auto& a : attackerResults) {
+            if (a.missionSuccess) successes++;
+        }
+        missionSuccessRate = static_cast<float>(successes) / static_cast<float>(attackerResults.size());
+    }
+
+    // ── Append row (write header if file doesn't exist yet) ──────────
+    std::ofstream file(filepath, std::ios::app);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open CSV file: " + filepath);
+    }
+
+    bool isNew = (std::ifstream(filepath).peek() == std::ifstream::traits_type::eof());
+    if (isNew) {
+        file << "run_id,blue_cost,red_cost,targets_destroyed,total_targets,"
+                "critical_asset_reached,total_steps,mission_success_rate\n";
+    }
+
+    file << runId << ","
+         << blueCost << ","
+         << redCost << ","
+         << targetsDestroyed << ","
+         << totalTargets << ","
+         << (criticalAssetReached ? "true" : "false") << ","
+         << totalSteps << ","
+         << missionSuccessRate << "\n";
+    file.close();
+
+    std::cout << "CSV row appended to " << filepath
+              << " (blue_cost=" << blueCost
+              << ", red_cost=" << redCost
+              << ", critical_asset_reached=" << (criticalAssetReached ? "true" : "false")
+              << ")\n";
 }
 

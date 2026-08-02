@@ -45,10 +45,14 @@ struct SimResult {
         int firstDetectedAtStep;
         int firstDetectedByDetector;
 
-        // Interception (set by interceptors)
-        bool intercepted;
-        int interceptedByInterceptor;
-        int interceptedAtStep;
+    // Interception (set by interceptors)
+    bool intercepted;
+    int interceptedByInterceptor;
+    int interceptedAtStep;
+
+    // Unit cost of this agent's vehicle (for cost-benefit CSV export).
+    // Populated in Simulation::buildResult() from VehicleSpecs::unitCostMin.
+    float unitCostMin = 0.0f;
     };
 
     // ─── Per-target output ──────────────────────────────────────────
@@ -100,6 +104,7 @@ struct SimResult {
         int col;
         bool alive;
         std::string state;
+        std::string agentType;   ///< vehicle type key (e.g. "hugin", "tb2")
         bool missionSuccess;
         int stepsTaken;
         double pathCost;
@@ -120,6 +125,10 @@ struct SimResult {
         std::vector<Intercept> intercepts;
 
         std::vector<std::pair<int,int>> moveHistory;
+
+        // Unit cost of this agent's vehicle (for cost-benefit CSV export).
+        // Populated in Simulation::buildResult() from VehicleSpecs::unitCostMin.
+        float unitCostMin = 0.0f;
     };
 
     // ─── Run-level data ─────────────────────────────────────────────
@@ -144,11 +153,40 @@ struct SimResult {
     int attackersAlive;
     double avgStepsToTarget;
 
+    // ─── Cost-benefit summary (filled by computeSummary) ────────────
+
+    float blueCost;          ///< Sum of unitCostMin over seekers intercepted (defence loss)
+    float redCost;           ///< Sum of unitCostMin over attackers that failed mission (offence waste)
+    float lossExchangeRatio; ///< redCost / blueCost (>1 = attackers trade up; <1 = defence efficient)
+
     // ─── Methods ────────────────────────────────────────────────────
 
     void computeSummary();
     void print() const;
     void saveJSON(const std::string& filepath) const;
+
+    /**
+     * Append one cost-benefit row to a CSV file (creates the header row
+     * on first call). Columns, in order:
+     *   run_id, blue_cost, red_cost, targets_destroyed, total_targets,
+     *   critical_asset_reached, total_steps, mission_success_rate
+     *
+     * Cost definitions (FIRST DRAFT — placeholder assumptions to be
+     * confirmed by the team):
+     *   - blue_cost  = sum of unitCostMin across all seekers that were
+     *                  intercepted (lost). NOTE: in the current codebase
+     *                  only seekers/attackers carry VehicleSpecs costs;
+     *                  targets/detectors/interceptors have no cost data
+     *                  yet, so this is a proxy until the team defines
+     *                  defender-side costs.
+     *   - red_cost   = sum of unitCostMin across all attackers that did
+     *                  NOT achieve missionSuccess (i.e. their cost was
+     *                  "wasted").
+     *   - critical_asset_reached = targetResults[0].destroyed. NOTE:
+     *                  simplification — the codebase has no dedicated
+     *                  critical-asset flag yet.
+     */
+    void saveCSV(const std::string& filepath, int runId) const;
 };
 
 #endif // SIMRESULT_H
