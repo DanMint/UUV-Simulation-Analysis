@@ -56,10 +56,8 @@ MapVisualizer::MapVisualizer(const MapCreation& map, int windowSize)
 //  COORDINATE CONVERSION
 // ════════════════════════════════════════════════════════════════════════════════
 
-bool MapVisualizer::mouseToGrid(int mouseX, int mouseY,
-                                int& outRow, int& outCol) const {
-    if (mouseX < 0 || mouseX >= m_windowSize ||
-        mouseY < 0 || mouseY >= m_windowSize)
+bool MapVisualizer::mouseToGrid(int mouseX, int mouseY, int& outRow, int& outCol) const {
+    if (mouseX < 0 || mouseX >= m_windowSize || mouseY < 0 || mouseY >= m_windowSize)
         return false;
 
     outCol = static_cast<int>(mouseX / m_cellSize);
@@ -118,7 +116,9 @@ void MapVisualizer::drawDetectorRadii(sf::RenderWindow& window) const {
 void MapVisualizer::drawInterceptorRadii(sf::RenderWindow& window) const {
     float pixelRadius = static_cast<float>(m_config.getInterceptorRadius()) * m_cellSize;
     for (const auto& unit : m_config.getUnits()) {
-        if (unit.type != "interceptor") continue;
+        if (unit.type != "interceptor") 
+            continue;
+
         sf::CircleShape c(pixelRadius);
         c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
         c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
@@ -138,10 +138,7 @@ void MapVisualizer::drawInterceptorRadii(sf::RenderWindow& window) const {
 void MapVisualizer::drawZones(sf::RenderWindow& window, sf::Font* font) const {
     float hs = std::max(4.0f, m_cellSize * 0.35f);  // corner-handle size
 
-    auto drawOneZone = [&](const SpawnZone& zone,
-                           const sf::Color& fill,
-                           const sf::Color& border,
-                           const std::string& label) {
+    auto drawOneZone = [&](const SpawnZone& zone, const sf::Color& fill, const sf::Color& border, const std::string& label) {
         float x = zone.colMin * m_cellSize;
         float y = zone.rowMin * m_cellSize;
         float w = zone.width()  * m_cellSize;
@@ -178,8 +175,10 @@ void MapVisualizer::drawZones(sf::RenderWindow& window, sf::Font* font) const {
     const auto& atkZones = m_config.getAttackerZones();
     for (int i = 0; i < (int)atkZones.size(); i++) {
         std::string label = "ATK " + std::to_string(i + 1);
+
         if (atkZones[i].numSeekers > 0)
             label += " (" + std::to_string(atkZones[i].numSeekers) + "S)";
+
         drawOneZone(atkZones[i], ATK_ZONE_FILL, ATK_ZONE_BORDER, label);
     }
 
@@ -188,13 +187,18 @@ void MapVisualizer::drawZones(sf::RenderWindow& window, sf::Font* font) const {
     for (int i = 0; i < (int)defZones.size(); i++) {
         std::string label = "DEF " + std::to_string(i + 1);
         std::string suffix;
+
         if (defZones[i].numDetectors > 0)
             suffix += std::to_string(defZones[i].numDetectors) + "D";
+
         if (defZones[i].numInterceptors > 0) {
             if (!suffix.empty()) suffix += " ";
             suffix += std::to_string(defZones[i].numInterceptors) + "I";
         }
-        if (!suffix.empty()) label += " (" + suffix + ")";
+
+        if (!suffix.empty()) 
+            label += " (" + suffix + ")";
+
         drawOneZone(defZones[i], DEF_ZONE_FILL, DEF_ZONE_BORDER, label);
     }
 
@@ -256,7 +260,8 @@ void MapVisualizer::drawZones(sf::RenderWindow& window, sf::Font* font) const {
 
 void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
     float half = m_cellSize * 0.45f;
-    if (half < 2.5f) half = 2.5f;
+    if (half < 2.5f) 
+        half = 2.5f;
 
     for (const auto& unit : m_config.getUnits()) {
         float cx = (unit.col + 0.5f) * m_cellSize;
@@ -271,6 +276,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             tri.setOutlineThickness(1.5f);
             window.draw(tri);
         }
+
         else if (unit.type == "target") {
             float side = half * 1.6f;
             sf::RectangleShape sq(sf::Vector2f(side, side));
@@ -281,6 +287,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             sq.setOutlineThickness(1.5f);
             window.draw(sq);
         }
+
         else if (unit.type == "detector") {
             float side = half * 1.4f;
             sf::RectangleShape d(sf::Vector2f(side, side));
@@ -292,6 +299,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             d.setOutlineThickness(1.5f);
             window.draw(d);
         }
+
         else if (unit.type == "interceptor") {
             float side = half * 1.4f;
             sf::RectangleShape d(sf::Vector2f(side, side));
@@ -313,7 +321,9 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             else if (unit.type == "interceptor") lbl = "I";
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
-            if (fs < 8) fs = 8;
+            if (fs < 8) 
+                fs = 8;
+
             sf::Text txt(*font, lbl, fs);
             txt.setFillColor(sf::Color::White);
             txt.setStyle(sf::Text::Bold);
@@ -330,10 +340,12 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
 //  drawHover  (zone mode suppresses cell highlight; interceptor preview added)
 // ════════════════════════════════════════════════════════════════════════════════
 
-void MapVisualizer::drawHover(sf::RenderWindow& window,
-                              int hoverRow, int hoverCol) const {
-    if (hoverRow < 0) return;
-    if (!m_zoneDrawMode.empty()) return;  // zone drag is the visual feedback
+void MapVisualizer::drawHover(sf::RenderWindow& window, int hoverRow, int hoverCol) const {
+    if (hoverRow < 0) 
+        return;
+
+    if (!m_zoneDrawMode.empty()) 
+        return;  // zone drag is the visual feedback
 
     sf::RectangleShape h(sf::Vector2f(m_cellSize, m_cellSize));
     h.setPosition(sf::Vector2f(hoverCol * m_cellSize, hoverRow * m_cellSize));
@@ -356,6 +368,7 @@ void MapVisualizer::drawHover(sf::RenderWindow& window,
         p.setPointCount(48);
         window.draw(p);
     }
+
     else if (m_currentType == "interceptor") {
         float r = static_cast<float>(m_config.getInterceptorRadius()) * m_cellSize;
         sf::CircleShape p(r);
@@ -379,7 +392,9 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
     panel.setPosition(sf::Vector2f(0.f, static_cast<float>(m_windowSize)));
     panel.setFillColor(PANEL_COLOR);
     window.draw(panel);
-    if (font == nullptr) return;
+
+    if (font == nullptr) 
+        return;
 
     std::ostringstream ss;
     sf::Color textColor;
@@ -399,6 +414,7 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
            << (m_typingBuffer.empty() ? "_" : m_typingBuffer + "_")
            << "    [type digits | Enter=confirm | Backspace | Esc=cancel zone]";
     }
+
     else if (m_gaPrepMode && m_zoneDrawMode.empty()) {
         // ── GA prep mode, not currently drawing a zone ───────────────────────
         textColor = sf::Color(200, 130, 255);  // purple
@@ -408,6 +424,7 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
            << "  DEF:"        << nDef
            << "  |  Enter=save scenario for GA";
     }
+    
     else if (m_zoneDrawMode == "attacker") {
         textColor = sf::Color(255, 140, 60);   // coral
         if (m_zoneDragging) {
@@ -417,7 +434,8 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
             int c2 = std::max(m_zoneDragStartCol, m_zoneDragCurrentCol);
             ss << "ATK ZONE DRAW  |  Dragging: " << (c2-c1+1) << "x" << (r2-r1+1)
                << " cells  |  Release to add zone";
-        } else {
+        } 
+        else {
             ss << "ATK ZONE DRAW (Z)  |  Zones: ATK=" << nAtk << " DEF=" << nDef
                << "  |  Drag=add  RClick=remove  Shift+Z=clear ATK  Z=exit";
         }
@@ -431,7 +449,8 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
             int c2 = std::max(m_zoneDragStartCol, m_zoneDragCurrentCol);
             ss << "DEF ZONE DRAW  |  Dragging: " << (c2-c1+1) << "x" << (r2-r1+1)
                << " cells  |  Release to add zone";
-        } else {
+        } 
+        else {
             ss << "DEF ZONE DRAW (X)  |  Zones: ATK=" << nAtk << " DEF=" << nDef
                << "  |  Drag=add  RClick=remove  Shift+X=clear DEF  X=exit";
         }
@@ -476,11 +495,15 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
         ss << "UUV Spawn Tool  |  GA PREP MODE  |  T:" << m_config.countType("target")
            << "  ATK=" << nAtk << "  DEF=" << nDef;
     }
+
     else if (m_zoneDrawMode == "attacker") {
         ss << "UUV Spawn Tool  |  ATK ZONE DRAW  |  ATK=" << nAtk << " DEF=" << nDef;
-    } else if (m_zoneDrawMode == "defender") {
+    } 
+    
+    else if (m_zoneDrawMode == "defender") {
         ss << "UUV Spawn Tool  |  DEF ZONE DRAW  |  ATK=" << nAtk << " DEF=" << nDef;
-    } else {
+    } 
+    else {
         ss << "UUV Spawn Tool  |  " << m_currentType
            << "  S:" << m_config.countType("seeker")
            << "  T:" << m_config.countType("target")
@@ -515,8 +538,13 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
         "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
         "C:\\Windows\\Fonts\\consola.ttf",
     };
-    for (const auto& p : fontPaths)
-        if (font.openFromFile(p)) { fontPtr = &font; break; }
+
+    for (const auto& p : fontPaths) {
+        if (font.openFromFile(p)) { 
+            fontPtr = &font; 
+            break; 
+        }
+    }
 
     if (!fontPtr)
         std::cout << "Warning: no system font found. Status bar disabled.\n"
@@ -543,8 +571,13 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 if (!m_zoneInputState.empty()) {
                     if (k->code == sf::Keyboard::Key::Enter) {
                         int count = 0;
-                        try { if (!m_typingBuffer.empty()) count = std::stoi(m_typingBuffer); }
-                        catch (...) { count = 0; }
+                        try { 
+                            if (!m_typingBuffer.empty()) 
+                                count = std::stoi(m_typingBuffer); 
+                        }
+                        catch (...) { 
+                            count = 0; 
+                        }
 
                         if (m_zoneInputState == "atk_seekers") {
                             m_config.addAttackerZone(
@@ -557,6 +590,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                             m_zoneInputState = "";
                             m_typingBuffer.clear();
                         }
+
                         else if (m_zoneInputState == "def_detectors") {
                             m_pendingFirstCount = count;
                             m_zoneInputState    = "def_interceptors";
@@ -564,6 +598,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                             std::cout << "How many INTERCEPTORS in this defender zone? "
                                       << "(type digits, Enter to confirm, Esc to cancel)\n";
                         }
+
                         else if (m_zoneInputState == "def_interceptors") {
                             m_config.addDefenderZone(
                                 m_pendingZone.rowMin, m_pendingZone.colMin,
@@ -578,14 +613,17 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         }
                         updateTitle(window);
                     }
+
                     else if (k->code == sf::Keyboard::Key::Escape) {
                         std::cout << "Zone cancelled.\n";
                         m_zoneInputState = "";
                         m_typingBuffer.clear();
                         updateTitle(window);
                     }
+
                     else if (k->code == sf::Keyboard::Key::Backspace) {
-                        if (!m_typingBuffer.empty()) m_typingBuffer.pop_back();
+                        if (!m_typingBuffer.empty()) 
+                            m_typingBuffer.pop_back();
                     }
                     // Block every other key while we're collecting count input
                     continue;
@@ -596,30 +634,36 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     if (m_gaPrepMode) {
                         std::cout << "Seeker placement disabled in GA prep mode. "
                                   << "The GA will spawn seekers within attacker zones.\n";
-                    } else {
+                    } 
+                    else {
                         m_currentType = "seeker";
                         m_zoneDrawMode = "";  m_zoneDragging = false;
                         updateTitle(window);
                     }
                 }
+
                 else if (k->code == sf::Keyboard::Key::T) {
                     m_currentType = "target";
                     m_zoneDrawMode = "";  m_zoneDragging = false;
                     updateTitle(window);
                 }
+
                 else if (k->code == sf::Keyboard::Key::D) {
                     if (m_gaPrepMode) {
                         std::cout << "Detector placement disabled in GA prep mode.\n";
-                    } else {
+                    } 
+                    else {
                         m_currentType = "detector";
                         m_zoneDrawMode = "";  m_zoneDragging = false;
                         updateTitle(window);
                     }
                 }
+
                 else if (k->code == sf::Keyboard::Key::I) {
                     if (m_gaPrepMode) {
                         std::cout << "Interceptor placement disabled in GA prep mode.\n";
-                    } else {
+                    } 
+                    else {
                         m_currentType = "interceptor";
                         m_zoneDrawMode = "";  m_zoneDragging = false;
                         updateTitle(window);
@@ -638,7 +682,8 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         }
                         std::cout << "GA PREP MODE ON  —  only targets and zones can be "
                                   << "placed. Press Q to exit.\n";
-                    } else {
+                    } 
+                    else {
                         std::cout << "GA PREP MODE OFF  —  all unit types available again.\n";
                     }
                     updateTitle(window);
@@ -651,12 +696,15 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         m_config.clearAttackerZones();
                         m_zoneDragging = false;
                         std::cout << "All attacker zones cleared.\n";
-                    } else if (m_zoneDrawMode == "attacker") {
+                    } 
+                    
+                    else if (m_zoneDrawMode == "attacker") {
                         // Z again: exit attacker zone mode (zones kept)
                         m_zoneDrawMode = "";
                         m_zoneDragging = false;
                         std::cout << "Exited attacker zone mode.\n";
-                    } else {
+                    } 
+                    else {
                         // Enter attacker zone mode
                         m_zoneDrawMode = "attacker";
                         m_zoneDragging = false;
@@ -673,12 +721,15 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         m_config.clearDefenderZones();
                         m_zoneDragging = false;
                         std::cout << "All defender zones cleared.\n";
-                    } else if (m_zoneDrawMode == "defender") {
+                    } 
+                    
+                    else if (m_zoneDrawMode == "defender") {
                         // X again: exit defender zone mode (zones kept)
                         m_zoneDrawMode = "";
                         m_zoneDragging = false;
                         std::cout << "Exited defender zone mode.\n";
-                    } else {
+                    } 
+                    else {
                         // Enter defender zone mode
                         m_zoneDrawMode = "defender";
                         m_zoneDragging = false;
@@ -701,6 +752,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     std::cout << "Detector sensing radius: " << m_config.getDetectorRadius() << "\n";
                     updateTitle(window);
                 }
+                
                 else if (k->code == sf::Keyboard::Key::Hyphen ||
                          k->code == sf::Keyboard::Key::Subtract) {
                     double r = m_config.getDetectorRadius();
@@ -715,6 +767,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     std::cout << "Interceptor kill radius: " << m_config.getInterceptorRadius() << "\n";
                     updateTitle(window);
                 }
+
                 else if (k->code == sf::Keyboard::Key::LBracket && shift) {
                     double r = m_config.getInterceptorRadius();
                     if (r > 0.5) m_config.setInterceptorRadius(r - 0.5);
@@ -728,6 +781,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     std::cout << "Max noise: " << m_config.getMaxNoiseLevel() << "\n";
                     updateTitle(window);
                 }
+
                 else if (k->code == sf::Keyboard::Key::LBracket) {
                     double n = m_config.getMaxNoiseLevel();
                     if (n > 0.0) m_config.setMaxNoiseLevel(n - 0.1);
@@ -742,8 +796,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                                      || m_config.hasDefenderZones();
                     if (hasSomething) {
                         if (!savePath.empty()) m_config.saveJSON(savePath);
-                        m_config.printSummary();
-                    } else {
+                            m_config.printSummary();
+                    } 
+                    else {
                         std::cout << "Nothing placed. Nothing saved.\n";
                     }
                     window.close();
@@ -783,6 +838,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 if (!m_zoneInputState.empty()) continue;
 
                 int clickRow, clickCol;
+
                 if (!mouseToGrid(btn->position.x, btn->position.y, clickRow, clickCol))
                     continue;
 
@@ -796,7 +852,8 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                             m_zoneDragCurrentCol = clickCol;
                             m_zoneDragging       = true;
                         }
-                    } else {
+                    } 
+                    else {
                         // Place unit (existing behaviour)
                         if (m_map.isWater(clickRow, clickCol)) {
                             if (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
@@ -807,20 +864,30 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         updateTitle(window);
                     }
                 }
+
                 else if (btn->button == sf::Mouse::Button::Right) {
                     if (!m_zoneDrawMode.empty()) {
                         // Remove zone containing this cell
                         bool removed = false;
+
                         if (m_zoneDrawMode == "attacker") {
                             removed = m_config.removeAttackerZoneContaining(clickRow, clickCol);
-                            if (removed) std::cout << "Removed attacker zone.\n";
-                        } else if (m_zoneDrawMode == "defender") {
+                            if (removed) 
+                                std::cout << "Removed attacker zone.\n";
+                        } 
+                        
+                        else if (m_zoneDrawMode == "defender") {
                             removed = m_config.removeDefenderZoneContaining(clickRow, clickCol);
-                            if (removed) std::cout << "Removed defender zone.\n";
+                            if (removed) 
+                                std::cout << "Removed defender zone.\n";
                         }
-                        if (!removed) std::cout << "No zone found at that cell.\n";
+
+                        if (!removed) 
+                            std::cout << "No zone found at that cell.\n";
+
                         updateTitle(window);
-                    } else {
+                    } 
+                    else {
                         // Remove unit (existing behaviour)
                         m_config.removeUnit(clickRow, clickCol);
                         updateTitle(window);
@@ -852,7 +919,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                             m_zoneInputState = "atk_seekers";
                             std::cout << "How many SEEKERS in this attacker zone? "
                                       << "(type digits, Enter to confirm, Esc to cancel)\n";
-                        } else if (m_zoneDrawMode == "defender") {
+                        } 
+                        
+                        else if (m_zoneDrawMode == "defender") {
                             m_zoneInputState = "def_detectors";
                             std::cout << "How many DETECTORS in this defender zone? "
                                       << "(type digits, Enter to confirm, Esc to cancel)\n";
