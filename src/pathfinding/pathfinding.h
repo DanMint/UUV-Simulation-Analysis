@@ -31,14 +31,22 @@ public:
      */
     Pathfinding(const std::vector<std::vector<int>>& grid);
 
+    // ════════════════════════════════════════════════════════════════════════════════
+    //  A* SEARCH
+    // ════════════════════════════════════════════════════════════════════════════════
+
     /**
      * Find optimal path from start to destination using A* with Octile heuristic.
      *
      * @return Vector of (row, col) from start to destination (inclusive).
      *         Empty if no path exists.
      */
-    std::vector<Pos> findPath(int startRow, int startCol,
-                              int destRow, int destCol) const;
+    std::vector<Pos> findPath(int startRow, int startCol, int destRow, int destCol) const;
+
+
+    // ════════════════════════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ════════════════════════════════════════════════════════════════════════════════
 
     /** Check if cell is within grid bounds. */
     bool isValid(int row, int col) const;
@@ -52,15 +60,9 @@ public:
     /** Get the total path cost of the last search (for analysis). */
     double getLastPathCost() const;
 
-private:
-    const std::vector<std::vector<int>>& m_grid;
-    int m_rows;
-    int m_cols;
-
-    // Stats from the last search (mutable so findPath can stay const)
-    mutable int m_lastNodesExpanded;
-    mutable double m_lastPathCost;
-
+    // ════════════════════════════════════════════════════════════════════════════════
+    //  OCTILE HEURISTIC
+    // ════════════════════════════════════════════════════════════════════════════════
     /**
      * Octile distance heuristic.
      *
@@ -74,15 +76,26 @@ private:
      */
     static double octileHeuristic(int row, int col, int destRow, int destCol);
 
+    // ════════════════════════════════════════════════════════════════════════════════
+    //  TRACE PATH
+    // ════════════════════════════════════════════════════════════════════════════════
     /** Trace path from destination back to start using parent map. */
-    static std::vector<Pos> tracePath(
-        const std::vector<std::vector<Pos>>& parents,
-        int destRow, int destCol);
+    static std::vector<Pos> tracePath(const std::vector<std::vector<Pos>>& parents, int destRow, int destCol);
+
+private:
+    const std::vector<std::vector<int>>& m_grid;
+    int m_rows;
+    int m_cols;
+
+    // Stats from the last search (mutable so findPath can stay const)
+    mutable int m_lastNodesExpanded;
+    mutable double m_lastPathCost;
 
     // 8 directions: cardinal + diagonal
     static constexpr int DIR_COUNT = 8;
     static constexpr int DR[DIR_COUNT] = { -1, 1, 0, 0, -1, -1, 1, 1 };
     static constexpr int DC[DIR_COUNT] = { 0, 0, -1, 1, -1, 1, -1, 1 };
+
     // Cost: 1.0 for cardinal (first 4), sqrt(2) for diagonal (last 4)
     static constexpr double MOVE_COST[DIR_COUNT] = {
         1.0, 1.0, 1.0, 1.0, 1.41421356, 1.41421356, 1.41421356, 1.41421356
