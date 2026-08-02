@@ -53,12 +53,16 @@ void SimResult::print() const {
                   << "path cost " << s.pathCost;
         if (s.reachedTarget) {
             std::cout << " -> reached target " << s.targetId;
-        } else if (s.intercepted) {
+        } 
+        
+        else if (s.intercepted) {
             std::cout << " -> INTERCEPTED by interceptor " << s.interceptedByInterceptor
                       << " at step " << s.interceptedAtStep;
-        } else {
+        } 
+        else {
             std::cout << " -> did NOT reach target";
         }
+
         if (s.detected) {
             std::cout << " (first tracked by detector " << s.firstDetectedByDetector
                       << " @ step " << s.firstDetectedAtStep << ")";
@@ -73,7 +77,8 @@ void SimResult::print() const {
         if (t.destroyed) {
             std::cout << "DESTROYED at step " << t.destroyedAtStep
                       << " by seeker " << t.destroyedBySeeker;
-        } else {
+        } 
+        else {
             std::cout << "survived";
         }
         std::cout << std::endl;
@@ -100,7 +105,9 @@ void SimResult::print() const {
             if (i.killCount > 0) {
                 std::cout << " [";
                 for (int k = 0; k < static_cast<int>(i.intercepts.size()); k++) {
-                    if (k > 0) std::cout << ", ";
+                    if (k > 0) 
+                        std::cout << ", ";
+                        
                     std::cout << "seeker " << i.intercepts[k].seekerId
                               << " @ step " << i.intercepts[k].step;
                 }

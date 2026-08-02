@@ -94,9 +94,9 @@ struct SimResult {
     bool allSeekersDead;
     double maxNoiseLevel;
 
-    std::vector<SeekerResult>      seekerResults;
-    std::vector<TargetResult>      targetResults;
-    std::vector<DetectorResult>    detectorResults;
+    std::vector<SeekerResult> seekerResults;
+    std::vector<TargetResult> targetResults;
+    std::vector<DetectorResult> detectorResults;
     std::vector<InterceptorResult> interceptorResults;
 
     // ─── Summary statistics (filled by computeSummary) ──────────────
@@ -108,7 +108,7 @@ struct SimResult {
     double avgStepsToTarget;
 
     // ─── Methods ────────────────────────────────────────────────────
-
+    
     void computeSummary();
     void print() const;
     void saveJSON(const std::string& filepath) const;

@@ -1,5 +1,21 @@
 #include "spawnConfig.h"
 
+bool SpawnZone::contains(int row, int col) const {
+     return row >= rowMin && row <= rowMax && col >= colMin && col <= colMax;
+}
+
+int SpawnZone::width() const {
+     return colMax - colMin + 1; 
+}
+
+int SpawnZone::height() const {
+    return rowMax - rowMin + 1; 
+}
+
+int SpawnZone::area() const {
+    return width() * height(); 
+}
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  UNIT MANAGEMENT  (unchanged)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -42,33 +58,55 @@ int SpawnConfig::countType(const std::string& type) const {
     return c;
 }
 
-int  SpawnConfig::totalUnits() const { return static_cast<int>(m_units.size()); }
-void SpawnConfig::clear()            { m_units.clear(); }
+int  SpawnConfig::totalUnits() const { 
+    return static_cast<int>(m_units.size()); 
+}
+
+void SpawnConfig::clear() { 
+    m_units.clear(); 
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  MAP DATA  (unchanged)
 // ════════════════════════════════════════════════════════════════════════════════
 
-void SpawnConfig::setMapData(const MapInfo& info,
-                             const std::vector<std::vector<int>>& grid) {
+void SpawnConfig::setMapData(const MapInfo& info, const std::vector<std::vector<int>>& grid) {
     m_mapInfo = info;
     m_grid    = grid;
     m_hasMapData = true;
 }
 
-const MapInfo& SpawnConfig::getMapInfo() const { return m_mapInfo; }
-const std::vector<std::vector<int>>& SpawnConfig::getGrid() const { return m_grid; }
-bool SpawnConfig::hasMapData() const { return m_hasMapData; }
+const MapInfo& SpawnConfig::getMapInfo() const { 
+    return m_mapInfo; 
+}
+
+const std::vector<std::vector<int>>& SpawnConfig::getGrid() const { 
+    return m_grid; 
+}
+
+bool SpawnConfig::hasMapData() const { 
+    return m_hasMapData; 
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  RADII  (unchanged)
 // ════════════════════════════════════════════════════════════════════════════════
 
-void   SpawnConfig::setDetectorRadius(double r)    { m_detectorRadius    = (r > 0) ? r : 1.0; }
-double SpawnConfig::getDetectorRadius() const       { return m_detectorRadius; }
+void SpawnConfig::setDetectorRadius(double r) { 
+    m_detectorRadius = (r > 0) ? r : 1.0; 
+}
 
-void   SpawnConfig::setInterceptorRadius(double r) { m_interceptorRadius = (r > 0) ? r : 1.0; }
-double SpawnConfig::getInterceptorRadius() const    { return m_interceptorRadius; }
+double SpawnConfig::getDetectorRadius() const {
+    return m_detectorRadius; 
+}
+
+void   SpawnConfig::setInterceptorRadius(double r) { 
+    m_interceptorRadius = (r > 0) ? r : 1.0; 
+}
+
+double SpawnConfig::getInterceptorRadius() const { 
+    return m_interceptorRadius; 
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  NOISE  (unchanged)
@@ -102,9 +140,17 @@ bool SpawnConfig::removeAttackerZoneContaining(int row, int col) {
     return false;
 }
 
-void SpawnConfig::clearAttackerZones()                           { m_attackerZones.clear(); }
-const std::vector<SpawnZone>& SpawnConfig::getAttackerZones() const { return m_attackerZones; }
-bool SpawnConfig::hasAttackerZones() const                       { return !m_attackerZones.empty(); }
+void SpawnConfig::clearAttackerZones() {
+     m_attackerZones.clear(); 
+}
+
+const std::vector<SpawnZone>& SpawnConfig::getAttackerZones() const { 
+    return m_attackerZones; 
+}
+
+bool SpawnConfig::hasAttackerZones() const { 
+    return !m_attackerZones.empty(); 
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  DEFENDER SPAWN ZONES
@@ -132,62 +178,89 @@ bool SpawnConfig::removeDefenderZoneContaining(int row, int col) {
     return false;
 }
 
-void SpawnConfig::clearDefenderZones()                           { m_defenderZones.clear(); }
-const std::vector<SpawnZone>& SpawnConfig::getDefenderZones() const { return m_defenderZones; }
-bool SpawnConfig::hasDefenderZones() const                       { return !m_defenderZones.empty(); }
+void SpawnConfig::clearDefenderZones() {
+     m_defenderZones.clear(); 
+}
+
+const std::vector<SpawnZone>& SpawnConfig::getDefenderZones() const { 
+    return m_defenderZones; 
+}
+
+bool SpawnConfig::hasDefenderZones() const { 
+    return !m_defenderZones.empty(); 
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  JSON HELPERS  (file-scope)
 // ════════════════════════════════════════════════════════════════════════════════
 
-static std::string extractString(const std::string& content,
-                                 const std::string& key,
-                                 size_t from = 0) {
+static std::string extractString(const std::string& content, const std::string& key, size_t from = 0) {
     size_t pos = content.find("\"" + key + "\"", from);
-    if (pos == std::string::npos) return "";
+
+    if (pos == std::string::npos) 
+        return "";
+
     size_t colon  = content.find(":", pos);
     size_t vStart = content.find("\"", colon + 1) + 1;
     size_t vEnd   = content.find("\"", vStart);
+
     return content.substr(vStart, vEnd - vStart);
 }
 
-static double extractNumber(const std::string& content,
-                            const std::string& key,
-                            size_t from = 0) {
+static double extractNumber(const std::string& content, const std::string& key, size_t from = 0) {
     size_t pos = content.find("\"" + key + "\"", from);
-    if (pos == std::string::npos) return 0.0;
+
+    if (pos == std::string::npos) 
+        return 0.0;
+
     size_t colon = content.find(":", pos);
     size_t vs    = colon + 1;
-    while (vs < content.size() && (content[vs] == ' ' || content[vs] == '\t')) vs++;
+
+    while (vs < content.size() && (content[vs] == ' ' || content[vs] == '\t')) 
+        vs++;
+
     return std::stod(content.substr(vs));
 }
 
 /** Parse an array of SpawnZone objects: [{"row_min":…,"col_min":…,…},…] */
-static std::vector<SpawnZone> parseZoneArray(const std::string& content,
-                                             const std::string& arrayKey) {
+static std::vector<SpawnZone> parseZoneArray(const std::string& content, const std::string& arrayKey) {
     std::vector<SpawnZone> zones;
     size_t keyPos = content.find("\"" + arrayKey + "\"");
-    if (keyPos == std::string::npos) return zones;
+
+    if (keyPos == std::string::npos) 
+        return zones;
 
     size_t arrOpen = content.find("[", keyPos);
-    if (arrOpen == std::string::npos) return zones;
+
+    if (arrOpen == std::string::npos) 
+        return zones;
 
     // Walk forward to find the matching ']', counting brackets
     int depth = 0;
     size_t arrClose = std::string::npos;
     for (size_t i = arrOpen; i < content.size(); i++) {
-        if      (content[i] == '[') depth++;
-        else if (content[i] == ']') { if (--depth == 0) { arrClose = i; break; } }
+        if (content[i] == '[') 
+            depth++;
+        else if (content[i] == ']') {
+            if (--depth == 0) { 
+                arrClose = i; 
+                break; 
+            } }
     }
-    if (arrClose == std::string::npos) return zones;
+    if (arrClose == std::string::npos) 
+        return zones;
 
     // Parse each {…} object within [arrOpen+1 .. arrClose-1]
     size_t pos = arrOpen + 1;
     while (pos < arrClose) {
         size_t objOpen  = content.find("{", pos);
-        if (objOpen  == std::string::npos || objOpen  >= arrClose) break;
+
+        if (objOpen  == std::string::npos || objOpen  >= arrClose) 
+            break;
         size_t objClose = content.find("}", objOpen);
-        if (objClose == std::string::npos || objClose >= arrClose) break;
+
+        if (objClose == std::string::npos || objClose >= arrClose) 
+            break;
 
         // Extract the substring for this single zone object
         std::string obj = content.substr(objOpen, objClose - objOpen + 1);
@@ -197,13 +270,14 @@ static std::vector<SpawnZone> parseZoneArray(const std::string& content,
         z.colMin = static_cast<int>(extractNumber(obj, "col_min"));
         z.rowMax = static_cast<int>(extractNumber(obj, "row_max"));
         z.colMax = static_cast<int>(extractNumber(obj, "col_max"));
-        z.numSeekers      = static_cast<int>(extractNumber(obj, "num_seekers"));
-        z.numDetectors    = static_cast<int>(extractNumber(obj, "num_detectors"));
+        z.numSeekers = static_cast<int>(extractNumber(obj, "num_seekers"));
+        z.numDetectors = static_cast<int>(extractNumber(obj, "num_detectors"));
         z.numInterceptors = static_cast<int>(extractNumber(obj, "num_interceptors"));
         zones.push_back(z);
 
         pos = objClose + 1;
     }
+
     return zones;
 }
 
@@ -222,7 +296,7 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     if (m_hasMapData) {
         file << "  \"map\": {\n";
         file << "    \"shp_path\": \""    << m_mapInfo.shpPath    << "\",\n";
-        file << "    \"cells_n\": "       << m_mapInfo.cellsN     << ",\n";
+        file << "    \"cells_n\": "       << m_mapInfo.cellsInARow     << ",\n";
         file << "    \"canvas_width\": "  << m_mapInfo.canvasWidth  << ",\n";
         file << "    \"canvas_height\": " << m_mapInfo.canvasHeight << ",\n";
         file << "    \"min_depth\": "     << m_mapInfo.minDepth   << ",\n";
@@ -295,7 +369,7 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
     file.close();
 
     std::cout << "Scenario saved to " << filepath << " (";
-    if (m_hasMapData) std::cout << m_mapInfo.cellsN << "x" << m_mapInfo.cellsN << " grid + ";
+    if (m_hasMapData) std::cout << m_mapInfo.cellsInARow << "x" << m_mapInfo.cellsInARow << " grid + ";
     std::cout << m_units.size()       << " units, "
               << m_attackerZones.size() << " ATK zones, "
               << m_defenderZones.size() << " DEF zones)\n";
@@ -310,8 +384,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
     if (!file.is_open())
         throw std::runtime_error("Cannot open spawn config: " + filepath);
 
-    std::string content((std::istreambuf_iterator<char>(file)),
-                         std::istreambuf_iterator<char>());
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
 
     SpawnConfig config;
@@ -320,21 +393,21 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
     if (content.find("\"map\"") != std::string::npos) {
         size_t ms = content.find("\"map\"");
         MapInfo info;
-        info.shpPath      = extractString(content, "shp_path",      ms);
-        info.cellsN       = static_cast<int>(extractNumber(content, "cells_n",       ms));
+        info.shpPath = extractString(content, "shp_path",      ms);
+        info.cellsInARow = static_cast<int>(extractNumber(content, "cells_n",       ms));
         info.canvasWidth  = static_cast<int>(extractNumber(content, "canvas_width",  ms));
         info.canvasHeight = static_cast<int>(extractNumber(content, "canvas_height", ms));
-        info.minDepth     = extractNumber(content, "min_depth",  ms);
-        info.maxDepth     = extractNumber(content, "max_depth",  ms);
-        info.waterCount   = static_cast<int>(extractNumber(content, "water_count", ms));
-        info.landCount    = static_cast<int>(extractNumber(content, "land_count",  ms));
+        info.minDepth = extractNumber(content, "min_depth",  ms);
+        info.maxDepth = extractNumber(content, "max_depth",  ms);
+        info.waterCount = static_cast<int>(extractNumber(content, "water_count", ms));
+        info.landCount = static_cast<int>(extractNumber(content, "land_count",  ms));
 
         std::vector<std::vector<int>> grid;
         size_t gridPos = content.find("\"grid\"");
-        if (gridPos != std::string::npos && info.cellsN > 0) {
+        if (gridPos != std::string::npos && info.cellsInARow > 0) {
             size_t gStart = content.find("[", gridPos);
             size_t pos    = gStart + 1;
-            for (int r = 0; r < info.cellsN; r++) {
+            for (int r = 0; r < info.cellsInARow; r++) {
                 size_t rowS = content.find("[", pos);
                 size_t rowE = content.find("]", rowS);
                 std::string rowStr = content.substr(rowS + 1, rowE - rowS - 1);
@@ -351,17 +424,19 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             }
         }
         config.setMapData(info, grid);
-        std::cout << "Loaded map: " << info.cellsN << "x" << info.cellsN
+        std::cout << "Loaded map: " << info.cellsInARow << "x" << info.cellsInARow
                   << " (" << info.waterCount << " water, " << info.landCount << " land)\n";
     }
 
     // ── Radii / noise ──
-    if (content.find("\"detector_radius\"")    != std::string::npos)
-        config.m_detectorRadius    = extractNumber(content, "detector_radius");
+    if (content.find("\"detector_radius\"") != std::string::npos)
+        config.m_detectorRadius = extractNumber(content, "detector_radius");
+
     if (content.find("\"interceptor_radius\"") != std::string::npos)
         config.m_interceptorRadius = extractNumber(content, "interceptor_radius");
-    if (content.find("\"max_noise_level\"")    != std::string::npos)
-        config.m_maxNoiseLevel     = extractNumber(content, "max_noise_level");
+
+    if (content.find("\"max_noise_level\"") != std::string::npos)
+        config.m_maxNoiseLevel = extractNumber(content, "max_noise_level");
 
     // ── Attacker zones — new format ──
     if (content.find("\"attacker_zones\"") != std::string::npos) {
@@ -385,8 +460,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
     if (content.find("\"defender_zones\"") != std::string::npos) {
         config.m_defenderZones = parseZoneArray(content, "defender_zones");
         if (!config.m_defenderZones.empty())
-            std::cout << "Loaded " << config.m_defenderZones.size()
-                      << " defender zone(s)\n";
+            std::cout << "Loaded " << config.m_defenderZones.size() << " defender zone(s)\n";
     }
 
     // ── Units ──
@@ -395,7 +469,10 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
         size_t pos = unitsPos;
         while (true) {
             pos = content.find("\"type\"", pos);
-            if (pos == std::string::npos) break;
+
+            if (pos == std::string::npos) 
+                break;
+
             size_t tStart = content.find("\"", content.find(":", pos) + 1) + 1;
             size_t tEnd   = content.find("\"", tStart);
             std::string type = content.substr(tStart, tEnd - tStart);
@@ -423,7 +500,7 @@ void SpawnConfig::printSummary() const {
 
     if (m_hasMapData) {
         std::cout << "  Map source:   " << m_mapInfo.shpPath << std::endl;
-        std::cout << "  Grid size:    " << m_mapInfo.cellsN << " x " << m_mapInfo.cellsN << std::endl;
+        std::cout << "  Grid size:    " << m_mapInfo.cellsInARow << " x " << m_mapInfo.cellsInARow << std::endl;
         std::cout << "  Depth range:  [" << m_mapInfo.minDepth << ", " << m_mapInfo.maxDepth << "]" << std::endl;
         std::cout << "  Water cells:  " << m_mapInfo.waterCount << std::endl;
         std::cout << "  Land cells:   " << m_mapInfo.landCount  << std::endl;
@@ -433,16 +510,23 @@ void SpawnConfig::printSummary() const {
     std::cout << "  Targets:      " << countType("target")      << std::endl;
     std::cout << "  Detectors:    " << countType("detector")    << std::endl;
     std::cout << "  Interceptors: " << countType("interceptor") << std::endl;
-    if (countType("detector")    > 0) std::cout << "  Det. radius:  " << m_detectorRadius    << " cells\n";
-    if (countType("interceptor") > 0) std::cout << "  Int. radius:  " << m_interceptorRadius << " cells\n";
-    std::cout << "  Noise level:  " << m_maxNoiseLevel
-              << (m_maxNoiseLevel > 0 ? " (enabled)" : " (off)") << std::endl;
+
+    if (countType("detector")    > 0) 
+        std::cout << "  Det. radius:  " << m_detectorRadius    << " cells\n";
+
+    if (countType("interceptor") > 0) 
+        std::cout << "  Int. radius:  " << m_interceptorRadius << " cells\n";
+
+    std::cout << "  Noise level:  " << m_maxNoiseLevel << (m_maxNoiseLevel > 0 ? " (enabled)" : " (off)") << std::endl;
 
     if (!m_attackerZones.empty()) {
         int totalSeekers = 0;
-        for (const auto& z : m_attackerZones) totalSeekers += z.numSeekers;
-        std::cout << "  Attacker zones: " << m_attackerZones.size()
-                  << "  (GA will spawn " << totalSeekers << " seeker(s) total)\n";
+
+        for (const auto& z : m_attackerZones) 
+            totalSeekers += z.numSeekers;
+
+        std::cout << "  Attacker zones: " << m_attackerZones.size() << "  (GA will spawn " << totalSeekers << " seeker(s) total)\n";
+        
         for (int i = 0; i < (int)m_attackerZones.size(); i++) {
             const auto& z = m_attackerZones[i];
             std::cout << "    Zone " << (i+1) << ": rows " << z.rowMin << "-" << z.rowMax
@@ -454,13 +538,16 @@ void SpawnConfig::printSummary() const {
 
     if (!m_defenderZones.empty()) {
         int totalDet = 0, totalInt = 0;
+
         for (const auto& z : m_defenderZones) {
             totalDet += z.numDetectors;
             totalInt += z.numInterceptors;
         }
+
         std::cout << "  Defender zones: " << m_defenderZones.size()
                   << "  (GA will spawn " << totalDet << " detector(s), "
                   << totalInt << " interceptor(s) total)\n";
+                  
         for (int i = 0; i < (int)m_defenderZones.size(); i++) {
             const auto& z = m_defenderZones[i];
             std::cout << "    Zone " << (i+1) << ": rows " << z.rowMin << "-" << z.rowMax

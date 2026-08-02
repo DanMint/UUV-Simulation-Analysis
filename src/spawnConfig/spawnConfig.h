@@ -10,7 +10,7 @@
 #include <algorithm>
 
 // ─── SpawnZone ───────────────────────────────────────────────────────────────
-//
+
 // A rectangular constraint region on the grid, shared by both the attacker
 // and defender sides. Row/col values are inclusive grid indices.
 //
@@ -32,14 +32,13 @@ struct SpawnZone {
     int numInterceptors = 0;
 
     /** True if (row, col) falls inside this zone (inclusive). */
-    bool contains(int row, int col) const {
-        return row >= rowMin && row <= rowMax &&
-               col >= colMin && col <= colMax;
-    }
+    bool contains(int row, int col) const;
 
-    int width()  const { return colMax - colMin + 1; }
-    int height() const { return rowMax - rowMin + 1; }
-    int area()   const { return width() * height(); }
+    int width() const;
+
+    int height() const;
+
+    int area() const;
 };
 
 // ─── UnitSpawn ────────────────────────────────────────────────────────────────
@@ -57,7 +56,7 @@ struct UnitSpawn {
 
 struct MapInfo {
     std::string shpPath;
-    int cellsN;
+    int cellsInARow;
     int canvasWidth;
     int canvasHeight;
     double minDepth;
