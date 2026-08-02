@@ -307,7 +307,7 @@ void MapCreation::classifyCells() {
 // ════════════════════════════════════════════════════════════════════════════════
 //  SEAM GAP CLEANUP
 // ════════════════════════════════════════════════════════════════════════════════
-//
+
 //  After initial classification, thin lines of land can appear where
 //  adjacent polygons in the shapefile don't perfectly overlap (seam gaps).
 //
