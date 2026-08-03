@@ -289,10 +289,7 @@ int main(int argc, char* argv[]) {
                 result.print();
 
                 std::ostringstream filename;
-                filename << runsDir << "/iter_" << iter << "_noise_";
-                std::ostringstream noiseStr;
-                noiseStr << currentNoise;
-                filename << noiseStr.str() << ".json";
+                filename << runsDir << "/run_" << iter << ".json";
                 result.saveJSON(filename.str());
 
                 // Append one cost-benefit row to the shared summary CSV

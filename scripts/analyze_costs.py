@@ -63,10 +63,10 @@ def _num(v):
 
 
 def _natural_key(filename):
-    """Sort 'iter_1_noise_0.5.json' numerically.
+    """Sort 'run_1.json' numerically.
 
     Splits out every number (int or float) in the filename so that
-    iter_10_noise_1.5.json sorts AFTER iter_2_noise_0.1.json —
+    run_10.json sorts AFTER run_2.json —
     alphabetical sorting would put 10 before 2, corrupting run_id
     -> JSON alignment when batch runs skip --noise-step.
     """
