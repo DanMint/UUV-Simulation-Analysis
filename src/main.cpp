@@ -6,6 +6,38 @@
 #include <string>
 #include <sstream>
 #include <cstdlib>
+#include <stdexcept>
+
+
+namespace {
+
+int categoryToMapUnitType(const std::string& category) {
+    if (category == "seeker") {
+        return MapCreation::SEEKER;
+    }
+    if (category == "target") {
+        return MapCreation::TARGET;
+    }
+    if (category == "detector") {
+        return MapCreation::DETECTOR;
+    }
+    if (category == "interceptor") {
+        return MapCreation::INTERCEPTOR;
+    }
+
+    throw std::invalid_argument("Unknown unit category: " + category);
+}
+
+void stampConfiguredUnits(MapCreation& map, const SpawnConfig& config) {
+    for (const auto& unit : config.getUnits()) {
+        map.placeUnit(
+            unit.row,
+            unit.col,
+            categoryToMapUnitType(unit.category));
+    }
+}
+
+} // namespace
 
 void printUsage(const char* progName) {
     std::cout << "Usage:\n"
@@ -15,10 +47,11 @@ void printUsage(const char* progName) {
               << "\nSpawn Tool Controls:\n"
               << "  Left click   - Place unit on water cell\n"
               << "  Right click  - Remove unit\n"
-              << "  S key        - Switch to Seeker mode (attacker, red triangle)\n"
-              << "  T key        - Switch to Target mode (defender, blue square)\n"
-              << "  D key        - Switch to Detector mode (sensor, orange diamond)\n"
-              << "  I key        - Switch to Interceptor mode (effector, purple diamond)\n"
+              << "  S key        - Select Seeker category (attacker, red triangle)\n"
+              << "  T key        - Select Target category (defender, blue square)\n"
+              << "  D key        - Select Detector category (sensor, orange diamond)\n"
+              << "  I key        - Select Interceptor category (effector, purple diamond)\n"
+              << "  B key        - Select the Basic type for the chosen category\n"
               << "  Z key        - Draw ATTACKER spawn zones for the GA\n"
               << "  X key        - Draw DEFENDER spawn zones for the GA\n"
               << "  Q key        - Toggle GA-prep mode (targets + zones only)\n"
@@ -107,15 +140,9 @@ int main(int argc, char* argv[]) {
                 return 0;
             }
 
-            // Stamp units onto grid
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            // Stamp units onto grid. The grid cares about the broad category;
+            // the concrete type is used later by category-specific behavior.
+            stampConfiguredUnits(map, config);
 
             // Attach map data and save scenario
             MapInfo info;
@@ -131,15 +158,8 @@ int main(int argc, char* argv[]) {
             config.saveJSON("scenario.json");
         }
         else {
-            // Stamp units from loaded scenario onto grid
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            // Stamp units from the loaded scenario onto the grid.
+            stampConfiguredUnits(map, config);
         }
 
         config.printSummary();
@@ -150,11 +170,11 @@ int main(int argc, char* argv[]) {
         // ── GA-prep scenario: no seekers placed but zones exist ──────
         // This is intentional: the user is preparing a scenario for the
         // Python GA to fill in. Save and exit cleanly — no simulation runs.
-        if (config.countType("seeker") == 0 && config.hasAttackerZones()) {
+        if (config.countCategory("seeker") == 0 && config.hasAttackerZones()) {
             std::cout << "\n=== GA Preparation Scenario ===\n";
-            std::cout << "  Targets:         " << config.countType("target") << "\n";
-            std::cout << "  Detectors:       " << config.countType("detector") << "\n";
-            std::cout << "  Interceptors:    " << config.countType("interceptor") << "\n";
+            std::cout << "  Targets:         " << config.countCategory("target") << "\n";
+            std::cout << "  Detectors:       " << config.countCategory("detector") << "\n";
+            std::cout << "  Interceptors:    " << config.countCategory("interceptor") << "\n";
             std::cout << "  Attacker zones:  " << config.getAttackerZones().size() << "\n";
             std::cout << "  Defender zones:  " << config.getDefenderZones().size() << "\n";
             std::cout << "\nScenario saved to scenario.json — no simulation run.\n";
@@ -165,11 +185,11 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        if (config.countType("seeker") == 0) {
+        if (config.countCategory("seeker") == 0) {
             std::cout << "No seekers placed. Cannot run simulation.\n";
             return 0;
         }
-        if (config.countType("target") == 0) {
+        if (config.countCategory("target") == 0) {
             std::cout << "No targets placed. Cannot run simulation.\n";
             return 0;
         }
@@ -218,14 +238,7 @@ int main(int argc, char* argv[]) {
             // Reset the grid: clear all units, then re-stamp them
             // This ensures each iteration starts from the same state
             map.clearAllUnits();
-            for (const auto& unit : config.getUnits()) {
-                int unitType = MapCreation::WATER;
-                if (unit.type == "seeker")   unitType = MapCreation::SEEKER;
-                if (unit.type == "target")   unitType = MapCreation::TARGET;
-                if (unit.type == "detector") unitType = MapCreation::DETECTOR;
-                if (unit.type == "interceptor") unitType = MapCreation::INTERCEPTOR;
-                map.placeUnit(unit.row, unit.col, unitType);
-            }
+            stampConfiguredUnits(map, config);
 
             // Run the simulation
             Simulation sim(map, config, 2000);

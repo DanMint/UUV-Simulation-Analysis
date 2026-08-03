@@ -17,7 +17,6 @@
 // The attacker GA searches for optimal seeker positions within attacker zones.
 // The defender GA searches for optimal defender positions within defender zones.
 // Manual unit placement is unaffected by zones.
-//
 struct SpawnZone {
     int rowMin;
     int colMin;
@@ -26,7 +25,7 @@ struct SpawnZone {
 
     // ── Unit counts requested for this zone ───────────────────────
     // Attacker zones use numSeekers; defender zones use the other two.
-    // Default 0 means "no units of that type from this zone".
+    // Default 0 means "no units of that category from this zone".
     int numSeekers      = 0;
     int numDetectors    = 0;
     int numInterceptors = 0;
@@ -35,18 +34,27 @@ struct SpawnZone {
     bool contains(int row, int col) const;
 
     int width() const;
-
     int height() const;
-
     int area() const;
 };
 
 // ─── UnitSpawn ────────────────────────────────────────────────────────────────
 
-/** A single unit placement on the grid.
- *  type in { "seeker", "target", "detector", "interceptor" }
+/**
+ * A single unit placement on the grid.
+ *
+ * category is the broad role:
+ *   "seeker", "target", "detector", or "interceptor".
+ *
+ * type is the concrete implementation within that category:
+ *   currently only "basic".
+ *
+ * Example:
+ *   category = "interceptor"
+ *   type     = "basic"
  */
 struct UnitSpawn {
+    std::string category;
     std::string type;
     int row;
     int col;
@@ -69,11 +77,11 @@ struct MapInfo {
 /**
  * Complete scenario descriptor:
  *   - Map metadata + full grid
- *   - Unit placements (seekers, targets, detectors, interceptors)
+ *   - Unit placements, each with a category and concrete type
  *   - Detector sensing radius and interceptor kill radius
  *   - Environmental noise level
- *   - Attacker spawn zones  (GA searches within these for optimal attacker positions)
- *   - Defender spawn zones  (GA searches within these for optimal defender positions)
+ *   - Attacker spawn zones
+ *   - Defender spawn zones
  *
  * Zones are optional. Without them the GA falls back to any water cell.
  * One JSON file = one complete, self-contained scenario.
@@ -84,12 +92,34 @@ public:
 
     // ─── Unit management ────────────────────────────────────────────
 
-    bool addUnit(const std::string& type, int row, int col);
+    /** Add a concrete unit. Returns false if the cell is occupied or either name is empty. */
+    bool addUnit(const std::string& category,
+                 const std::string& type,
+                 int row,
+                 int col);
+
+    /**
+     * Compatibility overload for older callers.
+     * Treats the supplied value as a category and assigns type="basic".
+     */
+    bool addUnit(const std::string& category, int row, int col);
+
     bool removeUnit(int row, int col);
     const UnitSpawn* getUnitAt(int row, int col) const;
     const std::vector<UnitSpawn>& getUnits() const;
-    std::vector<UnitSpawn> getUnitsByType(const std::string& type) const;
-    int countType(const std::string& type) const;
+
+    std::vector<UnitSpawn> getUnitsByCategory(const std::string& category) const;
+    std::vector<UnitSpawn> getUnitsByCategoryAndType(const std::string& category,
+                                                     const std::string& type) const;
+
+    int countCategory(const std::string& category) const;
+    int countCategoryAndType(const std::string& category,
+                             const std::string& type) const;
+
+    /** Compatibility aliases for older code that used "type" to mean category. */
+    std::vector<UnitSpawn> getUnitsByType(const std::string& category) const;
+    int countType(const std::string& category) const;
+
     int totalUnits() const;
     void clear();
 
@@ -107,27 +137,18 @@ public:
     double getMaxNoiseLevel() const;
 
     // ─── Attacker spawn zones ────────────────────────────────────────
-    //
-    // Multiple zones allowed. The GA restricts attacker spawn positions
-    // to water cells inside at least one attacker zone.
 
-    /** Add a zone. Coordinates are normalised (min/max swapped if needed).
-     *  numSeekers is how many seekers the GA should spawn inside this zone. */
+    /** Add a normalized attacker zone and its requested seeker count. */
     void addAttackerZone(int rowMin, int colMin, int rowMax, int colMax,
                          int numSeekers = 0);
 
-    /** Remove the first attacker zone containing (row, col). Returns true if one was found. */
     bool removeAttackerZoneContaining(int row, int col);
-
-    /** Remove all attacker zones. */
     void clearAttackerZones();
 
     const std::vector<SpawnZone>& getAttackerZones() const;
     bool hasAttackerZones() const;
 
     // ─── Defender spawn zones ────────────────────────────────────────
-    //
-    // Same semantics as attacker zones but for the defender side.
 
     void addDefenderZone(int rowMin, int colMin, int rowMax, int colMax,
                          int numDetectors = 0, int numInterceptors = 0);

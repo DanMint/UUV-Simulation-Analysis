@@ -13,30 +13,34 @@
  * MapVisualizer (SFML 3)
  *
  * ── Unit placement ──────────────────────────────────────────────────
- *   S / T / D / I   Switch unit mode (Seeker, Target, Detector, Interceptor)
- *   Left click       Place unit on water cell
- *   Right click      Remove unit
- *   + / -            Adjust detector sensing radius
- *   { / }            Adjust interceptor kill radius  (Shift+[ / Shift+])
- *   [ / ]            Adjust noise level
- *   C                Clear all units  (zones are preserved)
- *   Enter            Save scenario and return
- *   Escape           Cancel
+ *   S / T / D / I   Select a category (Seeker, Target, Detector, Interceptor)
+ *   B               Select the Basic type for the selected category
+ *   Left click      Place the selected category/type on a water cell
+ *   Right click     Remove unit
+ *   + / -           Adjust detector sensing radius
+ *   { / }           Adjust interceptor kill radius  (Shift+[ / Shift+])
+ *   [ / ]           Adjust noise level
+ *   C               Clear all units  (zones are preserved)
+ *   Enter           Save scenario and return
+ *   Escape          Cancel
  *
- * ── GA preparation mode (new) ───────────────────────────────────────
- *   Q                Toggle GA prep mode on/off
- *                    In GA prep mode the S, D, I keys are inert — the
- *                    user only places targets and draws zones. The
- *                    Python GA fills in seekers (and later detectors /
- *                    interceptors) within the zones at evaluation time.
+ * Example:
+ *   I, then B, then left click -> category="interceptor", type="basic"
+ *
+ * ── GA preparation mode ─────────────────────────────────────────────
+ *   Q               Toggle GA prep mode on/off
+ *                   In GA prep mode the S, D, I keys are inert. The
+ *                   user only places targets and draws zones. The
+ *                   Python GA fills in seekers (and later detectors /
+ *                   interceptors) within the zones at evaluation time.
  *
  * ── Zone drawing ────────────────────────────────────────────────────
- *   Z                Enter / exit attacker zone draw mode
- *   X                Enter / exit defender zone draw mode
- *   Left drag        Add a zone rectangle  (while in zone mode)
- *   Right click      Remove zone under cursor  (while in zone mode)
- *   Shift + Z        Clear ALL attacker zones
- *   Shift + X        Clear ALL defender zones
+ *   Z               Enter / exit attacker zone draw mode
+ *   X               Enter / exit defender zone draw mode
+ *   Left drag       Add a zone rectangle  (while in zone mode)
+ *   Right click     Remove zone under cursor  (while in zone mode)
+ *   Shift + Z       Clear ALL attacker zones
+ *   Shift + X       Clear ALL defender zones
  *
  * Each drag adds a new zone; zones accumulate until explicitly removed.
  * Pressing S/T/D/I exits zone mode without clearing any zones.
@@ -55,7 +59,14 @@ private:
     float m_cellSize;
 
     SpawnConfig m_config;
-    std::string m_currentType;     // "seeker" | "target" | "detector" | "interceptor"
+
+    // Broad role selected with S/T/D/I.
+    // Empty means no category is selected.
+    std::string m_currentCategory;
+
+    // Concrete implementation selected after the category.
+    // Empty means the user must select a type; currently B selects "basic".
+    std::string m_currentUnitType;
 
     // ── Zone draw state ──────────────────────────────────────────────
     // m_zoneDrawMode: "" = no zone mode, "attacker" or "defender"
@@ -67,22 +78,13 @@ private:
     int  m_zoneDragCurrentCol;
 
     // ── GA-prep mode ─────────────────────────────────────────────────
-    // When true, the seeker / detector / interceptor keys are inert.
-    // The user only places targets and draws zones; the GA fills in
-    // the rest later. Toggled with the Q key.
     bool m_gaPrepMode;
 
     // ── Zone count input state ───────────────────────────────────────
-    // After the user releases a zone drag, the zone is "pending" while
-    // we collect unit counts from the keyboard.
-    //   ""                  -> not collecting input
-    //   "atk_seekers"       -> attacker zone, awaiting seeker count
-    //   "def_detectors"     -> defender zone, awaiting detector count
-    //   "def_interceptors"  -> defender zone, awaiting interceptor count
     std::string m_zoneInputState;
-    SpawnZone   m_pendingZone;        // rectangle waiting for counts
-    int         m_pendingFirstCount;  // detectors count, held between the two defender prompts
-    std::string m_typingBuffer;       // digits typed so far
+    SpawnZone   m_pendingZone;
+    int         m_pendingFirstCount;
+    std::string m_typingBuffer;
 
     // ── Colors ───────────────────────────────────────────────────────
     static const sf::Color WATER_COLOR;
@@ -96,11 +98,9 @@ private:
     static const sf::Color HOVER_COLOR;
     static const sf::Color GRID_LINE_COLOR;
     static const sf::Color PANEL_COLOR;
-    // Attacker zone — coral / orange-red
     static const sf::Color ATK_ZONE_FILL;
     static const sf::Color ATK_ZONE_BORDER;
     static const sf::Color ATK_ZONE_DRAG;
-    // Defender zone — teal / cyan
     static const sf::Color DEF_ZONE_FILL;
     static const sf::Color DEF_ZONE_BORDER;
     static const sf::Color DEF_ZONE_DRAG;
