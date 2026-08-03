@@ -1,27 +1,34 @@
 #ifndef MAPCREATION_H
 #define MAPCREATION_H
 
-#include <string>
-#include <vector>
-#include <utility>
 #include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 class OGRPolygon;
+struct UnitSpawn;
 
 /**
  * MapCreation
  *
- * Reads a nautical .shp file containing depth polygons,
- * scales the geometry to fit a virtual canvas, and builds
- * a 2D grid classifying each cell as water or land.
+ * Reads a nautical .shp file containing depth polygons, scales the geometry to
+ * fit a virtual canvas, and builds a 2D grid classifying each cell as terrain
+ * or a broad unit category.
+ *
+ * Important category/type rule:
+ *   - The grid stores only the broad category: seeker, target, detector, or
+ *     interceptor.
+ *   - The concrete unit type, such as "basic", remains in UnitSpawn and is not
+ *     encoded as another grid-cell integer.
  *
  * Grid cell values:
  *   0 = water
  *   1 = land
- *   2 = seeker      (attacker)
- *   3 = target      (defender, stationary)
- *   4 = detector    (defender sensor — sense only)
- *   5 = interceptor (defender effector — kill only)
+ *   2 = seeker      (any seeker type)
+ *   3 = target      (any target type)
+ *   4 = detector    (any detector type)
+ *   5 = interceptor (any interceptor type)
  */
 class MapCreation {
 public:
@@ -34,68 +41,70 @@ public:
     static constexpr int INTERCEPTOR = 5;
 
     /**
-     * Default constructor that reads a .shp file and translates it to a grid (std::vector<std::vector<int>> m_grid)
-     * 
-     * @param shpPath - path to the .shp file
-     * @param cellsN - number of cells inside the 
-     * @param canvasWidth - width of canvas
-     * @param canvasHeight - height of canvas
-     * 
-    */
-    MapCreation(const std::string& shpPath, int cellsN = 100, int canvasWidth = 700, int canvasHeight = 700);
+     * Read a .shp file and translate it into a square grid.
+     *
+     * @param shpPath Path to the .shp file.
+     * @param cellsN Number of rows and columns in the square grid.
+     * @param canvasWidth Width of the virtual drawing canvas.
+     * @param canvasHeight Height of the virtual drawing canvas.
+     */
+    MapCreation(const std::string& shpPath,
+                int cellsN = 100,
+                int canvasWidth = 700,
+                int canvasHeight = 700);
 
-    /**
-     * Loads a map from cache 
-     * 
-     * @param cachePath - path to map file
-    */
+    /** Load a map from a cache file. */
     static MapCreation fromCache(const std::string& cachePath);
 
     ~MapCreation() = default;
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     //  SHAPEFILE LOADING
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
     void extractPolygon(OGRPolygon* ogrPoly,
-                        double depth1, double depth2,
-                        double minX, double maxY, double scale);
+                        double depth1,
+                        double depth2,
+                        double minX,
+                        double maxY,
+                        double scale);
 
     void loadShapefile(const std::string& shpPath);
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     //  POINT-IN-POLYGON (Ray Casting Algorithm)
-    // ════════════════════════════════════════════════════════════════════════════════
-    
+    // ══════════════════════════════════════════════════════════════════════════
+
     /**
-     * Ray tracing algorithm. Cast a horizontal ray from the point to the right.Count how many polygon edges it crosses. If odd → inside. If even → outside.
-     * 
-     * @param px - which vector
-     * @param py - what part in the vector
-     * @param vertices - 
+     * Cast a horizontal ray from the point and count polygon-edge crossings.
+     * An odd number of crossings means that the point is inside the polygon.
      */
-    static bool pointInPolygon(double px, double py, const std::vector<std::pair<double, double>>& vertices);
+    static bool pointInPolygon(
+        double px,
+        double py,
+        const std::vector<std::pair<double, double>>& vertices);
 
     bool isPointInWater(double px, double py) const;
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     //  GRID CLASSIFICATION
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
     void classifyCells();
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     //  SEAM GAP CLEANUP
-    // ════════════════════════════════════════════════════════════════════════════════
-    
+    // ══════════════════════════════════════════════════════════════════════════
+
     /**
-     * Seam gap cleanup. After initial classification thin lines of land can appear where adjacent polygons in the shapefile don't perfectly overlap (seam gaps).
-    */
+     * Repair thin land lines caused by small gaps between adjacent water
+     * polygons in the source shapefile.
+     */
     void cleanupSeamGaps();
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     //  GRID ACCESS
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
     const std::vector<std::vector<int>>& getGrid() const;
     int getCell(int row, int col) const;
@@ -105,27 +114,49 @@ public:
 
     std::vector<std::pair<int, int>> getAllWaterCells() const;
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
     //  UNIT PLACEMENT ON GRID
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Place a unit onto the grid. Only succeeds on water cells (0).
-     * @param unitType  SEEKER, TARGET, DETECTOR, or INTERCEPTOR
+     * Convert a broad category name into its grid-cell integer.
+     *
+     * @return SEEKER, TARGET, DETECTOR, or INTERCEPTOR.
+     * @throws std::invalid_argument for an unknown category.
+     */
+    static int categoryToCellType(const std::string& category);
+
+    /**
+     * Place a unit category onto a water cell.
+     *
+     * @param unitType SEEKER, TARGET, DETECTOR, or INTERCEPTOR.
+     * @return true when placement succeeds.
      */
     bool placeUnit(int row, int col, int unitType);
 
-    /** Remove a unit (resets cell back to water). */
+    /** Remove a unit and restore its cell to water. */
     bool removeUnit(int row, int col);
 
-    /** Clear ALL units from the grid (resets every 2/3/4/5 back to 0). */
+    /** Clear every unit category from the grid. */
     void clearAllUnits();
 
-    int placeUnitsFromConfig( const std::vector<std::pair<std::string, std::pair<int,int>>>& units);
+    /**
+     * Place UnitSpawn objects from SpawnConfig.
+     * Only unit.category affects the grid. unit.type remains available to the
+     * simulation for concrete behavior selection.
+     */
+    int placeUnitsFromConfig(const std::vector<UnitSpawn>& units);
 
-    // ════════════════════════════════════════════════════════════════════════════════
+    /**
+     * Compatibility overload for older callers whose string represented the
+     * broad category directly.
+     */
+    int placeUnitsFromConfig(
+        const std::vector<std::pair<std::string, std::pair<int, int>>>& units);
+
+    // ══════════════════════════════════════════════════════════════════════════
     //  GRID INFO
-    // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
 
     int getCellsN() const;
     int getCanvasWidth() const;
@@ -136,45 +167,48 @@ public:
     double getMinDepth() const;
     double getMaxDepth() const;
 
-   // ════════════════════════════════════════════════════════════════════════════════
-   //  CACHE I/O
-   // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
+    //  CACHE I/O
+    // ══════════════════════════════════════════════════════════════════════════
 
     void saveCache(const std::string& filepath) const;
-
     void loadCache(const std::string& cachePath);
 
-   // ════════════════════════════════════════════════════════════════════════════════
-   //  DEBUG / DISPLAY
-   // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
+    //  DEBUG / DISPLAY
+    // ══════════════════════════════════════════════════════════════════════════
 
     void printGrid() const;
     void printStats() const;
 
-   // ════════════════════════════════════════════════════════════════════════════════
-   //  HELPER 
-   // ════════════════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ══════════════════════════════════════════════════════════════════════════
 
-   static bool isUnitCell(int v);
+    static bool isUnitCell(int value);
 
 private:
-    int m_cellsInARow;
-    int m_canvasWidth;
-    int m_canvasHeight;
-    double m_colSpace;
-    double m_rowSpace;
-    int m_cellSize;
+    /** Private blank constructor used only by fromCache(). */
+    MapCreation() = default;
+
+    int m_cellsInARow = 0;
+    int m_canvasWidth = 0;
+    int m_canvasHeight = 0;
+    double m_colSpace = 0.0;
+    double m_rowSpace = 0.0;
+    int m_cellSize = 0;
 
     std::vector<std::vector<int>> m_grid;
 
-    double m_minDepth;
-    double m_maxDepth;
+    double m_minDepth = 0.0;
+    double m_maxDepth = 0.0;
 
     struct ScaledPolygon {
         std::vector<std::pair<double, double>> vertices;
-        double depth1;
-        double depth2;
+        double depth1 = 0.0;
+        double depth2 = 0.0;
     };
+
     std::vector<ScaledPolygon> m_polygons;
 };
 

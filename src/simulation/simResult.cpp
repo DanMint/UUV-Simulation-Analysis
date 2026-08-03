@@ -47,7 +47,8 @@ void SimResult::print() const {
 
     std::cout << "\n  Seekers:" << std::endl;
     for (const auto& s : seekerResults) {
-        std::cout << "    Seeker " << s.id << ": "
+        std::cout << "    Seeker " << s.id
+                  << " [" << s.category << "/" << s.type << "]: "
                   << s.stepsTaken << " steps, "
                   << s.nodesExpanded << " nodes expanded, "
                   << "path cost " << s.pathCost;
@@ -73,6 +74,7 @@ void SimResult::print() const {
     std::cout << "\n  Targets:" << std::endl;
     for (const auto& t : targetResults) {
         std::cout << "    Target " << t.id
+                  << " [" << t.category << "/" << t.type << "]"
                   << " at (" << t.row << "," << t.col << "): ";
         if (t.destroyed) {
             std::cout << "DESTROYED at step " << t.destroyedAtStep
@@ -88,6 +90,7 @@ void SimResult::print() const {
         std::cout << "\n  Detectors (sensors):" << std::endl;
         for (const auto& d : detectorResults) {
             std::cout << "    Detector " << d.id
+                      << " [" << d.category << "/" << d.type << "]"
                       << " at (" << d.row << "," << d.col
                       << "), sensing radius " << d.sensingRadius
                       << ": " << d.sightingCount << " sighting(s)";
@@ -99,6 +102,7 @@ void SimResult::print() const {
         std::cout << "\n  Interceptors (effectors):" << std::endl;
         for (const auto& i : interceptorResults) {
             std::cout << "    Interceptor " << i.id
+                      << " [" << i.category << "/" << i.type << "]"
                       << " at (" << i.row << "," << i.col
                       << "), kill radius " << i.killRadius
                       << ": " << i.killCount << " kill(s)";
@@ -155,6 +159,8 @@ void SimResult::saveJSON(const std::string& filepath) const {
         const auto& s = seekerResults[i];
         file << "    {\n";
         file << "      \"id\": " << s.id << ",\n";
+        file << "      \"category\": \"" << s.category << "\",\n";
+        file << "      \"type\": \"" << s.type << "\",\n";
         file << "      \"steps_taken\": " << s.stepsTaken << ",\n";
         file << "      \"path_cost\": " << s.pathCost << ",\n";
         file << "      \"nodes_expanded\": " << s.nodesExpanded << ",\n";
@@ -197,6 +203,8 @@ void SimResult::saveJSON(const std::string& filepath) const {
         const auto& t = targetResults[i];
         file << "    {\n";
         file << "      \"id\": " << t.id << ",\n";
+        file << "      \"category\": \"" << t.category << "\",\n";
+        file << "      \"type\": \"" << t.type << "\",\n";
         file << "      \"row\": " << t.row << ",\n";
         file << "      \"col\": " << t.col << ",\n";
         file << "      \"destroyed\": "
@@ -215,6 +223,8 @@ void SimResult::saveJSON(const std::string& filepath) const {
         const auto& d = detectorResults[i];
         file << "    {\n";
         file << "      \"id\": " << d.id << ",\n";
+        file << "      \"category\": \"" << d.category << "\",\n";
+        file << "      \"type\": \"" << d.type << "\",\n";
         file << "      \"row\": " << d.row << ",\n";
         file << "      \"col\": " << d.col << ",\n";
         file << "      \"sensing_radius\": " << d.sensingRadius << ",\n";
@@ -241,6 +251,8 @@ void SimResult::saveJSON(const std::string& filepath) const {
         const auto& it = interceptorResults[i];
         file << "    {\n";
         file << "      \"id\": " << it.id << ",\n";
+        file << "      \"category\": \"" << it.category << "\",\n";
+        file << "      \"type\": \"" << it.type << "\",\n";
         file << "      \"row\": " << it.row << ",\n";
         file << "      \"col\": " << it.col << ",\n";
         file << "      \"kill_radius\": " << it.killRadius << ",\n";

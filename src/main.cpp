@@ -11,31 +11,31 @@
 
 namespace {
 
-int categoryToMapUnitType(const std::string& category) {
-    if (category == "seeker") {
-        return MapCreation::SEEKER;
-    }
-    if (category == "target") {
-        return MapCreation::TARGET;
-    }
-    if (category == "detector") {
-        return MapCreation::DETECTOR;
-    }
-    if (category == "interceptor") {
-        return MapCreation::INTERCEPTOR;
+    int categoryToMapUnitType(const std::string& category) {
+        if (category == "seeker") {
+            return MapCreation::SEEKER;
+        }
+        if (category == "target") {
+            return MapCreation::TARGET;
+        }
+        if (category == "detector") {
+            return MapCreation::DETECTOR;
+        }
+        if (category == "interceptor") {
+            return MapCreation::INTERCEPTOR;
+        }
+
+        throw std::invalid_argument("Unknown unit category: " + category);
     }
 
-    throw std::invalid_argument("Unknown unit category: " + category);
-}
-
-void stampConfiguredUnits(MapCreation& map, const SpawnConfig& config) {
-    for (const auto& unit : config.getUnits()) {
-        map.placeUnit(
-            unit.row,
-            unit.col,
-            categoryToMapUnitType(unit.category));
+    void stampConfiguredUnits(MapCreation& map, const SpawnConfig& config) {
+        for (const auto& unit : config.getUnits()) {
+            map.placeUnit(
+                unit.row,
+                unit.col,
+                categoryToMapUnitType(unit.category));
+        }
     }
-}
 
 } // namespace
 

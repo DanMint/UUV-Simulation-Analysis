@@ -1,4 +1,5 @@
 #include "mapCreation.h"
+#include "spawnConfig.h"
 
 // GDAL = translator library for raster and vector geospatial data formats
 
@@ -22,38 +23,42 @@
  * @param canvasHeight 
  * 
  */
-MapCreation::MapCreation(const std::string& shpPath, int cellsInARow, int canvasWidth, int canvasHeight)
+MapCreation::MapCreation(const std::string& shpPath,
+                         int cellsInARow,
+                         int canvasWidth,
+                         int canvasHeight)
     : m_cellsInARow(cellsInARow),
       m_canvasWidth(canvasWidth),
-      m_canvasHeight(canvasHeight),
-      m_minDepth(0.0),
-      m_maxDepth(0.0)
+      m_canvasHeight(canvasHeight)
 {
-    // cell spacing calculation
+    if (m_cellsInARow <= 0) {
+        throw std::invalid_argument("cellsInARow must be greater than zero");
+    }
+    if (m_canvasWidth <= 0 || m_canvasHeight <= 0) {
+        throw std::invalid_argument("canvas dimensions must be greater than zero");
+    }
+
+    // Cell spacing calculation.
     m_colSpace = static_cast<double>(m_canvasWidth) / m_cellsInARow;
     m_rowSpace = static_cast<double>(m_canvasHeight) / m_cellsInARow;
     m_cellSize = m_canvasWidth / m_cellsInARow;
 
-    // Step 1: Read the shapefile and build scaled polygons
+    // Step 1: Read the shapefile and build scaled polygons.
     loadShapefile(shpPath);
 
-    // Step 2: Walk the grid and classify each cell as water or land
+    // Step 2: Walk the grid and classify each cell as water or land.
     classifyCells();
 
-    // Step 3: Fix polygon seam gaps (thin land lines through water)
+    // Step 3: Fix polygon seam gaps (thin land lines through water).
     cleanupSeamGaps();
 }
 
 MapCreation MapCreation::fromCache(const std::string& cachePath) {
-    // Create a "blank" object then fill it from cache
-    // We use a private helper, so we construct with dummy values
-    // and immediately overwrite from cache
-    MapCreation obj("", 0, 0, 0);  // won't actually load anything since cellsN=0
-    // Clear the failed state from the dummy constructor
-    obj.m_grid.clear();
-    obj.m_polygons.clear();
-    obj.loadCache(cachePath);
-    return obj;
+    // Use the private blank constructor so cache loading does not need dummy
+    // dimensions and never performs division by zero.
+    MapCreation map;
+    map.loadCache(cachePath);
+    return map;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -127,7 +132,11 @@ void MapCreation::loadShapefile(const std::string& shpPath) {
 
     // First pass: find geographic bounding box and depth range
     OGREnvelope envelope;
-    layer->GetExtent(&envelope);
+    if (layer->GetExtent(&envelope, TRUE) != OGRERR_NONE) {
+        GDALClose(dataset);
+        throw std::runtime_error(
+            "Failed to read shapefile extent: " + shpPath);
+    }
 
     double minX = envelope.MinX;
     double minY = envelope.MinY;
@@ -445,7 +454,8 @@ bool MapCreation::isWater(int row, int col) const {
 }
 
 bool MapCreation::isPassable(int row, int col) const {
-    // Water, seekers, and targets are passable — only land blocks
+    // Every non-land cell is traversable at the map layer. Higher-level
+    // collision rules can still reject cells occupied by particular units.
     return isValid(row, col) && m_grid[row][col] != LAND;
 }
 
@@ -465,21 +475,53 @@ std::vector<std::pair<int, int>> MapCreation::getAllWaterCells() const {
 //  UNIT PLACEMENT ON GRID
 // ════════════════════════════════════════════════════════════════════════════════
 
+int MapCreation::categoryToCellType(const std::string& category) {
+    if (category == "seeker") {
+        return SEEKER;
+    }
+    if (category == "target") {
+        return TARGET;
+    }
+    if (category == "detector") {
+        return DETECTOR;
+    }
+    if (category == "interceptor") {
+        return INTERCEPTOR;
+    }
+
+    throw std::invalid_argument("Unknown unit category: " + category);
+}
+
 bool MapCreation::placeUnit(int row, int col, int unitType) {
-    if (!isValid(row, col)) return false;
-    // Only place on water cells
-    if (m_grid[row][col] != WATER) return false;
+    if (!isValid(row, col)) {
+        return false;
+    }
+
+    // Reject terrain values and arbitrary integers. A concrete type such as
+    // "basic" is not encoded here; only the broad category is stored.
+    if (!isUnitCell(unitType)) {
+        return false;
+    }
+
+    // Units may only be placed on unoccupied water cells.
+    if (m_grid[row][col] != WATER) {
+        return false;
+    }
+
     m_grid[row][col] = unitType;
     return true;
 }
 
 bool MapCreation::removeUnit(int row, int col) {
-    if (!isValid(row, col)) return false;
-    // Only remove actual units (2/3/4/5), not terrain
+    if (!isValid(row, col)) {
+        return false;
+    }
+
     if (isUnitCell(m_grid[row][col])) {
         m_grid[row][col] = WATER;
         return true;
     }
+
     return false;
 }
 
@@ -493,31 +535,50 @@ void MapCreation::clearAllUnits() {
     }
 }
 
+int MapCreation::placeUnitsFromConfig(const std::vector<UnitSpawn>& units) {
+    int placed = 0;
+
+    for (const auto& unit : units) {
+        try {
+            const int cellType = categoryToCellType(unit.category);
+
+            if (placeUnit(unit.row, unit.col, cellType)) {
+                ++placed;
+            }
+        }
+        catch (const std::invalid_argument& error) {
+            std::cerr << "Skipping unit at (" << unit.row << ", " << unit.col
+                      << "): " << error.what() << '\n';
+        }
+    }
+
+    std::cout << "Placed " << placed << " / " << units.size()
+              << " configured units on grid\n";
+    return placed;
+}
+
 int MapCreation::placeUnitsFromConfig(
-    const std::vector<std::pair<std::string, std::pair<int,int>>>& units)
+    const std::vector<std::pair<std::string, std::pair<int, int>>>& units)
 {
     int placed = 0;
-    for (const auto& [type, pos] : units) {
-        int unitType = WATER; // fallback
-        if(type == "seeker")      
-            unitType = SEEKER;
 
-        else if (type == "target")
-            unitType = TARGET;
+    for (const auto& [category, position] : units) {
+        try {
+            const int cellType = categoryToCellType(category);
 
-        else if (type == "detector")
-            unitType = DETECTOR;
-
-        else if (type == "interceptor") 
-            unitType = INTERCEPTOR;
-
-        else continue;
-
-        if (placeUnit(pos.first, pos.second, unitType)) 
-            placed++;
-        
+            if (placeUnit(position.first, position.second, cellType)) {
+                ++placed;
+            }
+        }
+        catch (const std::invalid_argument& error) {
+            std::cerr << "Skipping legacy unit at ("
+                      << position.first << ", " << position.second
+                      << "): " << error.what() << '\n';
+        }
     }
-    std::cout << "Placed " << placed << " / " << units.size() << " units on grid\n";
+
+    std::cout << "Placed " << placed << " / " << units.size()
+              << " legacy configured units on grid\n";
     return placed;
 }
 
@@ -551,15 +612,30 @@ double MapCreation::getMaxDepth() const {
 
 int MapCreation::getWaterCount() const {
     int count = 0;
-    for (const auto& row : m_grid)
-        for (int cell : row)
-            if (cell == 0) count++;
+
+    for (const auto& row : m_grid) {
+        for (int cell : row) {
+            if (cell == WATER) {
+                ++count;
+            }
+        }
+    }
+
     return count;
 }
 
 int MapCreation::getLandCount() const {
-    int total = m_cellsInARow * m_cellsInARow;
-    return total - getWaterCount();
+    int count = 0;
+
+    for (const auto& row : m_grid) {
+        for (int cell : row) {
+            if (cell == LAND) {
+                ++count;
+            }
+        }
+    }
+
+    return count;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -595,27 +671,37 @@ void MapCreation::loadCache(const std::string& cachePath) {
         throw std::runtime_error("Cannot open cache file: " + cachePath);
     }
 
-    // Read header
-    file >> m_cellsInARow >> m_canvasWidth >> m_canvasHeight >> m_minDepth >> m_maxDepth;
+    // Read and validate the header before performing spacing calculations.
+    if (!(file >> m_cellsInARow
+               >> m_canvasWidth
+               >> m_canvasHeight
+               >> m_minDepth
+               >> m_maxDepth)) {
+        throw std::runtime_error("Invalid cache header: " + cachePath);
+    }
 
-    // Recalculate spacing
+    if (m_cellsInARow <= 0 || m_canvasWidth <= 0 || m_canvasHeight <= 0) {
+        throw std::runtime_error("Invalid cache dimensions: " + cachePath);
+    }
+
     m_colSpace = static_cast<double>(m_canvasWidth) / m_cellsInARow;
     m_rowSpace = static_cast<double>(m_canvasHeight) / m_cellsInARow;
     m_cellSize = m_canvasWidth / m_cellsInARow;
 
-    // Read grid
-    m_grid.resize(m_cellsInARow, std::vector<int>(m_cellsInARow, 1));
-    for (int row = 0; row < m_cellsInARow; row++) {
-        for (int col = 0; col < m_cellsInARow; col++) {
-            file >> m_grid[row][col];
+    m_grid.assign(m_cellsInARow, std::vector<int>(m_cellsInARow, LAND));
+
+    for (int row = 0; row < m_cellsInARow; ++row) {
+        for (int col = 0; col < m_cellsInARow; ++col) {
+            if (!(file >> m_grid[row][col])) {
+                throw std::runtime_error("Incomplete cache grid: " + cachePath);
+            }
         }
     }
 
-    file.close();
-
-    int water = getWaterCount();
-    std::cout << "Grid loaded from cache: " << m_cellsInARow << "x" << m_cellsInARow
-              << ", " << water << " water cells" << std::endl;
+    const int water = getWaterCount();
+    std::cout << "Grid loaded from cache: " << m_cellsInARow << "x"
+              << m_cellsInARow << ", " << water << " water cells"
+              << std::endl;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

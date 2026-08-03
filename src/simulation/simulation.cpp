@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <limits>
 #include <iostream>
+#include <stdexcept>
 
 Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps)
     : m_map(map), m_maxSteps(maxSteps),
@@ -14,20 +15,52 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
     double intRadius = config.getInterceptorRadius();
 
     for (const auto& unit : config.getUnits()) {
-        if (unit.type == "seeker") {
+        // Category chooses the agent family. Type chooses the concrete
+        // implementation inside that family. Only "basic" exists today.
+        if (unit.category == "seeker") {
+            if (unit.type != "basic") {
+                throw std::invalid_argument(
+                    "Unsupported seeker type: " + unit.type);
+            }
+
             m_seekers.emplace_back(seekerId++, unit.row, unit.col);
-        } 
-        
-        else if (unit.type == "target") {
+            m_seekerTypes.push_back(unit.type);
+        }
+
+        else if (unit.category == "target") {
+            if (unit.type != "basic") {
+                throw std::invalid_argument(
+                    "Unsupported target type: " + unit.type);
+            }
+
             m_targets.emplace_back(targetId++, unit.row, unit.col);
-        } 
-        
-        else if (unit.type == "detector") {
+            m_targetTypes.push_back(unit.type);
+        }
+
+        else if (unit.category == "detector") {
+            if (unit.type != "basic") {
+                throw std::invalid_argument(
+                    "Unsupported detector type: " + unit.type);
+            }
+
             m_detectors.emplace_back(detectorId++, unit.row, unit.col, detRadius);
-        } 
-        
-        else if (unit.type == "interceptor") {
-            m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
+            m_detectorTypes.push_back(unit.type);
+        }
+
+        else if (unit.category == "interceptor") {
+            if (unit.type != "basic") {
+                throw std::invalid_argument(
+                    "Unsupported interceptor type: " + unit.type);
+            }
+
+            m_interceptors.emplace_back(
+                interceptorId++, unit.row, unit.col, intRadius);
+            m_interceptorTypes.push_back(unit.type);
+        }
+
+        else {
+            throw std::invalid_argument(
+                "Unknown unit category: " + unit.category);
         }
     }
 
@@ -321,9 +354,13 @@ SimResult Simulation::buildResult(int totalSteps) const {
     result.maxNoiseLevel = m_maxNoiseLevel;
 
     // ── Seekers ──
-    for (const auto& s : m_seekers) {
+    for (std::size_t index = 0; index < m_seekers.size(); ++index) {
+        const auto& s = m_seekers[index];
+
         SimResult::SeekerResult sr;
         sr.id = s.id;
+        sr.category = "seeker";
+        sr.type = m_seekerTypes.at(index);
         sr.stepsTaken = s.stepsTaken;
         sr.pathCost = s.pathCost;
         sr.nodesExpanded = s.nodesExpanded;
@@ -345,9 +382,13 @@ SimResult Simulation::buildResult(int totalSteps) const {
     }
 
     // ── Targets ──
-    for (const auto& t : m_targets) {
+    for (std::size_t index = 0; index < m_targets.size(); ++index) {
+        const auto& t = m_targets[index];
+
         SimResult::TargetResult tr;
         tr.id = t.id;
+        tr.category = "target";
+        tr.type = m_targetTypes.at(index);
         tr.row = t.row;
         tr.col = t.col;
         tr.destroyed = !t.alive;
@@ -359,10 +400,14 @@ SimResult Simulation::buildResult(int totalSteps) const {
             result.allTargetsDestroyed = false;
     }
 
-    // ── Detectors (now sensor-only) ──
-    for (const auto& d : m_detectors) {
+    // ── Detectors (sensor-only) ──
+    for (std::size_t index = 0; index < m_detectors.size(); ++index) {
+        const auto& d = m_detectors[index];
+
         SimResult::DetectorResult dr;
         dr.id = d.id;
+        dr.category = "detector";
+        dr.type = m_detectorTypes.at(index);
         dr.row = d.row;
         dr.col = d.col;
         dr.sensingRadius = d.sensingRadius;
@@ -373,10 +418,14 @@ SimResult Simulation::buildResult(int totalSteps) const {
         result.detectorResults.push_back(dr);
     }
 
-    // ── Interceptors (new) ──
-    for (const auto& i : m_interceptors) {
+    // ── Interceptors (kill-only) ──
+    for (std::size_t index = 0; index < m_interceptors.size(); ++index) {
+        const auto& i = m_interceptors[index];
+
         SimResult::InterceptorResult ir;
         ir.id = i.id;
+        ir.category = "interceptor";
+        ir.type = m_interceptorTypes.at(index);
         ir.row = i.row;
         ir.col = i.col;
         ir.killRadius = i.killRadius;

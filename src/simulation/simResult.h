@@ -1,24 +1,18 @@
 #ifndef SIMRESULT_H
 #define SIMRESULT_H
 
-#include <vector>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
+#include <vector>
 
 /**
  * SimResult
  *
- * Holds all output data from one simulation run. Responsible for:
- *   - Storing per-seeker, per-target, per-detector, per-interceptor results
- *   - Computing summary statistics
- *   - Printing results to console
- *   - Saving results to JSON
- *
- * Does NOT run the simulation (that is Simulation's job) and does NOT
- * own map/spawn data (that is SpawnConfig's job).
+ * Holds all output data from one simulation run. Each per-agent record keeps
+ * both the broad category and the concrete type used to construct that agent.
  */
 struct SimResult {
 
@@ -26,6 +20,9 @@ struct SimResult {
 
     struct SeekerResult {
         int id;
+        std::string category;
+        std::string type;
+
         int stepsTaken;
         double pathCost;
         int nodesExpanded;
@@ -33,12 +30,10 @@ struct SimResult {
         int targetId;
         std::vector<std::pair<int,int>> moveHistory;
 
-        // Detection (set by detectors, sense-then-shoot doctrine)
         bool detected;
         int firstDetectedAtStep;
         int firstDetectedByDetector;
 
-        // Interception (set by interceptors)
         bool intercepted;
         int interceptedByInterceptor;
         int interceptedAtStep;
@@ -48,6 +43,9 @@ struct SimResult {
 
     struct TargetResult {
         int id;
+        std::string category;
+        std::string type;
+
         int row;
         int col;
         bool destroyed;
@@ -55,10 +53,13 @@ struct SimResult {
         int destroyedBySeeker;
     };
 
-    // ─── Per-detector output (sense-only) ───────────────────────────
+    // ─── Per-detector output ────────────────────────────────────────
 
     struct DetectorResult {
         int id;
+        std::string category;
+        std::string type;
+
         int row;
         int col;
         double sensingRadius;
@@ -71,10 +72,13 @@ struct SimResult {
         std::vector<Sighting> sightings;
     };
 
-    // ─── Per-interceptor output (kill-only) ─────────────────────────
+    // ─── Per-interceptor output ─────────────────────────────────────
 
     struct InterceptorResult {
         int id;
+        std::string category;
+        std::string type;
+
         int row;
         int col;
         double killRadius;
@@ -99,16 +103,16 @@ struct SimResult {
     std::vector<DetectorResult> detectorResults;
     std::vector<InterceptorResult> interceptorResults;
 
-    // ─── Summary statistics (filled by computeSummary) ──────────────
+    // ─── Summary statistics ─────────────────────────────────────────
 
     int targetsDestroyed;
     int seekersThatReached;
-    int seekersDetected;     // ever tracked
-    int seekersIntercepted;  // killed by an interceptor
+    int seekersDetected;
+    int seekersIntercepted;
     double avgStepsToTarget;
 
     // ─── Methods ────────────────────────────────────────────────────
-    
+
     void computeSummary();
     void print() const;
     void saveJSON(const std::string& filepath) const;

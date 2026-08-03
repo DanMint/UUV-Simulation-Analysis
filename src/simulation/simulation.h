@@ -1,9 +1,10 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
-#include <vector>
-#include <string>
 #include <random>
+#include <string>
+#include <vector>
+
 #include "mapCreation.h"
 #include "pathfinding.h"
 #include "targetAgent.h"
@@ -18,30 +19,28 @@
  *
  * Runs one complete simulation. Per step:
  *   1. Each living seeker moves one cell along its A* path
- *   2. Environmental noise (wave/wind) displaces seekers and may
- *      invalidate paths
- *   3. Detectors update tracks: any seeker inside a detector's sensing
- *      radius becomes `detected` (sticky)
- *   4. Interceptors engage: any detected seeker inside an interceptor's
- *      kill radius is rolled against the interceptor's probabilistic
- *      kill model
+ *   2. Environmental noise displaces seekers and may invalidate paths
+ *   3. Detectors update tracks
+ *   4. Interceptors engage tracked seekers
  *   5. Check seeker -> target collisions
  *   6. If any target was destroyed, surviving seekers retarget
- *   7. Loop until all targets dead, all seekers dead/reached, or
- *      maxSteps reached
+ *   7. Continue until termination or maxSteps
+ *
+ * Unit model:
+ *   - SpawnConfig supplies a broad category and a concrete type.
+ *   - category selects the agent family: seeker, target, detector, interceptor.
+ *   - type selects the implementation within that family.
+ *   - Currently, "basic" is the only supported concrete type.
  *
  * Doctrine: SENSE-THEN-SHOOT.
  *   - A lone detector sees but cannot kill.
- *   - A lone interceptor cannot fire — no tracks, no shots.
- *
- * Produces a SimResult when finished. Does NOT save the result file —
- * that is SimResult's responsibility.
+ *   - A lone interceptor cannot fire without a detector track.
  */
 class Simulation {
 public:
     Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000);
 
-    /** Run to completion. Returns results. */
+    /** Run to completion and return the final result. */
     SimResult run();
 
 private:
@@ -54,6 +53,13 @@ private:
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
 
+    // Concrete types are stored parallel to the agent vectors because the
+    // existing agent classes do not yet contain a type field.
+    std::vector<std::string> m_seekerTypes;
+    std::vector<std::string> m_targetTypes;
+    std::vector<std::string> m_detectorTypes;
+    std::vector<std::string> m_interceptorTypes;
+
     mutable std::mt19937 m_rng;
 
     /** Nearest living target to a seeker (Euclidean). -1 if none. */
@@ -62,29 +68,19 @@ private:
     /** True if seeker and target occupy the same cell. */
     bool checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const;
 
-    /**
-     * Detectors look for seekers; sets `detected = true` on first sight
-     * and logs every sighting (including repeats).
-     */
+    /** Detectors look for seekers and update sticky tracks. */
     void updateDetectorTracks(int currentStep);
 
-    /**
-     * Interceptors engage tracked seekers in range using their
-     * probabilistic kill model. Untracked seekers are skipped.
-     */
+    /** Interceptors engage tracked seekers in range. */
     void checkInterceptorEngagements(int currentStep);
 
-    /**
-     * Apply environmental noise to a seeker's position. Bresenham
-     * line-of-sight enforced so the seeker cannot jump over land.
-     * Invalidates the seeker's path on success.
-     */
+    /** Apply environmental noise and invalidate the path on displacement. */
     bool applyNoise(SeekerAgent& seeker);
 
-    /** Re-assign each seeker to its nearest target and recompute paths. */
+    /** Reassign each seeker to a living target and recompute paths. */
     void assignTargets(const Pathfinding& pf);
 
-    /** Build the final result struct from current agent state. */
+    /** Build the final result structure from the current agent state. */
     SimResult buildResult(int totalSteps) const;
 };
 
