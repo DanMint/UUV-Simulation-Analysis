@@ -98,14 +98,18 @@ void SimResult::computeSummary() {
         if (a.alive) attackersAlive++;
     }
 
-    // ── Cost-benefit summary ─────────────────────────────────────────
+    // ── Cost-benefit summary (Lance's formula) ──────────────────────
+    //   blue_cost = interceptor engagement spend = shots fired * cost per shot
+    //               (every shot counts — hit or miss: "$2M interceptor vs $1000 drone")
+    //   red_cost  = total unit cost of ALL attackers deployed (not just failures)
+    //   loss_exchange_ratio = red / blue (<1 = defence efficient; >1 = attackers trade up)
     blueCost = 0.0f;
-    for (const auto& s : seekerResults) {
-        if (s.intercepted) blueCost += s.unitCostMin;
+    for (const auto& ic : interceptorResults) {
+        blueCost += ic.engagementCount * ic.engagementCost;
     }
     redCost = 0.0f;
     for (const auto& a : attackerResults) {
-        if (!a.missionSuccess) redCost += a.unitCostMin;
+        redCost += a.unitCostMin;
     }
     lossExchangeRatio = (blueCost > 0.0f) ? redCost / blueCost : 0.0f;
 }
@@ -129,9 +133,9 @@ void SimResult::print() const {
     std::cout << "  Attackers active:    " << attackersAlive
               << " / " << attackerResults.size() << std::endl;
     std::cout << "  Avg steps to target: " << avgStepsToTarget << std::endl;
-    std::cout << "  Blue cost (lost):    $" << static_cast<long long>(blueCost) << std::endl;
-    std::cout << "  Red cost (wasted):   $" << static_cast<long long>(redCost) << std::endl;
-    std::cout << "  Loss exchange ratio: " << lossExchangeRatio << std::endl;
+    std::cout << "  Blue cost (engagement): $" << static_cast<long long>(blueCost) << std::endl;
+    std::cout << "  Red cost (deployed):    $" << static_cast<long long>(redCost) << std::endl;
+    std::cout << "  Loss exchange ratio:    " << lossExchangeRatio << std::endl;
 
     std::cout << "\n  Seekers:" << std::endl;
     for (const auto& s : seekerResults) {
@@ -157,7 +161,8 @@ void SimResult::print() const {
     std::cout << "\n  Targets:" << std::endl;
     for (const auto& t : targetResults) {
         std::cout << "    Target " << t.id
-                  << " at (" << t.row << "," << t.col << "): ";
+                  << " at (" << t.row << "," << t.col << ")"
+                  << (t.isCritical ? " [CRITICAL]" : "") << ": ";
         if (t.destroyed) {
             std::cout << "DESTROYED at step " << t.destroyedAtStep
                       << " by seeker " << t.destroyedBySeeker;
@@ -184,7 +189,9 @@ void SimResult::print() const {
             std::cout << "    Interceptor " << i.id
                       << " at (" << i.row << "," << i.col
                       << "), kill radius " << i.killRadius
-                      << ": " << i.killCount << " kill(s)";
+                      << ", vehicle " << (i.vehicleType.empty() ? "generic" : i.vehicleType)
+                      << ": " << i.killCount << " kill(s), "
+                      << i.engagementCount << " engagement(s)";
             if (i.killCount > 0) {
                 std::cout << " [";
                 for (size_t k = 0; k < i.intercepts.size(); k++) {
@@ -297,7 +304,8 @@ void SimResult::saveJSON(const std::string& filepath) const {
         jsonKey(buf, 3, "col",             t.col);                     buf << ",\n";
         jsonKeyBool(buf, 3, "destroyed",   t.destroyed);               buf << ",\n";
         jsonKey(buf, 3, "destroyed_at_step",   t.destroyedAtStep);     buf << ",\n";
-        jsonKey(buf, 3, "destroyed_by_seeker", t.destroyedBySeeker);   buf << "\n";
+        jsonKey(buf, 3, "destroyed_by_seeker", t.destroyedBySeeker);   buf << ",\n";
+        jsonKeyBool(buf, 3, "is_critical",  t.isCritical);             buf << "\n";
         buf << "    }";
         if (i < targetResults.size() - 1) buf << ",";
         buf << "\n";
@@ -331,6 +339,9 @@ void SimResult::saveJSON(const std::string& filepath) const {
         jsonKey(buf, 3, "col",         ic.col);                            buf << ",\n";
         jsonKey(buf, 3, "kill_radius", ic.killRadius);                     buf << ",\n";
         jsonKey(buf, 3, "kill_count",  ic.killCount);                      buf << ",\n";
+        jsonKey(buf, 3, "engagement_count", ic.engagementCount);          buf << ",\n";
+        jsonKey(buf, 3, "engagement_cost",  ic.engagementCost);           buf << ",\n";
+        jsonKeyStr(buf, 3, "vehicle_type",  ic.vehicleType);              buf << ",\n";
         jsonSightingArray(buf, 3, "intercepts", ic.intercepts);            buf << "\n";
         buf << "    }";
         if (i < interceptorResults.size() - 1) buf << ",";
@@ -384,39 +395,55 @@ void SimResult::saveJSON(const std::string& filepath) const {
 // ════════════════════════════════════════════════════════════════════════════════
 //
 //  Cost-benefit row layout:
-//    run_id, blue_cost, red_cost, targets_destroyed, total_targets,
-//    critical_asset_reached, total_steps, mission_success_rate
+//    run_id, blue_cost, red_cost, loss_exchange_ratio, targets_destroyed,
+//    total_targets, critical_asset_reached, total_steps, mission_success_rate,
+//    interceptor_engagements
 //
-//  FIRST-DRAFT cost definitions (placeholder — team to confirm):
-//    - blue_cost = sum of unitCostMin over seekers that were intercepted.
-//                  NOTE: only seekers/attackers carry VehicleSpecs cost in
-//                  this codebase today; targets/detectors/interceptors have
-//                  no cost data yet, so this is a proxy for defender-side loss.
-//    - red_cost  = sum of unitCostMin over attackers that did NOT achieve
-//                  missionSuccess (their procurement cost was "wasted").
-//    - critical_asset_reached = targetResults[0].destroyed (simplification;
-//                  no dedicated critical-asset flag exists yet).
-//
+//  Lance's cost-benefit definitions (FIRST DRAFT — team to confirm):
+//    - blue_cost = interceptor ENGAGEMENT spend = shots fired * cost per shot.
+//                  Every shot counts — hit or miss ("$2M interceptor vs $1000
+//                  drone" trade visible here).
+//    - red_cost  = total unit cost of ALL attackers DEPLOYED (not just failed
+//                  missions). Cost is sunk once a unit is committed.
+//    - loss_exchange_ratio = red_cost / blue_cost. <1 = defence efficient;
+//                  >1 = attackers trade up.
+//    - Legacy comparison metrics (seekers_lost, attackers_wasted) are tracked
+//                  in the per-run JSON but not in the CSV to keep the headline
+//                  columns aligned with Lance's formula.
+//    - critical_asset_reached = the DESIGNATED critical target (isCritical)
+    //                  was destroyed. Falls back to "any target destroyed" if
+    //                  no target is flagged critical.
+    //
 // ════════════════════════════════════════════════════════════════════════════════
 
 void SimResult::saveCSV(const std::string& filepath, int runId) const {
-    // ── Compute per-run cost columns ─────────────────────────────────
+    // ── Compute per-run cost columns (Lance's formula) ──────────────
     float blueCost = 0.0f;
-    for (const auto& s : seekerResults) {
-        // "Lost" = intercepted by the defence (killed before reaching target)
-        if (s.intercepted) blueCost += s.unitCostMin;
+    for (const auto& ic : interceptorResults) {
+        blueCost += ic.engagementCount * ic.engagementCost;
     }
 
     float redCost = 0.0f;
     for (const auto& a : attackerResults) {
-        // "Wasted" = did not achieve mission success
-        if (!a.missionSuccess) redCost += a.unitCostMin;
+        redCost += a.unitCostMin;  // cost of ALL attackers deployed
     }
 
     int totalTargets = static_cast<int>(targetResults.size());
+    // Critical asset reach: use the DESIGNATED critical target (isCritical),
+    // not the arbitrary first target. If no target is flagged critical,
+    // fall back to "any target destroyed" for backwards compatibility.
     bool criticalAssetReached = false;
-    if (!targetResults.empty()) {
-        criticalAssetReached = targetResults[0].destroyed;
+    bool hasCriticalFlag = false;
+    for (const auto& t : targetResults) {
+        if (t.isCritical) {
+            hasCriticalFlag = true;
+            if (t.destroyed) { criticalAssetReached = true; break; }
+        }
+    }
+    if (!hasCriticalFlag) {
+        for (const auto& t : targetResults) {
+            if (t.destroyed) { criticalAssetReached = true; break; }
+        }
     }
 
     float missionSuccessRate = 0.0f;
@@ -436,18 +463,26 @@ void SimResult::saveCSV(const std::string& filepath, int runId) const {
 
     bool isNew = (std::ifstream(filepath).peek() == std::ifstream::traits_type::eof());
     if (isNew) {
-        file << "run_id,blue_cost,red_cost,targets_destroyed,total_targets,"
-                "critical_asset_reached,total_steps,mission_success_rate\n";
+        file << "run_id,blue_cost,red_cost,loss_exchange_ratio,targets_destroyed,total_targets,"
+                "critical_asset_reached,total_steps,mission_success_rate,interceptor_engagements\n";
+    }
+
+    // Total interceptor shots fired across the whole defence
+    int totalEngagements = 0;
+    for (const auto& ic : interceptorResults) {
+        totalEngagements += ic.engagementCount;
     }
 
     file << runId << ","
          << blueCost << ","
          << redCost << ","
+         << lossExchangeRatio << ","
          << targetsDestroyed << ","
          << totalTargets << ","
          << (criticalAssetReached ? "true" : "false") << ","
          << totalSteps << ","
-         << missionSuccessRate << "\n";
+         << missionSuccessRate << ","
+         << totalEngagements << "\n";
     file.close();
 
     std::cout << "CSV row appended to " << filepath

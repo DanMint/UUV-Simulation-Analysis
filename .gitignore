@@ -9,3 +9,6 @@ grid_cache.txt
 windows_build/
 TODO.md
 GUIDE.md
+__pycache__/
+*.pyc
+*.pyo

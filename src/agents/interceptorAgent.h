@@ -1,6 +1,7 @@
 #ifndef INTERCEPTOR_AGENT_H
 #define INTERCEPTOR_AGENT_H
 
+#include <string>
 #include <vector>
 
 /**
@@ -20,6 +21,13 @@
  *
  * Persistent — can engage unlimited seekers. Invisible to seekers
  * (they do not path around interceptors).
+ *
+ * Cost model (Lance's framing): the cost of DEFENCE is the cost of what
+ * is actually EXPENDED — namely the interceptor's shots. Every shot
+ * costs money, hit or miss. A premium interceptor (e.g. HUGIN at $2-4M)
+ * fires expensive munitions, while a budget interceptor (BlueROV2 at
+ * $6k) fires cheap ones — so the "$2M interceptor vs $1000 drone" trade
+ * is captured in the per-shot cost.
  */
 struct InterceptorAgent {
     int id;
@@ -28,6 +36,10 @@ struct InterceptorAgent {
     double killRadius;     // engagement range in cells (Euclidean)
     bool alive;
     int killCount;         // total successful kills
+    int engagementCount;   // total shots fired (hits + misses)
+    float engagementCost;  // cost per shot ($)
+    std::string vehicleType;  // optional vehicle model (e.g. "hugin", "yuco")
+    static constexpr float DEFAULT_COST_PER_SHOT = 50000.0f;  // $50k default per shot
 
     struct Intercept {
         int seekerId;
@@ -36,6 +48,16 @@ struct InterceptorAgent {
     std::vector<Intercept> intercepts;
 
     InterceptorAgent(int id, int row, int col, double killRadius);
+    InterceptorAgent(int id, int row, int col, double killRadius,
+                     const std::string& vehicleType);
+
+    /**
+     * Compute the per-shot cost for a given interceptor vehicle type.
+     * Derives a realistic munition cost from the vehicle's unit cost
+     * (a premium platform fires more expensive ordnance). Falls back to
+     * DEFAULT_COST_PER_SHOT for unknown/generic types.
+     */
+    static float costPerShotForType(const std::string& vehicleType);
 
     /** True if a position is within this interceptor's kill radius. */
     bool isInRange(int checkRow, int checkCol) const;

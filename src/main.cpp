@@ -289,7 +289,7 @@ int main(int argc, char* argv[]) {
                 result.print();
 
                 std::ostringstream filename;
-                filename << runsDir << "/";
+                filename << runsDir << "/iter_" << iter << "_noise_";
                 std::ostringstream noiseStr;
                 noiseStr << currentNoise;
                 filename << noiseStr.str() << ".json";

@@ -180,9 +180,35 @@ paths (red), attacker paths (dashed, colour-coded by vehicle type), targets,
 detectors and interceptors. Outputs PNGs to `paths/`.
 
 `scripts/analyze_costs.py` reads `runs/summary.csv` (one row per batch run, written
-by `SimResult::saveCSV`) and prints a cost-benefit summary (blue cost = defender
-losses, red cost = attacker waste, loss-exchange ratio, mission success rate) plus
-three plots:
+by `SimResult::saveCSV`) and prints a cost-benefit summary plus three plots.
+
+### Cost-Benefit Definitions (Lance's Formula)
+
+The simulation tracks two cost metrics for the loss-exchange ratio:
+
+| Cost | Definition | What it measures |
+|------|-----------|------------------|
+| **Blue cost** | `Σ(interceptor.engagementCount × interceptor.engagementCost)` | **Every shot fired by interceptors** — hits AND misses. Engagement cost defaults to `$50,000/shot` (configurable via `DEFAULT_COST_PER_SHOT`). This captures the "$2M interceptor vs $1000 drone" trade: a single interceptor shot costs more than a cheap drone. |
+| **Red cost** | `Σ(attacker.unitCostMin)` | **Total cost of ALL attackers deployed** — sunk cost the moment they are committed, regardless of mission success. |
+| **Loss exchange ratio** | `red_cost / blue_cost` | `<1` = defence efficient (blue spends less than red's deployed assets), `>1` = attackers trade up (red's cheap swarm forces expensive blue intercepts). |
+
+**Example**: 10 Shahed drones (`$20k` each = `$200k` red cost) vs 4 interceptor shots
+(`$50k` each = `$200k` blue cost) → loss exchange ratio = `1.0` (breakeven).
+If 3 interceptors fire 12 shots (`$600k` blue) to stop 10 Shaheds (`$200k` red) →
+ratio = `0.33` → inefficient defence (blue spending 3× red's deployed cost).
+
+**Legacy columns** (`seekers_lost_cost`, `attackers_wasted_cost`) are available
+in the per-run JSON output for comparison with the old "losses" framing.
+
+### CSV columns
+
+```
+run_id,blue_cost,red_cost,loss_exchange_ratio,targets_destroyed,total_targets,
+critical_asset_reached,total_steps,mission_success_rate,interceptor_engagements
+```
+
+### Plots
+
 - Cost trade-off (blue vs red, colour = success rate) → `runs/cost_tradeoff.png`
 - Mission success vs sim length → `runs/success_vs_steps.png`
 - Loss-exchange-ratio histogram → `runs/loss_exchange_ratio.png`

@@ -7,14 +7,21 @@
 bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
     for (const auto& u : m_units)
         if (u.row == row && u.col == col) return false;
-    m_units.push_back({type, row, col, ""});  // empty vehicleType by default
+    m_units.push_back({type, row, col, "", false});  // empty vehicleType by default
     return true;
 }
 
 bool SpawnConfig::addUnit(const std::string& type, int row, int col, const std::string& vehicleType) {
     for (const auto& u : m_units)
         if (u.row == row && u.col == col) return false;
-    m_units.push_back({type, row, col, vehicleType});
+    m_units.push_back({type, row, col, vehicleType, false});
+    return true;
+}
+
+bool SpawnConfig::addUnit(const std::string& type, int row, int col, const std::string& vehicleType, bool isCritical) {
+    for (const auto& u : m_units)
+        if (u.row == row && u.col == col) return false;
+    m_units.push_back({type, row, col, vehicleType, isCritical});
     return true;
 }
 
@@ -293,8 +300,11 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         file << "    { \"type\": \"" << u.type
             << "\", \"row\": "      << u.row
             << ", \"col\": "        << u.col;
-        if (!u.vehicleType.empty()) {
+if (!u.vehicleType.empty()) {
             file << ", \"vehicle_type\": \"" << u.vehicleType << "\"";
+        }
+        if (u.type == "target" && u.isCritical) {
+            file << ", \"is_critical\": true";
         }
         file << " }";
         if (i < (int)m_units.size() - 1) file << ",";
@@ -427,10 +437,20 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
                 vehicleType = content.substr(vStart, vEnd - vStart);
             }
 
+// Optional is_critical field (only meaningful for targets)
+            bool isCritical = false;
+            size_t critPos = content.find("\"is_critical\"", colPos);
+            if (critPos != std::string::npos && objEnd != std::string::npos && critPos < objEnd) {
+                size_t colon = content.find(":", critPos);
+                size_t vs = colon + 1;
+                while (vs < content.size() && (content[vs]==' ' || content[vs]=='\t')) vs++;
+                isCritical = (content.compare(vs, 4, "true") == 0);
+            }
+
             if (!vehicleType.empty()) {
-                config.addUnit(type, row, col, vehicleType);
+                config.addUnit(type, row, col, vehicleType, isCritical);
             } else {
-                config.addUnit(type, row, col);
+                config.addUnit(type, row, col, "", isCritical);
             }
             pos = colPos + 1;
         }

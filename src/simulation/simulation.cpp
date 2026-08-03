@@ -23,11 +23,15 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
                 m_seekers.emplace_back(seekerId++, unit.row, unit.col);
             }
         } else if (unit.type == "target") {
-            m_targets.emplace_back(targetId++, unit.row, unit.col);
+            m_targets.emplace_back(targetId++, unit.row, unit.col, unit.isCritical);
         } else if (unit.type == "detector") {
             m_detectors.emplace_back(detectorId++, unit.row, unit.col, detRadius);
         } else if (unit.type == "interceptor") {
-            m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
+            if (!unit.vehicleType.empty()) {
+                m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius, unit.vehicleType);
+            } else {
+                m_interceptors.emplace_back(interceptorId++, unit.row, unit.col, intRadius);
+            }
         }
         else if (unit.type == "attacker") {
             if (!unit.vehicleType.empty()) {
@@ -112,6 +116,7 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
         for (auto& interceptor : m_interceptors) {
             if (!interceptor.alive) continue;
             if (!interceptor.isInRange(seeker.row, seeker.col)) continue;
+            interceptor.engagementCount++;
             double pKill = interceptor.killProbability(seeker.row, seeker.col);
             double r = roll(m_rng);
             if (r < pKill) {
@@ -130,6 +135,7 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
         for (auto& interceptor : m_interceptors) {
             if (!interceptor.alive) continue;
             if (!interceptor.isInRange(attacker.row, attacker.col)) continue;
+            interceptor.engagementCount++;
             double pKill = interceptor.killProbability(attacker.row, attacker.col);
             double r = roll(m_rng);
             if (r < pKill) {
@@ -224,6 +230,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
         SimResult::TargetResult tr;
         tr.id = t.id; tr.row = t.row; tr.col = t.col; tr.destroyed = !t.alive;
         tr.destroyedAtStep = -1; tr.destroyedBySeeker = -1;
+        tr.isCritical = t.isCritical;
         result.targetResults.push_back(tr);
         if (t.alive) result.allTargetsDestroyed = false;
     }
@@ -238,6 +245,9 @@ SimResult Simulation::buildResult(int totalSteps) const {
         SimResult::InterceptorResult ir;
         ir.id = i.id; ir.row = i.row; ir.col = i.col;
         ir.killRadius = i.killRadius; ir.killCount = i.killCount;
+        ir.engagementCount = i.engagementCount;
+        ir.engagementCost = i.engagementCost;
+        ir.vehicleType = i.vehicleType;
         for (const auto& ic : i.intercepts) ir.intercepts.push_back({ic.seekerId, ic.step});
         result.interceptorResults.push_back(ir);
     }

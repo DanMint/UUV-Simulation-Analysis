@@ -57,13 +57,14 @@ struct SimResult {
 
     // ─── Per-target output ──────────────────────────────────────────
 
-    struct TargetResult {
+struct TargetResult {
         int id;
         int row;
         int col;
         bool destroyed;
         int destroyedAtStep;
         int destroyedBySeeker;
+        bool isCritical;  ///< designated critical harbour asset (Lance's framing)
     };
 
     // ─── Per-detector output (sense-only) ───────────────────────────
@@ -82,7 +83,7 @@ struct SimResult {
         std::vector<Sighting> sightings;
     };
 
-    // ─── Per-interceptor output (kill-only) ─────────────────────────
+    // ─── Per-interceptor output (engagements + kills) ───────────────
 
     struct InterceptorResult {
         int id;
@@ -90,6 +91,9 @@ struct SimResult {
         int col;
         double killRadius;
         int killCount;
+        int engagementCount;   ///< total shots fired (hits + misses)
+        float engagementCost;  ///< cost per shot ($)
+        std::string vehicleType; ///< optional vehicle model (e.g. "hugin", "yuco")
 
         struct Intercept {
             int seekerId;
@@ -154,10 +158,16 @@ struct SimResult {
     double avgStepsToTarget;
 
     // ─── Cost-benefit summary (filled by computeSummary) ────────────
+    // Lance's formula:
+    //   blue_cost = interceptor ENGAGEMENT spend = shots fired * cost per shot
+    //               (every shot counts — hit or miss)
+    //   red_cost  = total unit cost of ALL attackers DEPLOYED
+    //   loss_exchange_ratio = red_cost / blue_cost
+    //               (>1 = attackers trade up; <1 = defence efficient)
 
-    float blueCost;          ///< Sum of unitCostMin over seekers intercepted (defence loss)
-    float redCost;           ///< Sum of unitCostMin over attackers that failed mission (offence waste)
-    float lossExchangeRatio; ///< redCost / blueCost (>1 = attackers trade up; <1 = defence efficient)
+    float blueCost;          ///< Σ(interceptor engagementCount × engagementCost)
+    float redCost;           ///< Σ(unitCostMin of ALL deployed attackers)
+    float lossExchangeRatio; ///< redCost / blueCost
 
     // ─── Methods ────────────────────────────────────────────────────
 
@@ -168,23 +178,22 @@ struct SimResult {
     /**
      * Append one cost-benefit row to a CSV file (creates the header row
      * on first call). Columns, in order:
-     *   run_id, blue_cost, red_cost, targets_destroyed, total_targets,
-     *   critical_asset_reached, total_steps, mission_success_rate
+     *   run_id, blue_cost, red_cost, loss_exchange_ratio, targets_destroyed,
+     *   total_targets, critical_asset_reached, total_steps,
+     *   mission_success_rate, interceptor_engagements
      *
-     * Cost definitions (FIRST DRAFT — placeholder assumptions to be
-     * confirmed by the team):
-     *   - blue_cost  = sum of unitCostMin across all seekers that were
-     *                  intercepted (lost). NOTE: in the current codebase
-     *                  only seekers/attackers carry VehicleSpecs costs;
-     *                  targets/detectors/interceptors have no cost data
-     *                  yet, so this is a proxy until the team defines
-     *                  defender-side costs.
-     *   - red_cost   = sum of unitCostMin across all attackers that did
-     *                  NOT achieve missionSuccess (i.e. their cost was
-     *                  "wasted").
-     *   - critical_asset_reached = targetResults[0].destroyed. NOTE:
-     *                  simplification — the codebase has no dedicated
-     *                  critical-asset flag yet.
+     * Cost definitions (FIRST DRAFT — Lance's formula, team to confirm):
+     *   - blue_cost = interceptor ENGAGEMENT spend = shots fired * cost per
+     *                 shot. Every shot counts — hit or miss ("$2M interceptor
+     *                 vs $1000 drone" trade visible here).
+     *   - red_cost  = total unit cost of ALL attackers DEPLOYED (not just
+     *                 failed missions). Cost is sunk once a unit is committed.
+     *   - loss_exchange_ratio = red_cost / blue_cost. <1 = defence efficient;
+     *                 >1 = attackers trade up.
+     *   - interceptor_engagements = total shots fired across all interceptors
+     *                 (hits + misses) — the driver of blue_cost.
+     *   - critical_asset_reached = targetResults[0].destroyed (simplification
+     *                 — no dedicated critical-asset flag exists yet).
      */
     void saveCSV(const std::string& filepath, int runId) const;
 };

@@ -54,6 +54,8 @@ struct UnitSpawn {
     int row;
     int col;
     std::string vehicleType;  // optional: e.g., "bluerov2", "tb2", "queenhornet"
+    bool isCritical = false;  // only meaningful for "target" type — designates
+                              // a critical harbour asset (Lance's framing).
 };
 
 // ─── MapInfo ──────────────────────────────────────────────────────────────────
@@ -90,8 +92,9 @@ public:
 
     // ─── Unit management ────────────────────────────────────────────
 
-    bool addUnit(const std::string& type, int row, int col);
+bool addUnit(const std::string& type, int row, int col);
     bool addUnit(const std::string& type, int row, int col, const std::string& vehicleType);
+    bool addUnit(const std::string& type, int row, int col, const std::string& vehicleType, bool isCritical);
     bool removeUnit(int row, int col);
     const UnitSpawn* getUnitAt(int row, int col) const;
     const std::vector<UnitSpawn>& getUnits() const;
