@@ -1,16 +1,22 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
 
 #include "mapCreation.h"
 #include "pathfinding.h"
+
 #include "targetAgent.h"
+
 #include "seekerAgent.h"
+#include "basicSeekerAgent.h"
+
 #include "detectorAgent.h"
 #include "interceptorAgent.h"
+
 #include "spawnConfig.h"
 #include "simResult.h"
 
@@ -18,7 +24,7 @@
  * Simulation
  *
  * Runs one complete simulation. Per step:
- *   1. Each living seeker moves one cell along its A* path
+ *   1. Each living seeker performs its concrete movement behavior
  *   2. Environmental noise displaces seekers and may invalidate paths
  *   3. Detectors update tracks
  *   4. Interceptors engage tracked seekers
@@ -28,9 +34,19 @@
  *
  * Unit model:
  *   - SpawnConfig supplies a broad category and a concrete type.
- *   - category selects the agent family: seeker, target, detector, interceptor.
- *   - type selects the implementation within that family.
- *   - Currently, "basic" is the only supported concrete type.
+ *   - category selects the agent family.
+ *   - type selects the concrete C++ implementation.
+ *
+ * Current seeker mapping:
+ *   category="seeker", type="basic"
+ *       -> BasicSeekerAgent
+ *
+ * Future mappings may include:
+ *   category="seeker", type="fast"
+ *       -> FastSeekerAgent
+ *
+ *   category="seeker", type="evader"
+ *       -> EvaderSeekerAgent
  *
  * Doctrine: SENSE-THEN-SHOOT.
  *   - A lone detector sees but cannot kill.
@@ -38,7 +54,11 @@
  */
 class Simulation {
 public:
-    Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000);
+    Simulation(
+        MapCreation& map,
+        const SpawnConfig& config,
+        int maxSteps = 2000
+    );
 
     /** Run to completion and return the final result. */
     SimResult run();
@@ -48,14 +68,32 @@ private:
     int m_maxSteps;
     double m_maxNoiseLevel;
 
-    std::vector<SeekerAgent>      m_seekers;
+    /**
+     * Seekers require polymorphic storage because different concrete seeker
+     * types derive from SeekerAgent.
+     *
+     * unique_ptr prevents object slicing and gives Simulation sole ownership
+     * of every seeker object.
+     */
+    std::vector<std::unique_ptr<SeekerAgent>> m_seekers;
+
+    // The current SeekerAgent hierarchy does not expose getType(), so the
+    // SpawnConfig type is kept parallel to m_seekers for result output.
+    std::vector<std::string> m_seekerTypes;
+
+    /*
+     * These categories currently have only their existing concrete classes.
+     * They may be converted to polymorphic unique_ptr collections later using
+     * the same pattern as m_seekers.
+     */
     std::vector<TargetAgent>      m_targets;
     std::vector<DetectorAgent>    m_detectors;
     std::vector<InterceptorAgent> m_interceptors;
 
-    // Concrete types are stored parallel to the agent vectors because the
-    // existing agent classes do not yet contain a type field.
-    std::vector<std::string> m_seekerTypes;
+    /*
+     * Temporary type tracking for the categories that have not yet been
+     * converted to polymorphic base/derived storage.
+     */
     std::vector<std::string> m_targetTypes;
     std::vector<std::string> m_detectorTypes;
     std::vector<std::string> m_interceptorTypes;
@@ -66,7 +104,10 @@ private:
     int findNearestTarget(const SeekerAgent& seeker) const;
 
     /** True if seeker and target occupy the same cell. */
-    bool checkCollision(const SeekerAgent& seeker, const TargetAgent& target) const;
+    bool checkCollision(
+        const SeekerAgent& seeker,
+        const TargetAgent& target
+    ) const;
 
     /** Detectors look for seekers and update sticky tracks. */
     void updateDetectorTracks(int currentStep);
@@ -78,7 +119,7 @@ private:
     bool applyNoise(SeekerAgent& seeker);
 
     /** Reassign each seeker to a living target and recompute paths. */
-    void assignTargets(const Pathfinding& pf);
+    void assignTargets(const Pathfinding& pathfinding);
 
     /** Build the final result structure from the current agent state. */
     SimResult buildResult(int totalSteps) const;

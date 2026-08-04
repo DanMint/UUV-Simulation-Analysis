@@ -11,7 +11,8 @@ SeekerAgent::SeekerAgent(int id, int row, int col)
       firstDetectedByDetector(-1),
       intercepted(false),
       interceptedByInterceptor(-1),
-      interceptedAtStep(-1)
+      interceptedAtStep(-1),
+      cost(0)
 {
     // Record starting position
     moveHistory.push_back({row, col});
