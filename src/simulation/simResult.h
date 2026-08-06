@@ -13,6 +13,14 @@
  *
  * Holds all output data from one simulation run. Each per-agent record keeps
  * both the broad category and the concrete type used to construct that agent.
+ *
+ * Cost model:
+ *   - Seeker, detector, and interceptor records store the fixed deployment
+ *     cost assigned by their concrete agent class.
+ *   - Targets do not have a cost.
+ *   - totalSeekerCost is the sum of all seeker deployment costs.
+ *   - totalDefenderCost is the sum of all detector and interceptor costs.
+ *   - Agent cost is independent of pathCost and simulation duration.
  */
 struct SimResult {
 
@@ -22,13 +30,14 @@ struct SimResult {
         int id;
         std::string category;
         std::string type;
+        int cost;
 
         int stepsTaken;
         double pathCost;
         int nodesExpanded;
         bool reachedTarget;
         int targetId;
-        std::vector<std::pair<int,int>> moveHistory;
+        std::vector<std::pair<int, int>> moveHistory;
 
         bool detected;
         int firstDetectedAtStep;
@@ -59,6 +68,7 @@ struct SimResult {
         int id;
         std::string category;
         std::string type;
+        int cost;
 
         int row;
         int col;
@@ -69,6 +79,7 @@ struct SimResult {
             int seekerId;
             int step;
         };
+
         std::vector<Sighting> sightings;
     };
 
@@ -78,6 +89,7 @@ struct SimResult {
         int id;
         std::string category;
         std::string type;
+        int cost;
 
         int row;
         int col;
@@ -88,6 +100,7 @@ struct SimResult {
             int seekerId;
             int step;
         };
+
         std::vector<Intercept> intercepts;
     };
 
@@ -110,6 +123,12 @@ struct SimResult {
     int seekersDetected;
     int seekersIntercepted;
     double avgStepsToTarget;
+
+    /** Sum of the fixed cost of every seeker used in the run. */
+    int totalSeekerCost;
+
+    /** Sum of the fixed cost of every detector and interceptor. */
+    int totalDefenderCost;
 
     // ─── Methods ────────────────────────────────────────────────────
 

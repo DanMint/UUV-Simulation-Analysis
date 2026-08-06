@@ -736,6 +736,7 @@ SimResult Simulation::buildResult(
         seekerResult.id = seeker.id;
         seekerResult.category = "seeker";
         seekerResult.type = m_seekerTypes.at(index);
+        seekerResult.cost = seeker.cost;
 
         seekerResult.stepsTaken = seeker.stepsTaken;
         seekerResult.pathCost = seeker.pathCost;
@@ -812,6 +813,7 @@ SimResult Simulation::buildResult(
         detectorResult.category = "detector";
         detectorResult.type =
             m_detectorTypes.at(index);
+        detectorResult.cost = detector.cost;
         detectorResult.row = detector.row;
         detectorResult.col = detector.col;
         detectorResult.sensingRadius =
@@ -848,6 +850,7 @@ SimResult Simulation::buildResult(
         interceptorResult.category = "interceptor";
         interceptorResult.type =
             m_interceptorTypes.at(index);
+        interceptorResult.cost = interceptor.cost;
         interceptorResult.row = interceptor.row;
         interceptorResult.col = interceptor.col;
         interceptorResult.killRadius =
