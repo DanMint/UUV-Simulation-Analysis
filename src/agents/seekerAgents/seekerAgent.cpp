@@ -4,6 +4,7 @@ SeekerAgent::SeekerAgent(int id, int row, int col)
     : id(id), row(row), col(col),
       spawnRow(row), spawnCol(col),
       alive(true), reachedTarget(false),
+      cost(0),
       pathIndex(0), targetId(-1),
       stepsTaken(0), pathCost(0.0), nodesExpanded(0),
       detected(false),
@@ -11,10 +12,8 @@ SeekerAgent::SeekerAgent(int id, int row, int col)
       firstDetectedByDetector(-1),
       intercepted(false),
       interceptedByInterceptor(-1),
-      interceptedAtStep(-1),
-      cost(0)
+      interceptedAtStep(-1)
 {
-    // Record starting position
     moveHistory.push_back({row, col});
 }
 
@@ -24,7 +23,7 @@ void SeekerAgent::computePath(const Pathfinding& pf, int destRow, int destCol) {
     pathCost = pf.getLastPathCost();
     nodesExpanded = pf.getLastNodesExpanded();
 
-    // Skip the first waypoint if it's our current position
+    // Skip the first waypoint if it is the current position.
     if (!path.empty() && path[0].first == row && path[0].second == col) {
         pathIndex = 1;
     }
@@ -41,6 +40,14 @@ bool SeekerAgent::moveStep() {
 
     moveHistory.push_back({row, col});
     return true;
+}
+
+double SeekerAgent::radarEvasionProbability() const {
+    return 0.0;
+}
+
+double SeekerAgent::interceptorEvasionProbability() const {
+    return 0.0;
 }
 
 bool SeekerAgent::hasPath() const {

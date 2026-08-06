@@ -16,7 +16,9 @@ namespace {
  * This function is the explicit link between the SpawnConfig type string and
  * the concrete C++ class:
  *
- *   "basic" -> BasicSeekerAgent
+ *   "basic"  -> BasicSeekerAgent
+ *   "fast"   -> FastSeekerAgent
+ *   "evader" -> EvaderSeekerAgent
  */
 std::unique_ptr<SeekerAgent> createSeekerAgent(
     const UnitSpawn& unit,
@@ -31,6 +33,22 @@ std::unique_ptr<SeekerAgent> createSeekerAgent(
 
     if (unit.type == "basic") {
         return std::make_unique<BasicSeekerAgent>(
+            id,
+            unit.row,
+            unit.col
+        );
+    }
+
+    if (unit.type == "fast") {
+        return std::make_unique<FastSeekerAgent>(
+            id,
+            unit.row,
+            unit.col
+        );
+    }
+
+    if (unit.type == "evader") {
+        return std::make_unique<EvaderSeekerAgent>(
             id,
             unit.row,
             unit.col
@@ -219,6 +237,23 @@ void Simulation::updateDetectorTracks(int currentStep) {
                 continue;
             }
 
+            const double radarEvasion =
+                seeker.radarEvasionProbability();
+
+            if (radarEvasion > 0.0) {
+                std::bernoulli_distribution evadeRadar(radarEvasion);
+
+                if (evadeRadar(m_rng)) {
+                    std::cout
+                        << "  Step " << currentStep
+                        << ": Seeker " << seeker.id
+                        << " evaded Detector " << detector.id
+                        << " at (" << seeker.row
+                        << "," << seeker.col << ")\n";
+                    continue;
+                }
+            }
+
             detector.recordSighting(
                 seeker.id,
                 currentStep
@@ -270,6 +305,25 @@ void Simulation::checkInterceptorEngagements(
                     seeker.col
                 )) {
                 continue;
+            }
+
+            const double interceptorEvasion =
+                seeker.interceptorEvasionProbability();
+
+            if (interceptorEvasion > 0.0) {
+                std::bernoulli_distribution evadeInterceptor(
+                    interceptorEvasion
+                );
+
+                if (evadeInterceptor(m_rng)) {
+                    std::cout
+                        << "  Step " << currentStep
+                        << ": Seeker " << seeker.id
+                        << " evaded Interceptor " << interceptor.id
+                        << " at (" << seeker.row
+                        << "," << seeker.col << ")\n";
+                    continue;
+                }
             }
 
             const double killProbability =

@@ -7,10 +7,13 @@
 /**
  * SeekerAgent
  *
- * Base class for all seeker implementations.
- *
  * Attacker that pathfinds to the nearest target and moves toward it.
  * Tracks its full movement history for analysis.
+ *
+ * This is the base class for concrete seeker types such as:
+ *   - BasicSeekerAgent
+ *   - FastSeekerAgent
+ *   - EvaderSeekerAgent
  */
 struct SeekerAgent {
     int id;
@@ -26,10 +29,10 @@ struct SeekerAgent {
     std::vector<Pathfinding::Pos> path;
     int pathIndex;
 
-    // Full move history
+    // Full move history (every position visited)
     std::vector<Pathfinding::Pos> moveHistory;
 
-    // Current target assignment
+    // Current target assignment (-1 if none)
     int targetId;
 
     // Stats
@@ -49,15 +52,22 @@ struct SeekerAgent {
 
     SeekerAgent(int id, int row, int col);
 
-    // Required when deleting a derived seeker through SeekerAgent*.
+    /** Required when deleting derived seekers through SeekerAgent pointers. */
     virtual ~SeekerAgent() = default;
 
+    /** Compute A* path to a target. Updates path, pathCost, nodesExpanded. */
     void computePath(const Pathfinding& pf, int destRow, int destCol);
 
-    // Virtual so future seeker types can override movement behavior.
-    // BasicSeekerAgent currently inherits this implementation unchanged.
+    /** Move along the computed path. Concrete types may override this. */
     virtual bool moveStep();
 
+    /** Probability of evading one detector observation attempt. */
+    virtual double radarEvasionProbability() const;
+
+    /** Probability of evading one interceptor engagement attempt. */
+    virtual double interceptorEvasionProbability() const;
+
+    /** True iff we have a path with remaining waypoints. */
     bool hasPath() const;
 };
 

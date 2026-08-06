@@ -11,31 +11,31 @@
 
 namespace {
 
-    int categoryToMapUnitType(const std::string& category) {
-        if (category == "seeker") {
-            return MapCreation::SEEKER;
-        }
-        if (category == "target") {
-            return MapCreation::TARGET;
-        }
-        if (category == "detector") {
-            return MapCreation::DETECTOR;
-        }
-        if (category == "interceptor") {
-            return MapCreation::INTERCEPTOR;
-        }
-
-        throw std::invalid_argument("Unknown unit category: " + category);
+int categoryToMapUnitType(const std::string& category) {
+    if (category == "seeker") {
+        return MapCreation::SEEKER;
+    }
+    if (category == "target") {
+        return MapCreation::TARGET;
+    }
+    if (category == "detector") {
+        return MapCreation::DETECTOR;
+    }
+    if (category == "interceptor") {
+        return MapCreation::INTERCEPTOR;
     }
 
-    void stampConfiguredUnits(MapCreation& map, const SpawnConfig& config) {
-        for (const auto& unit : config.getUnits()) {
-            map.placeUnit(
-                unit.row,
-                unit.col,
-                categoryToMapUnitType(unit.category));
-        }
+    throw std::invalid_argument("Unknown unit category: " + category);
+}
+
+void stampConfiguredUnits(MapCreation& map, const SpawnConfig& config) {
+    for (const auto& unit : config.getUnits()) {
+        map.placeUnit(
+            unit.row,
+            unit.col,
+            categoryToMapUnitType(unit.category));
     }
+}
 
 } // namespace
 
@@ -51,7 +51,9 @@ void printUsage(const char* progName) {
               << "  T key        - Select Target category (defender, blue square)\n"
               << "  D key        - Select Detector category (sensor, orange diamond)\n"
               << "  I key        - Select Interceptor category (effector, purple diamond)\n"
-              << "  B key        - Select the Basic type for the chosen category\n"
+              << "  B key        - Select Basic type\n"
+              << "  F key        - Select Fast type (Seeker category only)\n"
+              << "  E key        - Select Evader type (Seeker category only)\n"
               << "  Z key        - Draw ATTACKER spawn zones for the GA\n"
               << "  X key        - Draw DEFENDER spawn zones for the GA\n"
               << "  Q key        - Toggle GA-prep mode (targets + zones only)\n"

@@ -24,6 +24,8 @@ add_executable(uuv_sim
     src/agents/interceptorAgents/interceptorAgent.cpp
     src/agents/seekerAgents/seekerAgent.cpp
     src/agents/seekerAgents/basic/basicSeekerAgent.cpp
+    src/agents/seekerAgents/fast/fastSeekerAgent.cpp
+    src/agents/seekerAgents/evader/evaderSeekerAgent.cpp
 )
 
 add_executable(test_target_assignment
@@ -38,6 +40,8 @@ add_executable(test_target_assignment
     src/agents/interceptorAgents/interceptorAgent.cpp
     src/agents/seekerAgents/seekerAgent.cpp
     src/agents/seekerAgents/basic/basicSeekerAgent.cpp
+    src/agents/seekerAgents/fast/fastSeekerAgent.cpp
+    src/agents/seekerAgents/evader/evaderSeekerAgent.cpp
 )
 
 target_include_directories(uuv_sim PRIVATE
@@ -47,6 +51,8 @@ target_include_directories(uuv_sim PRIVATE
     src/agents/interceptorAgents
     src/agents/seekerAgents
     src/agents/seekerAgents/basic
+    src/agents/seekerAgents/fast
+    src/agents/seekerAgents/evader
     src/mapCreation
     src/spawnConfig
     src/mapVisualizer
@@ -61,6 +67,8 @@ target_include_directories(test_target_assignment PRIVATE
     src/agents/interceptorAgents
     src/agents/seekerAgents
     src/agents/seekerAgents/basic
+    src/agents/seekerAgents/fast
+    src/agents/seekerAgents/evader
     src/mapCreation
     src/spawnConfig
     src/mapVisualizer

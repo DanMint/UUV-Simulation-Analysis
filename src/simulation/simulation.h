@@ -13,6 +13,8 @@
 
 #include "seekerAgent.h"
 #include "basicSeekerAgent.h"
+#include "fastSeekerAgent.h"
+#include "evaderSeekerAgent.h"
 
 #include "detectorAgent.h"
 #include "interceptorAgent.h"
@@ -37,16 +39,10 @@
  *   - category selects the agent family.
  *   - type selects the concrete C++ implementation.
  *
- * Current seeker mapping:
- *   category="seeker", type="basic"
- *       -> BasicSeekerAgent
- *
- * Future mappings may include:
- *   category="seeker", type="fast"
- *       -> FastSeekerAgent
- *
- *   category="seeker", type="evader"
- *       -> EvaderSeekerAgent
+ * Current seeker mappings:
+ *   category="seeker", type="basic"  -> BasicSeekerAgent
+ *   category="seeker", type="fast"   -> FastSeekerAgent
+ *   category="seeker", type="evader" -> EvaderSeekerAgent
  *
  * Doctrine: SENSE-THEN-SHOOT.
  *   - A lone detector sees but cannot kill.

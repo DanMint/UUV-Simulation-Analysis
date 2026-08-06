@@ -14,7 +14,9 @@
  *
  * ── Unit placement ──────────────────────────────────────────────────
  *   S / T / D / I   Select a category (Seeker, Target, Detector, Interceptor)
- *   B               Select the Basic type for the selected category
+ *   B               Select Basic type
+ *   F               Select Fast type (Seeker category only)
+ *   E               Select Evader type (Seeker category only)
  *   Left click      Place the selected category/type on a water cell
  *   Right click     Remove unit
  *   + / -           Adjust detector sensing radius
@@ -24,8 +26,10 @@
  *   Enter           Save scenario and return
  *   Escape          Cancel
  *
- * Example:
- *   I, then B, then left click -> category="interceptor", type="basic"
+ * Examples:
+ *   S, then B, then left click -> category="seeker", type="basic"
+ *   S, then F, then left click -> category="seeker", type="fast"
+ *   S, then E, then left click -> category="seeker", type="evader"
  *
  * ── GA preparation mode ─────────────────────────────────────────────
  *   Q               Toggle GA prep mode on/off
@@ -65,7 +69,7 @@ private:
     std::string m_currentCategory;
 
     // Concrete implementation selected after the category.
-    // Empty means the user must select a type; currently B selects "basic".
+    // Empty means the user must select a type; B selects "basic"; seeker mode also supports F="fast" and E="evader".
     std::string m_currentUnitType;
 
     // ── Zone draw state ──────────────────────────────────────────────

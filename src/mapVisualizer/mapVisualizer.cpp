@@ -490,8 +490,14 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
         }
         else if (m_currentUnitType.empty()) {
             textColor = sf::Color(255, 220, 80);
-            ss << "Category: " << m_currentCategory
-               << " | Choose type: B=Basic";
+            ss << "Category: " << m_currentCategory;
+
+            if (m_currentCategory == "seeker") {
+                ss << " | Choose type: B=Basic F=Fast E=Evader";
+            }
+            else {
+                ss << " | Choose type: B=Basic";
+            }
         }
         else {
             if (m_currentCategory == "seeker") {
@@ -515,7 +521,13 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
                << " | DetR:" << m_config.getDetectorRadius()
                << " IntR:" << m_config.getInterceptorRadius()
                << " N:" << m_config.getMaxNoiseLevel()
-               << " | S/T/D/I=category B=basic Z=ATK X=DEF Enter=save";
+               << " | S/T/D/I=category B=basic";
+
+            if (m_currentCategory == "seeker") {
+                ss << " F=fast E=evader";
+            }
+
+            ss << " Z=ATK X=DEF Enter=save";
         }
     }
 
@@ -564,6 +576,10 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
     }
     else if (m_currentUnitType.empty()) {
         ss << m_currentCategory << " | Select type: B=basic";
+
+        if (m_currentCategory == "seeker") {
+            ss << " F=fast E=evader";
+        }
     }
     else {
         ss << m_currentCategory << "/" << m_currentUnitType
@@ -612,7 +628,8 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
 
     if (!fontPtr)
         std::cout << "Warning: no system font found. Status bar disabled.\n"
-                  << "Keys: S/T/D/I=category B=basic Z=ATK zone X=DEF zone "
+                  << "Keys: S/T/D/I=category B=basic F=fast E=evader(seeker) "
+                  << "Z=ATK zone X=DEF zone "
                   << "+/-=DetR {/}=IntR [/]=Noise C=clear units "
                   << "Shift+Z/X=clear zones Enter=save Esc=cancel\n";
 
@@ -703,8 +720,14 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     m_zoneDrawMode.clear();
                     m_zoneDragging = false;
 
-                    std::cout << "Selected category: " << category
-                              << ". Press B to select the basic type.\n";
+                    std::cout << "Selected category: " << category;
+
+                    if (category == "seeker") {
+                        std::cout << ". Select B=basic, F=fast, or E=evader.\n";
+                    }
+                    else {
+                        std::cout << ". Press B to select the basic type.\n";
+                    }
                     updateTitle(window);
                 };
 
@@ -748,6 +771,34 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         std::cout << "Selected unit: "
                                   << m_currentCategory << "/" << m_currentUnitType
                                   << "\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::F) {
+                    if (m_currentCategory != "seeker") {
+                        std::cout << "Fast is only available for the seeker category. "
+                                  << "Press S first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "fast";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: seeker/fast\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::E) {
+                    if (m_currentCategory != "seeker") {
+                        std::cout << "Evader is only available for the seeker category. "
+                                  << "Press S first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "evader";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: seeker/evader\n";
                         updateTitle(window);
                     }
                 }
