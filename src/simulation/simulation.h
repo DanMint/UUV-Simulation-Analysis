@@ -17,6 +17,9 @@
 #include "evaderSeekerAgent.h"
 
 #include "detectorAgent.h"
+#include "basicDetectorAgent.h"
+#include "mediumDetectorAgent.h"
+#include "advancedDetectorAgent.h"
 
 #include "interceptorAgent.h"
 #include "basicInterceptorAgent.h"
@@ -47,6 +50,11 @@
  *   category="seeker", type="basic"  -> BasicSeekerAgent
  *   category="seeker", type="fast"   -> FastSeekerAgent
  *   category="seeker", type="evader" -> EvaderSeekerAgent
+ *
+ * Current detector mappings:
+ *   category="detector", type="basic"    -> BasicDetectorAgent
+ *   category="detector", type="medium"   -> MediumDetectorAgent
+ *   category="detector", type="advanced" -> AdvancedDetectorAgent
  *
  * Current interceptor mappings:
  *   category="interceptor", type="basic"    -> BasicInterceptorAgent
@@ -91,8 +99,10 @@ private:
      * They may be converted to polymorphic unique_ptr collections later using
      * the same pattern as m_seekers.
      */
-    std::vector<TargetAgent>   m_targets;
-    std::vector<DetectorAgent> m_detectors;
+    std::vector<TargetAgent> m_targets;
+
+    // Polymorphic detector collection.
+    std::vector<std::unique_ptr<DetectorAgent>> m_detectors;
 
     // Polymorphic interceptor collection.
     std::vector<std::unique_ptr<InterceptorAgent>> m_interceptors;

@@ -17,8 +17,8 @@
  *   B               Select Basic type
  *   F               Select Fast type (Seeker category only)
  *   E               Select Evader type (Seeker category only)
- *   M               Select Medium type (Interceptor category only)
- *   A               Select Advanced type (Interceptor category only)
+ *   M               Select Medium type (Detector or Interceptor)
+ *   A               Select Advanced type (Detector or Interceptor)
  *   Left click      Place the selected category/type on a water cell
  *   Right click     Remove unit
  *   + / -           Adjust detector sensing radius
@@ -32,6 +32,9 @@
  *   S, then B, then left click -> category="seeker", type="basic"
  *   S, then F, then left click -> category="seeker", type="fast"
  *   S, then E, then left click -> category="seeker", type="evader"
+ *   D, then B, then left click -> category="detector", type="basic"
+ *   D, then M, then left click -> category="detector", type="medium"
+ *   D, then A, then left click -> category="detector", type="advanced"
  *   I, then B, then left click -> category="interceptor", type="basic"
  *   I, then M, then left click -> category="interceptor", type="medium"
  *   I, then A, then left click -> category="interceptor", type="advanced"
@@ -74,9 +77,7 @@ private:
     std::string m_currentCategory;
 
     // Concrete implementation selected after the category.
-    // Empty means the user must select a type.
-    // Seeker: B="basic", F="fast", E="evader".
-    // Interceptor: B="basic", M="medium", A="advanced".
+    // Empty means the user must select a type. Seeker supports B/F/E; detector and interceptor support B/M/A.
     std::string m_currentUnitType;
 
     // ── Zone draw state ──────────────────────────────────────────────

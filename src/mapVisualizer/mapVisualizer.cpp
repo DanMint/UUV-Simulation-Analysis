@@ -4,6 +4,23 @@
 #include <cmath>
 #include <algorithm>
 
+
+namespace {
+
+double detectorRadiusMultiplier(const std::string& type) {
+    if (type == "medium") {
+        return 1.25;
+    }
+
+    if (type == "advanced") {
+        return 1.50;
+    }
+
+    return 1.0;
+}
+
+} // namespace
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  COLOR CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════════
@@ -95,9 +112,16 @@ void MapVisualizer::drawGrid(sf::RenderWindow& window) const {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void MapVisualizer::drawDetectorRadii(sf::RenderWindow& window) const {
-    float pixelRadius = static_cast<float>(m_config.getDetectorRadius()) * m_cellSize;
     for (const auto& unit : m_config.getUnits()) {
-        if (unit.category != "detector") continue;
+        if (unit.category != "detector") {
+            continue;
+        }
+
+        const float pixelRadius = static_cast<float>(
+            m_config.getDetectorRadius() *
+            detectorRadiusMultiplier(unit.type)
+        ) * m_cellSize;
+
         sf::CircleShape c(pixelRadius);
         c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
         c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
@@ -359,7 +383,10 @@ void MapVisualizer::drawHover(sf::RenderWindow& window, int hoverRow, int hoverC
     float cy = (hoverRow + 0.5f) * m_cellSize;
 
     if (m_currentCategory == "detector" && !m_currentUnitType.empty()) {
-        float r = static_cast<float>(m_config.getDetectorRadius()) * m_cellSize;
+        float r = static_cast<float>(
+            m_config.getDetectorRadius() *
+            detectorRadiusMultiplier(m_currentUnitType)
+        ) * m_cellSize;
         sf::CircleShape p(r);
         p.setOrigin(sf::Vector2f(r, r));
         p.setPosition(sf::Vector2f(cx, cy));
@@ -495,7 +522,8 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
             if (m_currentCategory == "seeker") {
                 ss << " | Choose type: B=Basic F=Fast E=Evader";
             }
-            else if (m_currentCategory == "interceptor") {
+            else if (m_currentCategory == "detector" ||
+                     m_currentCategory == "interceptor") {
                 ss << " | Choose type: B=Basic M=Medium A=Advanced";
             }
             else {
@@ -529,7 +557,8 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
             if (m_currentCategory == "seeker") {
                 ss << " F=fast E=evader";
             }
-            else if (m_currentCategory == "interceptor") {
+            else if (m_currentCategory == "detector" ||
+                     m_currentCategory == "interceptor") {
                 ss << " M=medium A=advanced";
             }
 
@@ -586,7 +615,8 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
         if (m_currentCategory == "seeker") {
             ss << " F=fast E=evader";
         }
-        else if (m_currentCategory == "interceptor") {
+        else if (m_currentCategory == "detector" ||
+                 m_currentCategory == "interceptor") {
             ss << " M=medium A=advanced";
         }
     }
@@ -734,7 +764,8 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     if (category == "seeker") {
                         std::cout << ". Select B=basic, F=fast, or E=evader.\n";
                     }
-                    else if (category == "interceptor") {
+                    else if (category == "detector" ||
+                             category == "interceptor") {
                         std::cout << ". Select B=basic, M=medium, or A=advanced.\n";
                     }
                     else {
@@ -815,30 +846,38 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     }
                 }
                 else if (k->code == sf::Keyboard::Key::M) {
-                    if (m_currentCategory != "interceptor") {
-                        std::cout << "Medium is only available for the interceptor category. "
-                                  << "Press I first.\n";
+                    if (m_currentCategory != "detector" &&
+                        m_currentCategory != "interceptor") {
+                        std::cout
+                            << "Medium is available for detector and interceptor categories. "
+                            << "Press D or I first.\n";
                     }
                     else {
                         m_currentUnitType = "medium";
                         m_zoneDrawMode.clear();
                         m_zoneDragging = false;
 
-                        std::cout << "Selected unit: interceptor/medium\n";
+                        std::cout << "Selected unit: "
+                                  << m_currentCategory
+                                  << "/medium\n";
                         updateTitle(window);
                     }
                 }
                 else if (k->code == sf::Keyboard::Key::A) {
-                    if (m_currentCategory != "interceptor") {
-                        std::cout << "Advanced is only available for the interceptor category. "
-                                  << "Press I first.\n";
+                    if (m_currentCategory != "detector" &&
+                        m_currentCategory != "interceptor") {
+                        std::cout
+                            << "Advanced is available for detector and interceptor categories. "
+                            << "Press D or I first.\n";
                     }
                     else {
                         m_currentUnitType = "advanced";
                         m_zoneDrawMode.clear();
                         m_zoneDragging = false;
 
-                        std::cout << "Selected unit: interceptor/advanced\n";
+                        std::cout << "Selected unit: "
+                                  << m_currentCategory
+                                  << "/advanced\n";
                         updateTitle(window);
                     }
                 }

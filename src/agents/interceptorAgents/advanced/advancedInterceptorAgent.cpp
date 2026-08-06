@@ -34,12 +34,12 @@ double AdvancedInterceptorAgent::killProbability(
         : 0.0;
 
     if (ratio <= 0.5) {
-        return 1;
+        return 0.99;
     }
 
     if (ratio <= 0.7) {
-        return 1;
+        return 0.90;
     }
 
-    return 1;
+    return 0.80;
 }

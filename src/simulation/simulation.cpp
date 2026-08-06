@@ -1,5 +1,6 @@
 #include "simulation.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -57,6 +58,58 @@ std::unique_ptr<SeekerAgent> createSeekerAgent(
 
     throw std::invalid_argument(
         "Unsupported seeker type: " + unit.type
+    );
+}
+
+
+/**
+ * Factory for detector implementations.
+ *
+ *   "basic"    -> BasicDetectorAgent
+ *   "medium"   -> MediumDetectorAgent
+ *   "advanced" -> AdvancedDetectorAgent
+ */
+std::unique_ptr<DetectorAgent> createDetectorAgent(
+    const UnitSpawn& unit,
+    int id,
+    double sensingRadius
+) {
+    if (unit.category != "detector") {
+        throw std::invalid_argument(
+            "createDetectorAgent expected category 'detector', received: " +
+            unit.category
+        );
+    }
+
+    if (unit.type == "basic") {
+        return std::make_unique<BasicDetectorAgent>(
+            id,
+            unit.row,
+            unit.col,
+            sensingRadius
+        );
+    }
+
+    if (unit.type == "medium") {
+        return std::make_unique<MediumDetectorAgent>(
+            id,
+            unit.row,
+            unit.col,
+            sensingRadius
+        );
+    }
+
+    if (unit.type == "advanced") {
+        return std::make_unique<AdvancedDetectorAgent>(
+            id,
+            unit.row,
+            unit.col,
+            sensingRadius
+        );
+    }
+
+    throw std::invalid_argument(
+        "Unsupported detector type: " + unit.type
     );
 }
 
@@ -161,17 +214,12 @@ Simulation::Simulation(
         }
 
         else if (unit.category == "detector") {
-            if (unit.type != "basic") {
-                throw std::invalid_argument(
-                    "Unsupported detector type: " + unit.type
-                );
-            }
-
-            m_detectors.emplace_back(
-                detectorId++,
-                unit.row,
-                unit.col,
-                detectorRadius
+            m_detectors.push_back(
+                createDetectorAgent(
+                    unit,
+                    detectorId++,
+                    detectorRadius
+                )
             );
 
             m_detectorTypes.push_back(unit.type);
@@ -275,7 +323,9 @@ void Simulation::updateDetectorTracks(int currentStep) {
             continue;
         }
 
-        for (auto& detector : m_detectors) {
+        for (auto& detectorPointer : m_detectors) {
+            DetectorAgent& detector = *detectorPointer;
+
             if (!detector.alive) {
                 continue;
             }
@@ -284,21 +334,37 @@ void Simulation::updateDetectorTracks(int currentStep) {
                 continue;
             }
 
-            const double radarEvasion =
-                seeker.radarEvasionProbability();
+            const double seekerRadarEvasion = std::clamp(
+                seeker.radarEvasionProbability(),
+                0.0,
+                1.0
+            );
 
-            if (radarEvasion > 0.0) {
-                std::bernoulli_distribution evadeRadar(radarEvasion);
+            const double detectorResistance = std::clamp(
+                detector.radarEvasionResistance(),
+                0.0,
+                1.0
+            );
 
-                if (evadeRadar(m_rng)) {
-                    std::cout
-                        << "  Step " << currentStep
-                        << ": Seeker " << seeker.id
-                        << " evaded Detector " << detector.id
-                        << " at (" << seeker.row
-                        << "," << seeker.col << ")\n";
-                    continue;
-                }
+            // The detector removes a fraction of the seeker's evasion ability.
+            const double effectiveEvasion =
+                seekerRadarEvasion * (1.0 - detectorResistance);
+
+            const double probability = 1.0 - effectiveEvasion;
+
+            std::bernoulli_distribution detectionRoll(probability);
+
+            if (!detectionRoll(m_rng)) {
+                std::cout
+                    << "  Step " << currentStep
+                    << ": Seeker " << seeker.id
+                    << " evaded Detector " << detector.id
+                    << " at (" << seeker.row
+                    << "," << seeker.col << ")"
+                    << " [pDetect=" << std::fixed
+                    << std::setprecision(1)
+                    << probability * 100.0 << "%]\n";
+                continue;
             }
 
             detector.recordSighting(
@@ -316,7 +382,10 @@ void Simulation::updateDetectorTracks(int currentStep) {
                     << ": Detector " << detector.id
                     << " acquired Seeker " << seeker.id
                     << " at (" << seeker.row
-                    << "," << seeker.col << ")\n";
+                    << "," << seeker.col << ")"
+                    << " [pDetect=" << std::fixed
+                    << std::setprecision(1)
+                    << probability * 100.0 << "%]\n";
             }
         }
     }
@@ -735,7 +804,7 @@ SimResult Simulation::buildResult(
          ++index) {
 
         const DetectorAgent& detector =
-            m_detectors[index];
+            *m_detectors[index];
 
         SimResult::DetectorResult detectorResult;
 
