@@ -495,6 +495,9 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
             if (m_currentCategory == "seeker") {
                 ss << " | Choose type: B=Basic F=Fast E=Evader";
             }
+            else if (m_currentCategory == "interceptor") {
+                ss << " | Choose type: B=Basic M=Medium A=Advanced";
+            }
             else {
                 ss << " | Choose type: B=Basic";
             }
@@ -525,6 +528,9 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
 
             if (m_currentCategory == "seeker") {
                 ss << " F=fast E=evader";
+            }
+            else if (m_currentCategory == "interceptor") {
+                ss << " M=medium A=advanced";
             }
 
             ss << " Z=ATK X=DEF Enter=save";
@@ -579,6 +585,9 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
 
         if (m_currentCategory == "seeker") {
             ss << " F=fast E=evader";
+        }
+        else if (m_currentCategory == "interceptor") {
+            ss << " M=medium A=advanced";
         }
     }
     else {
@@ -725,6 +734,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     if (category == "seeker") {
                         std::cout << ". Select B=basic, F=fast, or E=evader.\n";
                     }
+                    else if (category == "interceptor") {
+                        std::cout << ". Select B=basic, M=medium, or A=advanced.\n";
+                    }
                     else {
                         std::cout << ". Press B to select the basic type.\n";
                     }
@@ -799,6 +811,34 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         m_zoneDragging = false;
 
                         std::cout << "Selected unit: seeker/evader\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::M) {
+                    if (m_currentCategory != "interceptor") {
+                        std::cout << "Medium is only available for the interceptor category. "
+                                  << "Press I first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "medium";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: interceptor/medium\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::A) {
+                    if (m_currentCategory != "interceptor") {
+                        std::cout << "Advanced is only available for the interceptor category. "
+                                  << "Press I first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "advanced";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: interceptor/advanced\n";
                         updateTitle(window);
                     }
                 }

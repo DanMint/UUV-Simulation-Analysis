@@ -60,6 +60,58 @@ std::unique_ptr<SeekerAgent> createSeekerAgent(
     );
 }
 
+
+/**
+ * Factory for interceptor implementations.
+ *
+ *   "basic"    -> BasicInterceptorAgent
+ *   "medium"   -> MediumInterceptorAgent
+ *   "advanced" -> AdvancedInterceptorAgent
+ */
+std::unique_ptr<InterceptorAgent> createInterceptorAgent(
+    const UnitSpawn& unit,
+    int id,
+    double killRadius
+) {
+    if (unit.category != "interceptor") {
+        throw std::invalid_argument(
+            "createInterceptorAgent expected category 'interceptor', received: " +
+            unit.category
+        );
+    }
+
+    if (unit.type == "basic") {
+        return std::make_unique<BasicInterceptorAgent>(
+            id,
+            unit.row,
+            unit.col,
+            killRadius
+        );
+    }
+
+    if (unit.type == "medium") {
+        return std::make_unique<MediumInterceptorAgent>(
+            id,
+            unit.row,
+            unit.col,
+            killRadius
+        );
+    }
+
+    if (unit.type == "advanced") {
+        return std::make_unique<AdvancedInterceptorAgent>(
+            id,
+            unit.row,
+            unit.col,
+            killRadius
+        );
+    }
+
+    throw std::invalid_argument(
+        "Unsupported interceptor type: " + unit.type
+    );
+}
+
 } // namespace
 
 Simulation::Simulation(
@@ -126,17 +178,12 @@ Simulation::Simulation(
         }
 
         else if (unit.category == "interceptor") {
-            if (unit.type != "basic") {
-                throw std::invalid_argument(
-                    "Unsupported interceptor type: " + unit.type
-                );
-            }
-
-            m_interceptors.emplace_back(
-                interceptorId++,
-                unit.row,
-                unit.col,
-                interceptorRadius
+            m_interceptors.push_back(
+                createInterceptorAgent(
+                    unit,
+                    interceptorId++,
+                    interceptorRadius
+                )
             );
 
             m_interceptorTypes.push_back(unit.type);
@@ -295,7 +342,9 @@ void Simulation::checkInterceptorEngagements(
             continue;
         }
 
-        for (auto& interceptor : m_interceptors) {
+        for (auto& interceptorPointer : m_interceptors) {
+            InterceptorAgent& interceptor = *interceptorPointer;
+
             if (!interceptor.alive) {
                 continue;
             }
@@ -722,7 +771,7 @@ SimResult Simulation::buildResult(
          ++index) {
 
         const InterceptorAgent& interceptor =
-            m_interceptors[index];
+            *m_interceptors[index];
 
         SimResult::InterceptorResult interceptorResult;
 

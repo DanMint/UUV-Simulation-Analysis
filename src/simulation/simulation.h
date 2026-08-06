@@ -17,7 +17,11 @@
 #include "evaderSeekerAgent.h"
 
 #include "detectorAgent.h"
+
 #include "interceptorAgent.h"
+#include "basicInterceptorAgent.h"
+#include "mediumInterceptorAgent.h"
+#include "advancedInterceptorAgent.h"
 
 #include "spawnConfig.h"
 #include "simResult.h"
@@ -43,6 +47,11 @@
  *   category="seeker", type="basic"  -> BasicSeekerAgent
  *   category="seeker", type="fast"   -> FastSeekerAgent
  *   category="seeker", type="evader" -> EvaderSeekerAgent
+ *
+ * Current interceptor mappings:
+ *   category="interceptor", type="basic"    -> BasicInterceptorAgent
+ *   category="interceptor", type="medium"   -> MediumInterceptorAgent
+ *   category="interceptor", type="advanced" -> AdvancedInterceptorAgent
  *
  * Doctrine: SENSE-THEN-SHOOT.
  *   - A lone detector sees but cannot kill.
@@ -82,13 +91,15 @@ private:
      * They may be converted to polymorphic unique_ptr collections later using
      * the same pattern as m_seekers.
      */
-    std::vector<TargetAgent>      m_targets;
-    std::vector<DetectorAgent>    m_detectors;
-    std::vector<InterceptorAgent> m_interceptors;
+    std::vector<TargetAgent>   m_targets;
+    std::vector<DetectorAgent> m_detectors;
+
+    // Polymorphic interceptor collection.
+    std::vector<std::unique_ptr<InterceptorAgent>> m_interceptors;
 
     /*
-     * Temporary type tracking for the categories that have not yet been
-     * converted to polymorphic base/derived storage.
+     * Type tracking retained for result serialization. Vector indices
+     * correspond to their associated agent vectors.
      */
     std::vector<std::string> m_targetTypes;
     std::vector<std::string> m_detectorTypes;

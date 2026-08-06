@@ -6,47 +6,65 @@
 /**
  * InterceptorAgent
  *
- * Stationary effector on the defender side.
- * KILLS tracked seekers only — an interceptor will NOT fire on a seeker
- * unless that seeker has been detected by at least one DetectorAgent
- * (sense-then-shoot doctrine).
+ * Base class for stationary defender effectors.
  *
- * Engagement model (probabilistic, distance-tiered):
- *   - For a tracked seeker within killRadius, compute ratio = dist / radius.
- *   - Roll a uniform [0,1); kill if roll < kill probability:
- *       inner 50% of radius (ratio <= 0.5)  → 90% kill chance
- *       50%-70% of radius   (ratio <= 0.7)  → 60% kill chance
- *       70%-100% of radius                  → 50% kill chance
+ * An interceptor may engage only a seeker that has already been detected by
+ * at least one DetectorAgent. This preserves the simulation's
+ * sense-then-shoot doctrine.
  *
- * Persistent — can engage unlimited seekers. Invisible to seekers
- * (they do not path around interceptors).
+ * Base engagement model (used by BasicInterceptorAgent):
+ *   - inner 50% of kill radius: 90% kill probability
+ *   - 50%-70% of kill radius:   60% kill probability
+ *   - 70%-100% of kill radius:  50% kill probability
+ *
+ * Concrete interceptor types may override killProbability() while reusing
+ * the shared range checking, state, and intercept logging in this class.
  */
 struct InterceptorAgent {
     int id;
     int row;
     int col;
-    double killRadius;     // engagement range in cells (Euclidean)
+
+    double killRadius;
     bool alive;
-    int killCount;         // total successful kills
+
+    // Relative acquisition/deployment cost assigned by the concrete type.
+    int cost;
+
+    int killCount;
 
     struct Intercept {
         int seekerId;
         int step;
     };
+
     std::vector<Intercept> intercepts;
 
-    InterceptorAgent(int id, int row, int col, double killRadius);
+    InterceptorAgent(
+        int id,
+        int row,
+        int col,
+        double killRadius
+    );
 
-    /** True if a position is within this interceptor's kill radius. */
+    /** Required when derived interceptors are owned through base pointers. */
+    virtual ~InterceptorAgent() = default;
+
+    /** True when a position is inside the interceptor's kill radius. */
     bool isInRange(int checkRow, int checkCol) const;
 
     /**
-     * Distance-tiered kill probability at the given position.
-     * Returns 0.0 if the target is outside killRadius.
+     * Return the distance-tiered kill probability at a position.
+     *
+     * Returns 0.0 when the position is outside killRadius. Derived
+     * interceptor classes override this function to provide stronger models.
      */
-    double killProbability(int checkRow, int checkCol) const;
+    virtual double killProbability(
+        int checkRow,
+        int checkCol
+    ) const;
 
-    /** Log a successful intercept of a seeker at a given step. */
+    /** Record a successful intercept. */
     void recordIntercept(int seekerId, int step);
 };
 

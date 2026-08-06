@@ -22,6 +22,10 @@ add_executable(uuv_sim
     src/agents/targetAgents/targetAgent.cpp
     src/agents/detectorAgents/detectorAgent.cpp
     src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/basic/basicInterceptorAgent.cpp
+    src/agents/interceptorAgents/medium/mediumInterceptorAgent.cpp
+    src/agents/interceptorAgents/advanced/advancedInterceptorAgent.cpp
     src/agents/seekerAgents/seekerAgent.cpp
     src/agents/seekerAgents/basic/basicSeekerAgent.cpp
     src/agents/seekerAgents/fast/fastSeekerAgent.cpp
@@ -38,6 +42,10 @@ add_executable(test_target_assignment
     src/agents/targetAgents/targetAgent.cpp
     src/agents/detectorAgents/detectorAgent.cpp
     src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/basic/basicInterceptorAgent.cpp
+    src/agents/interceptorAgents/medium/mediumInterceptorAgent.cpp
+    src/agents/interceptorAgents/advanced/advancedInterceptorAgent.cpp
     src/agents/seekerAgents/seekerAgent.cpp
     src/agents/seekerAgents/basic/basicSeekerAgent.cpp
     src/agents/seekerAgents/fast/fastSeekerAgent.cpp
@@ -49,6 +57,9 @@ target_include_directories(uuv_sim PRIVATE
     src/agents/targetAgents
     src/agents/detectorAgents
     src/agents/interceptorAgents
+    src/agents/interceptorAgents/basic
+    src/agents/interceptorAgents/medium
+    src/agents/interceptorAgents/advanced
     src/agents/seekerAgents
     src/agents/seekerAgents/basic
     src/agents/seekerAgents/fast
@@ -65,6 +76,9 @@ target_include_directories(test_target_assignment PRIVATE
     src/agents/targetAgents
     src/agents/detectorAgents
     src/agents/interceptorAgents
+    src/agents/interceptorAgents/basic
+    src/agents/interceptorAgents/medium
+    src/agents/interceptorAgents/advanced
     src/agents/seekerAgents
     src/agents/seekerAgents/basic
     src/agents/seekerAgents/fast
