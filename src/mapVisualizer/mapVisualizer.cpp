@@ -4,6 +4,23 @@
 #include <cmath>
 #include <algorithm>
 
+
+namespace {
+
+double detectorRadiusMultiplier(const std::string& type) {
+    if (type == "medium") {
+        return 1.25;
+    }
+
+    if (type == "advanced") {
+        return 1.50;
+    }
+
+    return 1.0;
+}
+
+} // namespace
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  COLOR CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════════
@@ -38,7 +55,8 @@ MapVisualizer::MapVisualizer(const MapCreation& map, int windowSize)
     : m_map(map),
       m_windowSize(windowSize),
       m_panelHeight(40),
-      m_currentType("seeker"),
+      m_currentCategory(""),
+      m_currentUnitType(""),
       m_zoneDrawMode(""),
       m_zoneDragging(false),
       m_zoneDragStartRow(-1),  m_zoneDragStartCol(-1),
@@ -94,9 +112,16 @@ void MapVisualizer::drawGrid(sf::RenderWindow& window) const {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void MapVisualizer::drawDetectorRadii(sf::RenderWindow& window) const {
-    float pixelRadius = static_cast<float>(m_config.getDetectorRadius()) * m_cellSize;
     for (const auto& unit : m_config.getUnits()) {
-        if (unit.type != "detector") continue;
+        if (unit.category != "detector") {
+            continue;
+        }
+
+        const float pixelRadius = static_cast<float>(
+            m_config.getDetectorRadius() *
+            detectorRadiusMultiplier(unit.type)
+        ) * m_cellSize;
+
         sf::CircleShape c(pixelRadius);
         c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
         c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
@@ -116,7 +141,7 @@ void MapVisualizer::drawDetectorRadii(sf::RenderWindow& window) const {
 void MapVisualizer::drawInterceptorRadii(sf::RenderWindow& window) const {
     float pixelRadius = static_cast<float>(m_config.getInterceptorRadius()) * m_cellSize;
     for (const auto& unit : m_config.getUnits()) {
-        if (unit.type != "interceptor") 
+        if (unit.category != "interceptor") 
             continue;
 
         sf::CircleShape c(pixelRadius);
@@ -222,7 +247,7 @@ void MapVisualizer::drawZones(sf::RenderWindow& window, sf::Font* font) const {
         window.draw(rect);
 
         if (font != nullptr && w > 60.f && h > 18.f) {
-            sf::Text lbl(*font, "PENDING - type count", 11);
+            sf::Text lbl(*font, "PENDING - enter count", 11);
             lbl.setFillColor(sf::Color(255, 255, 255, 230));
             lbl.setStyle(sf::Text::Bold);
             lbl.setPosition(sf::Vector2f(x + 6.f, y + 4.f));
@@ -267,7 +292,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
         float cx = (unit.col + 0.5f) * m_cellSize;
         float cy = (unit.row + 0.5f) * m_cellSize;
 
-        if (unit.type == "seeker") {
+        if (unit.category == "seeker") {
             sf::CircleShape tri(half, 3);
             tri.setOrigin(sf::Vector2f(half, half));
             tri.setPosition(sf::Vector2f(cx, cy));
@@ -277,7 +302,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             window.draw(tri);
         }
 
-        else if (unit.type == "target") {
+        else if (unit.category == "target") {
             float side = half * 1.6f;
             sf::RectangleShape sq(sf::Vector2f(side, side));
             sq.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
@@ -288,7 +313,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             window.draw(sq);
         }
 
-        else if (unit.type == "detector") {
+        else if (unit.category == "detector") {
             float side = half * 1.4f;
             sf::RectangleShape d(sf::Vector2f(side, side));
             d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
@@ -300,7 +325,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             window.draw(d);
         }
 
-        else if (unit.type == "interceptor") {
+        else if (unit.category == "interceptor") {
             float side = half * 1.4f;
             sf::RectangleShape d(sf::Vector2f(side, side));
             d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
@@ -315,10 +340,10 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
         // Label letter
         if (font != nullptr && m_cellSize >= 10.0f) {
             std::string lbl;
-            if      (unit.type == "seeker")      lbl = "S";
-            else if (unit.type == "target")      lbl = "T";
-            else if (unit.type == "detector")    lbl = "D";
-            else if (unit.type == "interceptor") lbl = "I";
+            if      (unit.category == "seeker")      lbl = "S";
+            else if (unit.category == "target")      lbl = "T";
+            else if (unit.category == "detector")    lbl = "D";
+            else if (unit.category == "interceptor") lbl = "I";
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) 
@@ -357,8 +382,11 @@ void MapVisualizer::drawHover(sf::RenderWindow& window, int hoverRow, int hoverC
     float cx = (hoverCol + 0.5f) * m_cellSize;
     float cy = (hoverRow + 0.5f) * m_cellSize;
 
-    if (m_currentType == "detector") {
-        float r = static_cast<float>(m_config.getDetectorRadius()) * m_cellSize;
+    if (m_currentCategory == "detector" && !m_currentUnitType.empty()) {
+        float r = static_cast<float>(
+            m_config.getDetectorRadius() *
+            detectorRadiusMultiplier(m_currentUnitType)
+        ) * m_cellSize;
         sf::CircleShape p(r);
         p.setOrigin(sf::Vector2f(r, r));
         p.setPosition(sf::Vector2f(cx, cy));
@@ -369,7 +397,7 @@ void MapVisualizer::drawHover(sf::RenderWindow& window, int hoverRow, int hoverC
         window.draw(p);
     }
 
-    else if (m_currentType == "interceptor") {
+    else if (m_currentCategory == "interceptor" && !m_currentUnitType.empty()) {
         float r = static_cast<float>(m_config.getInterceptorRadius()) * m_cellSize;
         sf::CircleShape p(r);
         p.setOrigin(sf::Vector2f(r, r));
@@ -393,87 +421,149 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
     panel.setFillColor(PANEL_COLOR);
     window.draw(panel);
 
-    if (font == nullptr) 
+    if (font == nullptr) {
         return;
+    }
 
     std::ostringstream ss;
-    sf::Color textColor;
+    sf::Color textColor = sf::Color::White;
 
     int nAtk = static_cast<int>(m_config.getAttackerZones().size());
     int nDef = static_cast<int>(m_config.getDefenderZones().size());
 
     if (!m_zoneInputState.empty()) {
-        // ── Count-input prompt — highest priority ─────────────────────────────
-        textColor = sf::Color(255, 220, 80);  // bright yellow
+        // Count-input prompt has the highest priority.
+        textColor = sf::Color(255, 220, 80);
         std::string prompt;
-        if      (m_zoneInputState == "atk_seekers")      prompt = "SEEKERS in this attacker zone";
-        else if (m_zoneInputState == "def_detectors")    prompt = "DETECTORS in this defender zone";
-        else if (m_zoneInputState == "def_interceptors") prompt = "INTERCEPTORS in this defender zone";
+
+        if (m_zoneInputState == "atk_seekers") {
+            prompt = "SEEKERS in this attacker zone";
+        }
+        else if (m_zoneInputState == "def_detectors") {
+            prompt = "DETECTORS in this defender zone";
+        }
+        else if (m_zoneInputState == "def_interceptors") {
+            prompt = "INTERCEPTORS in this defender zone";
+        }
 
         ss << "How many " << prompt << "?  >>> "
            << (m_typingBuffer.empty() ? "_" : m_typingBuffer + "_")
            << "    [type digits | Enter=confirm | Backspace | Esc=cancel zone]";
     }
-
-    else if (m_gaPrepMode && m_zoneDrawMode.empty()) {
-        // ── GA prep mode, not currently drawing a zone ───────────────────────
-        textColor = sf::Color(200, 130, 255);  // purple
-        ss << "GA PREP MODE (Q to exit)  |  T=target  Z=ATK zone  X=DEF zone"
-           << "  |  Targets:" << m_config.countType("target")
-           << "  ATK:"        << nAtk
-           << "  DEF:"        << nDef
-           << "  |  Enter=save scenario for GA";
-    }
-    
     else if (m_zoneDrawMode == "attacker") {
-        textColor = sf::Color(255, 140, 60);   // coral
+        textColor = sf::Color(255, 140, 60);
+
         if (m_zoneDragging) {
             int r1 = std::min(m_zoneDragStartRow, m_zoneDragCurrentRow);
             int r2 = std::max(m_zoneDragStartRow, m_zoneDragCurrentRow);
             int c1 = std::min(m_zoneDragStartCol, m_zoneDragCurrentCol);
             int c2 = std::max(m_zoneDragStartCol, m_zoneDragCurrentCol);
-            ss << "ATK ZONE DRAW  |  Dragging: " << (c2-c1+1) << "x" << (r2-r1+1)
-               << " cells  |  Release to add zone";
-        } 
+
+            ss << "ATK ZONE DRAW | Dragging: " << (c2 - c1 + 1)
+               << "x" << (r2 - r1 + 1)
+               << " cells | Release to add zone";
+        }
         else {
-            ss << "ATK ZONE DRAW (Z)  |  Zones: ATK=" << nAtk << " DEF=" << nDef
-               << "  |  Drag=add  RClick=remove  Shift+Z=clear ATK  Z=exit";
+            ss << "ATK ZONE DRAW (Z) | Zones: ATK=" << nAtk
+               << " DEF=" << nDef
+               << " | Drag=add RClick=remove Shift+Z=clear Z=exit";
         }
     }
     else if (m_zoneDrawMode == "defender") {
-        textColor = sf::Color(60, 210, 180);   // teal
+        textColor = sf::Color(60, 210, 180);
+
         if (m_zoneDragging) {
             int r1 = std::min(m_zoneDragStartRow, m_zoneDragCurrentRow);
             int r2 = std::max(m_zoneDragStartRow, m_zoneDragCurrentRow);
             int c1 = std::min(m_zoneDragStartCol, m_zoneDragCurrentCol);
             int c2 = std::max(m_zoneDragStartCol, m_zoneDragCurrentCol);
-            ss << "DEF ZONE DRAW  |  Dragging: " << (c2-c1+1) << "x" << (r2-r1+1)
-               << " cells  |  Release to add zone";
-        } 
+
+            ss << "DEF ZONE DRAW | Dragging: " << (c2 - c1 + 1)
+               << "x" << (r2 - r1 + 1)
+               << " cells | Release to add zone";
+        }
         else {
-            ss << "DEF ZONE DRAW (X)  |  Zones: ATK=" << nAtk << " DEF=" << nDef
-               << "  |  Drag=add  RClick=remove  Shift+X=clear DEF  X=exit";
+            ss << "DEF ZONE DRAW (X) | Zones: ATK=" << nAtk
+               << " DEF=" << nDef
+               << " | Drag=add RClick=remove Shift+X=clear X=exit";
         }
     }
-    else {
-        // Normal unit-placement mode
-        std::string modeLabel;
-        if      (m_currentType == "seeker")      { modeLabel = "SEEKER (S)";      textColor = sf::Color(255, 120, 120); }
-        else if (m_currentType == "target")      { modeLabel = "TARGET (T)";      textColor = sf::Color(120, 160, 255); }
-        else if (m_currentType == "detector")    { modeLabel = "DETECTOR (D)";    textColor = sf::Color(255, 200, 80);  }
-        else if (m_currentType == "interceptor") { modeLabel = "INTERCEPTOR (I)"; textColor = sf::Color(200, 120, 255); }
+    else if (m_gaPrepMode) {
+        textColor = sf::Color(200, 130, 255);
 
-        ss << "Mode: " << modeLabel
-           << "  |  S:" << m_config.countType("seeker")
-           << "  T:"    << m_config.countType("target")
-           << "  D:"    << m_config.countType("detector")
-           << "  I:"    << m_config.countType("interceptor")
-           << "  DetR:" << m_config.getDetectorRadius()
-           << "  IntR:" << m_config.getInterceptorRadius()
-           << "  N:"    << m_config.getMaxNoiseLevel()
-           << "  |  ATK zones:" << nAtk
-           << "  DEF zones:"    << nDef
-           << "  |  Z=ATK  X=DEF  Enter=Save";
+        ss << "GA PREP MODE (Q=exit) | ";
+
+        if (m_currentCategory == "target" && m_currentUnitType == "basic") {
+            ss << "Selected: target/basic | Left click=place target";
+        }
+        else if (m_currentCategory == "target") {
+            ss << "Category: target | B=basic";
+        }
+        else {
+            ss << "T=target then B=basic";
+        }
+
+        ss << " | Z=ATK X=DEF"
+           << " | Targets:" << m_config.countCategory("target")
+           << " ATK:" << nAtk
+           << " DEF:" << nDef
+           << " | Enter=save";
+    }
+    else {
+        // Normal category/type selection and placement mode.
+        if (m_currentCategory.empty()) {
+            textColor = sf::Color::White;
+            ss << "Choose category: S=Seeker T=Target D=Detector I=Interceptor";
+        }
+        else if (m_currentUnitType.empty()) {
+            textColor = sf::Color(255, 220, 80);
+            ss << "Category: " << m_currentCategory;
+
+            if (m_currentCategory == "seeker") {
+                ss << " | Choose type: B=Basic F=Fast E=Evader";
+            }
+            else if (m_currentCategory == "detector" ||
+                     m_currentCategory == "interceptor") {
+                ss << " | Choose type: B=Basic M=Medium A=Advanced";
+            }
+            else {
+                ss << " | Choose type: B=Basic";
+            }
+        }
+        else {
+            if (m_currentCategory == "seeker") {
+                textColor = sf::Color(255, 120, 120);
+            }
+            else if (m_currentCategory == "target") {
+                textColor = sf::Color(120, 160, 255);
+            }
+            else if (m_currentCategory == "detector") {
+                textColor = sf::Color(255, 200, 80);
+            }
+            else if (m_currentCategory == "interceptor") {
+                textColor = sf::Color(200, 120, 255);
+            }
+
+            ss << "Mode: " << m_currentCategory << "/" << m_currentUnitType
+               << " | S:" << m_config.countCategory("seeker")
+               << " T:" << m_config.countCategory("target")
+               << " D:" << m_config.countCategory("detector")
+               << " I:" << m_config.countCategory("interceptor")
+               << " | DetR:" << m_config.getDetectorRadius()
+               << " IntR:" << m_config.getInterceptorRadius()
+               << " N:" << m_config.getMaxNoiseLevel()
+               << " | S/T/D/I=category B=basic";
+
+            if (m_currentCategory == "seeker") {
+                ss << " F=fast E=evader";
+            }
+            else if (m_currentCategory == "detector" ||
+                     m_currentCategory == "interceptor") {
+                ss << " M=medium A=advanced";
+            }
+
+            ss << " Z=ATK X=DEF Enter=save";
+        }
     }
 
     sf::Text text(*font, ss.str(), 13);
@@ -491,26 +581,55 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
     int nDef = static_cast<int>(m_config.getDefenderZones().size());
 
     std::ostringstream ss;
-    if (m_gaPrepMode && m_zoneDrawMode.empty()) {
-        ss << "UUV Spawn Tool  |  GA PREP MODE  |  T:" << m_config.countType("target")
-           << "  ATK=" << nAtk << "  DEF=" << nDef;
+    ss << "UUV Spawn Tool | ";
+
+    if (m_zoneDrawMode == "attacker") {
+        ss << "ATK ZONE DRAW | ATK=" << nAtk << " DEF=" << nDef;
+    }
+    else if (m_zoneDrawMode == "defender") {
+        ss << "DEF ZONE DRAW | ATK=" << nAtk << " DEF=" << nDef;
+    }
+    else if (m_gaPrepMode) {
+        ss << "GA PREP MODE | ";
+
+        if (m_currentCategory == "target" && m_currentUnitType == "basic") {
+            ss << "target/basic";
+        }
+        else if (m_currentCategory == "target") {
+            ss << "target | select B=basic";
+        }
+        else {
+            ss << "select T then B";
+        }
+
+        ss << " | T:" << m_config.countCategory("target")
+           << " ATK:" << nAtk
+           << " DEF:" << nDef;
+    }
+    else if (m_currentCategory.empty()) {
+        ss << "Select category: S/T/D/I";
+    }
+    else if (m_currentUnitType.empty()) {
+        ss << m_currentCategory << " | Select type: B=basic";
+
+        if (m_currentCategory == "seeker") {
+            ss << " F=fast E=evader";
+        }
+        else if (m_currentCategory == "detector" ||
+                 m_currentCategory == "interceptor") {
+            ss << " M=medium A=advanced";
+        }
+    }
+    else {
+        ss << m_currentCategory << "/" << m_currentUnitType
+           << " | S:" << m_config.countCategory("seeker")
+           << " T:" << m_config.countCategory("target")
+           << " D:" << m_config.countCategory("detector")
+           << " I:" << m_config.countCategory("interceptor")
+           << " ATK:" << nAtk
+           << " DEF:" << nDef;
     }
 
-    else if (m_zoneDrawMode == "attacker") {
-        ss << "UUV Spawn Tool  |  ATK ZONE DRAW  |  ATK=" << nAtk << " DEF=" << nDef;
-    } 
-    
-    else if (m_zoneDrawMode == "defender") {
-        ss << "UUV Spawn Tool  |  DEF ZONE DRAW  |  ATK=" << nAtk << " DEF=" << nDef;
-    } 
-    else {
-        ss << "UUV Spawn Tool  |  " << m_currentType
-           << "  S:" << m_config.countType("seeker")
-           << "  T:" << m_config.countType("target")
-           << "  D:" << m_config.countType("detector")
-           << "  I:" << m_config.countType("interceptor")
-           << "  ATK:" << nAtk << "  DEF:" << nDef;
-    }
     window.setTitle(ss.str());
 }
 
@@ -548,8 +667,10 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
 
     if (!fontPtr)
         std::cout << "Warning: no system font found. Status bar disabled.\n"
-                  << "Keys: S T D I=unit  Z=ATK zone  X=DEF zone  +/-=DetR  {/}=IntR  [/]=Noise  "
-                  << "C=clear units  Shift+Z/X=clear zones  Enter=save  Esc=cancel\n";
+                  << "Keys: S/T/D/I=category B=basic F=fast E=evader(seeker) "
+                  << "Z=ATK zone X=DEF zone "
+                  << "+/-=DetR {/}=IntR [/]=Noise C=clear units "
+                  << "Shift+Z/X=clear zones Enter=save Esc=cancel\n";
 
     int hoverRow = -1, hoverCol = -1;
 
@@ -629,43 +750,134 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     continue;
                 }
 
-                // ── Unit modes — exit zone draw if active ─────────────────────
+                // ── Category selection ───────────────────────────────────────
+                // Selecting a category clears the previous concrete type.
+                // The user must then press B to select the basic type.
+                auto selectCategory = [&](const std::string& category) {
+                    m_currentCategory = category;
+                    m_currentUnitType.clear();
+                    m_zoneDrawMode.clear();
+                    m_zoneDragging = false;
+
+                    std::cout << "Selected category: " << category;
+
+                    if (category == "seeker") {
+                        std::cout << ". Select B=basic, F=fast, or E=evader.\n";
+                    }
+                    else if (category == "detector" ||
+                             category == "interceptor") {
+                        std::cout << ". Select B=basic, M=medium, or A=advanced.\n";
+                    }
+                    else {
+                        std::cout << ". Press B to select the basic type.\n";
+                    }
+                    updateTitle(window);
+                };
+
                 if (k->code == sf::Keyboard::Key::S) {
                     if (m_gaPrepMode) {
                         std::cout << "Seeker placement disabled in GA prep mode. "
                                   << "The GA will spawn seekers within attacker zones.\n";
-                    } 
+                    }
                     else {
-                        m_currentType = "seeker";
-                        m_zoneDrawMode = "";  m_zoneDragging = false;
-                        updateTitle(window);
+                        selectCategory("seeker");
                     }
                 }
-
                 else if (k->code == sf::Keyboard::Key::T) {
-                    m_currentType = "target";
-                    m_zoneDrawMode = "";  m_zoneDragging = false;
-                    updateTitle(window);
+                    selectCategory("target");
                 }
-
                 else if (k->code == sf::Keyboard::Key::D) {
                     if (m_gaPrepMode) {
                         std::cout << "Detector placement disabled in GA prep mode.\n";
-                    } 
+                    }
                     else {
-                        m_currentType = "detector";
-                        m_zoneDrawMode = "";  m_zoneDragging = false;
-                        updateTitle(window);
+                        selectCategory("detector");
                     }
                 }
-
                 else if (k->code == sf::Keyboard::Key::I) {
                     if (m_gaPrepMode) {
                         std::cout << "Interceptor placement disabled in GA prep mode.\n";
-                    } 
+                    }
                     else {
-                        m_currentType = "interceptor";
-                        m_zoneDrawMode = "";  m_zoneDragging = false;
+                        selectCategory("interceptor");
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::B) {
+                    if (m_currentCategory.empty()) {
+                        std::cout << "Select a category first using S, T, D, or I.\n";
+                    }
+                    else {
+                        m_currentUnitType = "basic";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: "
+                                  << m_currentCategory << "/" << m_currentUnitType
+                                  << "\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::F) {
+                    if (m_currentCategory != "seeker") {
+                        std::cout << "Fast is only available for the seeker category. "
+                                  << "Press S first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "fast";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: seeker/fast\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::E) {
+                    if (m_currentCategory != "seeker") {
+                        std::cout << "Evader is only available for the seeker category. "
+                                  << "Press S first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "evader";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: seeker/evader\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::M) {
+                    if (m_currentCategory != "detector" &&
+                        m_currentCategory != "interceptor") {
+                        std::cout
+                            << "Medium is available for detector and interceptor categories. "
+                            << "Press D or I first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "medium";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: "
+                                  << m_currentCategory
+                                  << "/medium\n";
+                        updateTitle(window);
+                    }
+                }
+                else if (k->code == sf::Keyboard::Key::A) {
+                    if (m_currentCategory != "detector" &&
+                        m_currentCategory != "interceptor") {
+                        std::cout
+                            << "Advanced is available for detector and interceptor categories. "
+                            << "Press D or I first.\n";
+                    }
+                    else {
+                        m_currentUnitType = "advanced";
+                        m_zoneDrawMode.clear();
+                        m_zoneDragging = false;
+
+                        std::cout << "Selected unit: "
+                                  << m_currentCategory
+                                  << "/advanced\n";
                         updateTitle(window);
                     }
                 }
@@ -673,19 +885,22 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                 // ── Q — toggle GA prep mode ───────────────────────────────────
                 else if (k->code == sf::Keyboard::Key::Q) {
                     m_gaPrepMode = !m_gaPrepMode;
+
                     if (m_gaPrepMode) {
-                        // Switch to target mode if we were in a disabled mode
-                        if (m_currentType == "seeker"   ||
-                            m_currentType == "detector" ||
-                            m_currentType == "interceptor") {
-                            m_currentType = "target";
+                        // Only the target category remains manually placeable.
+                        if (m_currentCategory != "target") {
+                            m_currentCategory.clear();
+                            m_currentUnitType.clear();
                         }
-                        std::cout << "GA PREP MODE ON  —  only targets and zones can be "
-                                  << "placed. Press Q to exit.\n";
-                    } 
-                    else {
-                        std::cout << "GA PREP MODE OFF  —  all unit types available again.\n";
+
+                        std::cout << "GA PREP MODE ON — only targets and zones can be "
+                                  << "placed. Press T then B to place a basic target. "
+                                  << "Press Q to exit.\n";
                     }
+                    else {
+                        std::cout << "GA PREP MODE OFF — all categories are available again.\n";
+                    }
+
                     updateTitle(window);
                 }
 
@@ -854,13 +1069,33 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                         }
                     } 
                     else {
-                        // Place unit (existing behaviour)
+                        if (m_currentCategory.empty()) {
+                            std::cout << "Select a category first: "
+                                      << "S=seeker, T=target, D=detector, I=interceptor.\n";
+                            continue;
+                        }
+
+                        if (m_currentUnitType.empty()) {
+                            std::cout << "Select a type for category "
+                                      << m_currentCategory
+                                      << ". Press B for basic.\n";
+                            continue;
+                        }
+
                         if (m_map.isWater(clickRow, clickCol)) {
-                            if (!m_config.addUnit(m_currentType, clickRow, clickCol)) {
+                            if (!m_config.addUnit(m_currentCategory,
+                                                  m_currentUnitType,
+                                                  clickRow,
+                                                  clickCol)) {
+                                // Preserve the previous replace-on-click behavior.
                                 m_config.removeUnit(clickRow, clickCol);
-                                m_config.addUnit(m_currentType, clickRow, clickCol);
+                                m_config.addUnit(m_currentCategory,
+                                                 m_currentUnitType,
+                                                 clickRow,
+                                                 clickCol);
                             }
                         }
+
                         updateTitle(window);
                     }
                 }

@@ -19,10 +19,24 @@ add_executable(uuv_sim
     src/pathfinding/pathfinding.cpp
     src/simulation/simulation.cpp
     src/simulation/simResult.cpp
-    src/agents/targetAgent.cpp
-    src/agents/detectorAgent.cpp
-    src/agents/interceptorAgent.cpp
-    src/agents/seekerAgent.cpp
+
+    src/agents/targetAgents/targetAgent.cpp
+
+    src/agents/detectorAgents/detectorAgent.cpp
+    src/agents/detectorAgents/basic/basicDetectorAgent.cpp
+    src/agents/detectorAgents/medium/mediumDetectorAgent.cpp
+    src/agents/detectorAgents/advanced/advancedDetectorAgent.cpp
+
+    src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/basic/basicInterceptorAgent.cpp
+    src/agents/interceptorAgents/medium/mediumInterceptorAgent.cpp
+    src/agents/interceptorAgents/advanced/advancedInterceptorAgent.cpp
+
+    src/agents/seekerAgents/seekerAgent.cpp
+    src/agents/seekerAgents/basic/basicSeekerAgent.cpp
+    src/agents/seekerAgents/fast/fastSeekerAgent.cpp
+    src/agents/seekerAgents/evader/evaderSeekerAgent.cpp
 )
 
 add_executable(test_target_assignment
@@ -32,14 +46,46 @@ add_executable(test_target_assignment
     src/pathfinding/pathfinding.cpp
     src/simulation/simulation.cpp
     src/simulation/simResult.cpp
-    src/agents/targetAgent.cpp
-    src/agents/detectorAgent.cpp
-    src/agents/interceptorAgent.cpp
-    src/agents/seekerAgent.cpp
+    
+    src/agents/targetAgents/targetAgent.cpp
+
+    src/agents/detectorAgents/detectorAgent.cpp
+    src/agents/detectorAgents/basic/basicDetectorAgent.cpp
+    src/agents/detectorAgents/medium/mediumDetectorAgent.cpp
+    src/agents/detectorAgents/advanced/advancedDetectorAgent.cpp
+
+    src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/interceptorAgent.cpp
+    src/agents/interceptorAgents/basic/basicInterceptorAgent.cpp
+    src/agents/interceptorAgents/medium/mediumInterceptorAgent.cpp
+    src/agents/interceptorAgents/advanced/advancedInterceptorAgent.cpp
+    
+    src/agents/seekerAgents/seekerAgent.cpp
+    src/agents/seekerAgents/basic/basicSeekerAgent.cpp
+    src/agents/seekerAgents/fast/fastSeekerAgent.cpp
+    src/agents/seekerAgents/evader/evaderSeekerAgent.cpp
 )
 
 target_include_directories(uuv_sim PRIVATE
     src/agents
+
+    src/agents/targetAgents
+
+    src/agents/detectorAgents
+    src/agents/detectorAgents/basic
+    src/agents/detectorAgents/medium
+    src/agents/detectorAgents/advanced
+
+    src/agents/interceptorAgents
+    src/agents/interceptorAgents/basic
+    src/agents/interceptorAgents/medium
+    src/agents/interceptorAgents/advanced
+
+    src/agents/seekerAgents
+    src/agents/seekerAgents/basic
+    src/agents/seekerAgents/fast
+    src/agents/seekerAgents/evader
+
     src/mapCreation
     src/spawnConfig
     src/mapVisualizer
@@ -48,7 +94,25 @@ target_include_directories(uuv_sim PRIVATE
 )
 
 target_include_directories(test_target_assignment PRIVATE
-    src/agents
+     src/agents
+
+    src/agents/targetAgents
+
+    src/agents/detectorAgents
+    src/agents/detectorAgents/basic
+    src/agents/detectorAgents/medium
+    src/agents/detectorAgents/advanced
+
+    src/agents/interceptorAgents
+    src/agents/interceptorAgents/basic
+    src/agents/interceptorAgents/medium
+    src/agents/interceptorAgents/advanced
+
+    src/agents/seekerAgents
+    src/agents/seekerAgents/basic
+    src/agents/seekerAgents/fast
+    src/agents/seekerAgents/evader
+
     src/mapCreation
     src/spawnConfig
     src/mapVisualizer

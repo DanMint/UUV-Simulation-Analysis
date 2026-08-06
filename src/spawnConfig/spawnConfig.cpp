@@ -17,14 +17,29 @@ int SpawnZone::area() const {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  UNIT MANAGEMENT  (unchanged)
+//  UNIT MANAGEMENT
 // ════════════════════════════════════════════════════════════════════════════════
 
-bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
-    for (const auto& u : m_units)
-        if (u.row == row && u.col == col) return false;
-    m_units.push_back({type, row, col});
+bool SpawnConfig::addUnit(const std::string& category,
+                          const std::string& type,
+                          int row,
+                          int col) {
+    if (category.empty() || type.empty()) {
+        return false;
+    }
+
+    for (const auto& unit : m_units) {
+        if (unit.row == row && unit.col == col) {
+            return false;
+        }
+    }
+
+    m_units.push_back({category, type, row, col});
     return true;
+}
+
+bool SpawnConfig::addUnit(const std::string& category, int row, int col) {
+    return addUnit(category, "basic", row, col);
 }
 
 bool SpawnConfig::removeUnit(int row, int col) {
@@ -38,32 +53,87 @@ bool SpawnConfig::removeUnit(int row, int col) {
 }
 
 const UnitSpawn* SpawnConfig::getUnitAt(int row, int col) const {
-    for (const auto& u : m_units)
-        if (u.row == row && u.col == col) return &u;
+    for (const auto& unit : m_units) {
+        if (unit.row == row && unit.col == col) {
+            return &unit;
+        }
+    }
     return nullptr;
 }
 
-const std::vector<UnitSpawn>& SpawnConfig::getUnits() const { return m_units; }
+const std::vector<UnitSpawn>& SpawnConfig::getUnits() const {
+    return m_units;
+}
 
-std::vector<UnitSpawn> SpawnConfig::getUnitsByType(const std::string& type) const {
+std::vector<UnitSpawn> SpawnConfig::getUnitsByCategory(
+    const std::string& category) const {
+
     std::vector<UnitSpawn> result;
-    for (const auto& u : m_units)
-        if (u.type == type) result.push_back(u);
+
+    for (const auto& unit : m_units) {
+        if (unit.category == category) {
+            result.push_back(unit);
+        }
+    }
+
     return result;
 }
 
-int SpawnConfig::countType(const std::string& type) const {
-    int c = 0;
-    for (const auto& u : m_units) if (u.type == type) c++;
-    return c;
+std::vector<UnitSpawn> SpawnConfig::getUnitsByCategoryAndType(
+    const std::string& category,
+    const std::string& type) const {
+
+    std::vector<UnitSpawn> result;
+
+    for (const auto& unit : m_units) {
+        if (unit.category == category && unit.type == type) {
+            result.push_back(unit);
+        }
+    }
+
+    return result;
 }
 
-int  SpawnConfig::totalUnits() const { 
-    return static_cast<int>(m_units.size()); 
+int SpawnConfig::countCategory(const std::string& category) const {
+    int count = 0;
+
+    for (const auto& unit : m_units) {
+        if (unit.category == category) {
+            ++count;
+        }
+    }
+
+    return count;
 }
 
-void SpawnConfig::clear() { 
-    m_units.clear(); 
+int SpawnConfig::countCategoryAndType(const std::string& category,
+                                      const std::string& type) const {
+    int count = 0;
+
+    for (const auto& unit : m_units) {
+        if (unit.category == category && unit.type == type) {
+            ++count;
+        }
+    }
+
+    return count;
+}
+
+std::vector<UnitSpawn> SpawnConfig::getUnitsByType(
+    const std::string& category) const {
+    return getUnitsByCategory(category);
+}
+
+int SpawnConfig::countType(const std::string& category) const {
+    return countCategory(category);
+}
+
+int SpawnConfig::totalUnits() const {
+    return static_cast<int>(m_units.size());
+}
+
+void SpawnConfig::clear() {
+    m_units.clear();
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -355,12 +425,15 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
 
     // ── Units ──
     file << "  \"units\": [\n";
-    for (int i = 0; i < (int)m_units.size(); i++) {
-        const auto& u = m_units[i];
-        file << "    { \"type\": \"" << u.type
-             << "\", \"row\": "      << u.row
-             << ", \"col\": "        << u.col << " }";
-        if (i < (int)m_units.size() - 1) file << ",";
+    for (int i = 0; i < static_cast<int>(m_units.size()); i++) {
+        const auto& unit = m_units[i];
+        file << "    { \"category\": \"" << unit.category
+             << "\", \"type\": \""          << unit.type
+             << "\", \"row\": "               << unit.row
+             << ", \"col\": "                 << unit.col << " }";
+        if (i < static_cast<int>(m_units.size()) - 1) {
+            file << ",";
+        }
         file << "\n";
     }
     file << "  ]\n";
@@ -464,26 +537,70 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
     }
 
     // ── Units ──
+    // New format:
+    //   { "category": "interceptor", "type": "basic", "row": 1, "col": 2 }
+    //
+    // Legacy format is also accepted:
+    //   { "type": "interceptor", "row": 1, "col": 2 }
     size_t unitsPos = content.find("\"units\"");
     if (unitsPos != std::string::npos) {
-        size_t pos = unitsPos;
-        while (true) {
-            pos = content.find("\"type\"", pos);
+        size_t arrayOpen = content.find("[", unitsPos);
 
-            if (pos == std::string::npos) 
-                break;
+        if (arrayOpen != std::string::npos) {
+            int bracketDepth = 0;
+            size_t arrayClose = std::string::npos;
 
-            size_t tStart = content.find("\"", content.find(":", pos) + 1) + 1;
-            size_t tEnd   = content.find("\"", tStart);
-            std::string type = content.substr(tStart, tEnd - tStart);
+            for (size_t i = arrayOpen; i < content.size(); ++i) {
+                if (content[i] == '[') {
+                    ++bracketDepth;
+                }
+                else if (content[i] == ']') {
+                    --bracketDepth;
+                    if (bracketDepth == 0) {
+                        arrayClose = i;
+                        break;
+                    }
+                }
+            }
 
-            size_t rowPos = content.find("\"row\"", tEnd);
-            int row = static_cast<int>(extractNumber(content, "row", tEnd));
-            size_t colPos = content.find("\"col\"", rowPos);
-            int col = static_cast<int>(extractNumber(content, "col", rowPos));
+            if (arrayClose != std::string::npos) {
+                size_t pos = arrayOpen + 1;
 
-            config.addUnit(type, row, col);
-            pos = colPos + 1;
+                while (pos < arrayClose) {
+                    size_t objectOpen = content.find("{", pos);
+                    if (objectOpen == std::string::npos || objectOpen >= arrayClose) {
+                        break;
+                    }
+
+                    size_t objectClose = content.find("}", objectOpen);
+                    if (objectClose == std::string::npos || objectClose > arrayClose) {
+                        break;
+                    }
+
+                    std::string object = content.substr(
+                        objectOpen,
+                        objectClose - objectOpen + 1);
+
+                    std::string category = extractString(object, "category");
+                    std::string type     = extractString(object, "type");
+                    int row = static_cast<int>(extractNumber(object, "row"));
+                    int col = static_cast<int>(extractNumber(object, "col"));
+
+                    // Backward compatibility: the old "type" value was
+                    // actually the category, and there was no concrete type.
+                    if (category.empty()) {
+                        category = type;
+                        type = "basic";
+                    }
+
+                    if (type.empty()) {
+                        type = "basic";
+                    }
+
+                    config.addUnit(category, type, row, col);
+                    pos = objectClose + 1;
+                }
+            }
         }
     }
 
@@ -506,15 +623,19 @@ void SpawnConfig::printSummary() const {
         std::cout << "  Land cells:   " << m_mapInfo.landCount  << std::endl;
     }
 
-    std::cout << "  Seekers:      " << countType("seeker")      << std::endl;
-    std::cout << "  Targets:      " << countType("target")      << std::endl;
-    std::cout << "  Detectors:    " << countType("detector")    << std::endl;
-    std::cout << "  Interceptors: " << countType("interceptor") << std::endl;
+    std::cout << "  Seekers:      " << countCategory("seeker")
+              << " (basic: " << countCategoryAndType("seeker", "basic") << ")\n";
+    std::cout << "  Targets:      " << countCategory("target")
+              << " (basic: " << countCategoryAndType("target", "basic") << ")\n";
+    std::cout << "  Detectors:    " << countCategory("detector")
+              << " (basic: " << countCategoryAndType("detector", "basic") << ")\n";
+    std::cout << "  Interceptors: " << countCategory("interceptor")
+              << " (basic: " << countCategoryAndType("interceptor", "basic") << ")\n";
 
-    if (countType("detector")    > 0) 
+    if (countCategory("detector")    > 0) 
         std::cout << "  Det. radius:  " << m_detectorRadius    << " cells\n";
 
-    if (countType("interceptor") > 0) 
+    if (countCategory("interceptor") > 0) 
         std::cout << "  Int. radius:  " << m_interceptorRadius << " cells\n";
 
     std::cout << "  Noise level:  " << m_maxNoiseLevel << (m_maxNoiseLevel > 0 ? " (enabled)" : " (off)") << std::endl;
