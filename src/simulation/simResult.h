@@ -87,7 +87,7 @@ struct SimResult {
         std::vector<Intercept> intercepts;
     };
 
-    // ─── Per-patrol-defender output (Chris added) ────────────────────
+    // ─── Per-patrol-defender output  ────────────────────
     // Patrol defenders both sense AND kill, so this result combines
     // fields from both DetectorResult and InterceptorResult.
     // isDynamic tells us if it was moving or sitting still this run.
@@ -126,7 +126,7 @@ struct SimResult {
     std::vector<DetectorResult>    detectorResults;
     std::vector<InterceptorResult> interceptorResults;
 
-    std::vector<PatrolDefenderResult> patrolDefenderResults; // Chris added: need this to store
+    std::vector<PatrolDefenderResult> patrolDefenderResults; // per-run results for each patrol defender agent
     
     // ─── Summary statistics (filled by computeSummary) ──────────────
 

@@ -10,7 +10,7 @@ bool SpawnConfig::addUnit(const std::string& type, int row, int col) {
     m_units.push_back({type, row, col});
     return true;
 }
-bool SpawnConfig::addUnit(const UnitSpawn& unit) {//Chris section added
+bool SpawnConfig::addUnit(const UnitSpawn& unit) {
     m_units.push_back(unit);
     return true;
 }
@@ -289,9 +289,9 @@ void SpawnConfig::saveJSON(const std::string& filepath) const {
         const auto& u = m_units[i];
         file << "    { \"type\": \"" << u.type
              << "\", \"row\": "      << u.row
-             << ", \"col\": "        << u.col //<< " }"; //chris curretnlyu messing around wiht how patrols get saved
+             << ", \"col\": "        << u.col 
 
-             // Chris added: save waypoint fields so patrol defender routes survive to disk
+             //  save waypoint fields so patrol defender routes survive to disk
              << ", \"waypoint_row\": " << u.waypointRow
              << ", \"waypoint_col\": " << u.waypointCol << " }";
 
@@ -415,7 +415,7 @@ SpawnConfig SpawnConfig::loadJSON(const std::string& filepath) {
             int col = static_cast<int>(extractNumber(content, "col", rowPos));
 
 
-            // Chris added: read waypoint fields back in (defaults to -1 / no waypoint if absent)
+            // read waypoint fields back in (defaults to -1 / no waypoint if absent)
             UnitSpawn u;
             u.type = type;
             u.row = row;

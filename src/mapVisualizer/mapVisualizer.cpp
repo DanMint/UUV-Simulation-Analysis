@@ -313,7 +313,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             d.setOutlineColor(sf::Color::White);
             d.setOutlineThickness(1.5f);
             window.draw(d);
-                // Chris added: show pending point A while waiting for B click
+                // show pending point A while waiting for B click
           // draw B diamond if waypoint exists
                 if (unit.waypointRow != -1) {
                     float bx = (unit.waypointCol + 0.5f) * m_cellSize;
@@ -341,7 +341,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
         }
     }
 
-            // Chris added: draw dotted line between A and B for each patrol pair
+            // draw dotted line between A and B for each patrol pair
         for (const auto& unit : m_config.getUnits()) {
             if (unit.type != "patrol_defender") continue;
             if (unit.waypointRow == -1) continue;
@@ -368,7 +368,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
                 window.draw(dot);
             }
         }
-    }//there was a } idk what for tho I migfht need to go back and comment what closses what cause now confused
+    }
 
         // Label letter
         if (font != nullptr && m_cellSize >= 10.0f) {
@@ -377,7 +377,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             else if (unit.type == "target")      lbl = "T";
             else if (unit.type == "detector")    lbl = "D";
             else if (unit.type == "interceptor") lbl = "I";
-            else if (unit.type == "patrol_defender") lbl = "A"; //Chris added: changed from P to A messing around with labels to see wahts best idk yet
+            else if (unit.type == "patrol_defender") lbl = "A"; // single-letter label shown on the map for this unit type
 
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) fs = 8;
@@ -512,7 +512,7 @@ void MapVisualizer::drawStatusBar(sf::RenderWindow& window, sf::Font* font) cons
         else if (m_currentType == "target")      { modeLabel = "TARGET (T)";      textColor = sf::Color(120, 160, 255); }
         else if (m_currentType == "detector")    { modeLabel = "DETECTOR (D)";    textColor = sf::Color(255, 200, 80);  }
         else if (m_currentType == "interceptor") { modeLabel = "INTERCEPTOR (I)"; textColor = sf::Color(200, 120, 255); }
-        else if (m_currentType == "patrol_defender") { modeLabel = "PATROL DEFENDER (P)"; textColor = sf::Color(0, 210, 255); }//Chris added this should fix the display status
+        else if (m_currentType == "patrol_defender") { modeLabel = "PATROL DEFENDER (P)"; textColor = sf::Color(0, 210, 255); } //Now able to place patrol defender and has an accurate viewing when placing them in that intally phase when running program 
 
         ss << "Mode: " << modeLabel
            << "  |  S:" << m_config.countType("seeker")
@@ -696,7 +696,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     }
                 }
 
-                else if (k->code == sf::Keyboard::Key::P) {//Chris add
+                else if (k->code == sf::Keyboard::Key::P) {// switches placement mode to patrol defender when P is pressed
                     m_currentType = "patrol_defender";
                     m_zoneDrawMode = "";
                     m_zoneDragging = false;
@@ -874,7 +874,7 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                             m_zoneDragging       = true;
                         }
                     } else {
-                        // Place unit (existing behaviour) --- Chris added: the waypoint system essetnlly
+                        // Place unit (existing behaviour) --- added the waypoint system (place point A, then point B) for patrol defender units
                         if (m_map.isWater(clickRow, clickCol)) {
                             if (m_currentType == "patrol_defender") {
                                 if (!m_patrolWaitingForB) {

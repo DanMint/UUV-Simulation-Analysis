@@ -110,9 +110,9 @@ void SimResult::print() const {
         }
     }
 
-    // Chris added: print patrol defenders separately so I can see them clearly
+    // print patrol defenders separately so I can see them clearly
     if (!patrolDefenderResults.empty()) {
-        std::cout << "\n  Patrol Defenders (Chris):" << std::endl;
+        std::cout << "\n  Patrol Defenders :" << std::endl;
         for (const auto& p : patrolDefenderResults) {
             std::cout << "    Patrol Defender " << p.id
                       << " at (" << p.row << "," << p.col << ")"
@@ -134,7 +134,7 @@ void SimResult::print() const {
 
 void SimResult::saveJSON(const std::string& filepath) const {
 
-    std::cout << "DEBUG: saveJSON with waypoints support is running\n"; // added this casue i was trouible shooting the json stuff turned into a nightmare to sovle for soem reason 
+    //std::cout << "DEBUG: saveJSON with waypoints support is running\n"; // added this casue i was trouible shooting the json stuff turned into a nightmare to sovle for soem reason 
 
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -273,7 +273,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
     file << "  ],\n";
 
 
-    // Chris added: patrol defenders get their own JSON section --- Note need to add the , in the file line above otherwise wont get the png and would need to go in to idnividual json files and solve 
+    // patrol defenders get their own JSON section 
     file << "  \"patrol_defenders\": [\n";
     for (int i = 0; i < (int)patrolDefenderResults.size(); i++) {
         const auto& p = patrolDefenderResults[i];
@@ -286,7 +286,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
         file << "      \"sighting_count\": " << p.sightingCount << ",\n";
         file << "      \"kill_radius\": " << p.killRadius << ",\n";
         file << "      \"kill_count\": " << p.killCount << ",\n";
- //this section was just to save all the waypoint and hsitroy for when we get to json/png stuff had to add later commenting just so i dont forget in case i need to edit        
+    // writes each waypoint pair to the JSON array
         file << "      \"waypoints\": [\n";
         for (int j = 0; j < (int)p.waypoints.size(); j++) {
             file << "        [" << p.waypoints[j].first << ", " << p.waypoints[j].second << "]";
@@ -302,8 +302,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
             file << "\n";
         }
         file << "      ]\n";
-
-        //this was orignally below the interceptor logic thats patrols has 
+ 
         file << "    }";
         if (i < (int)patrolDefenderResults.size() - 1) file << ",";
         file << "\n";

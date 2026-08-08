@@ -60,12 +60,15 @@ void PatrolDefenderAgent::addWaypoint(int r, int c) {
 
 void PatrolDefenderAgent::moveTowardWaypoint() {
     moveHistory.push_back({row, col});
-    
+
     // need at least 2 waypoints to patrol --- if i dont have the 2 waypoints dont move
     if (waypoints.size() < 2) return;
 
-    // get current target waypoint
-    auto [targetRow, targetCol] = waypoints[currentWaypoint];
+    // get current target waypoint - had initally used auto but changed to using .first and .second to get the row/col values of the pair so think waypoints.push_back({r, c});  // r goes into .first, c goes into .second since wer using a pair of ints to store the row/col values of the waypoint
+    //auto [targetRow, targetCol] = waypoints[currentWaypoint];
+
+    int targetRow = waypoints[currentWaypoint].first;
+    int targetCol = waypoints[currentWaypoint].second;
 
     // calculate direction
     double dr = targetRow - row;
@@ -99,59 +102,3 @@ void PatrolDefenderAgent::moveTowardWaypoint() {
     }
 }
 
-/*
-I will be going thru all my code stuff in this order and commenting to both better my understanding of the current code and new code as my agents share code block thats already here going in this order for now, btw all my code changes will be refered to as Chris added ___ so when i look back i can just ctrl + f :
-
-    -patrolAgent.h — defined what your agent IS (its variables)
-    -patrolAgent.cpp — defined what your agent DOES (its functions)
-    -agent.h — just told the project "hey this new agent exists"
-    -simulation.h — added a list to store patrol defenders in memory
-    -simulation.cpp — plugged it into the loop so it actually runs each tick
-    -mapVisualizer.cpp — added P key so you can place it on screen adn coloring
-    -CMakeList.txt - need to make sure its being read properly via correct pathing/folder
-    -SimResults - this is beacuese it translates out build results to this file whcih will then turn it into a json then the visualize.py reads the json heres the break down :sim runs > buildResult packages it > saveJSON writes the file > visualize.py reads it > you see the replay
-    -do i need to look into main or really any iother fuile 
-    -mapcreation.h - needed to add cell type 6 
-
-
-
-
-    For actully running the program:
-    1. use      cd build
-    2. use      cmake ..
-    3. use      make 
-    4. use      cd ..
-    5. use      ./build/uuv_sim maps/pearlHarbour/harbour_Depth_Area.shp
-
-
-    From doing map to getting vidsual:
-    1. use      rm -f paths/*.png       to clear all prior pngs also      rm -rf runs/*     Clear runs
-    2. use      ./build/uuv_sim --scenario scenario.json        to build the last scenario you will need to re input the values ig
-    3. use      python3 visulaize.py    to actully take the jsons and turn into the pngs 
-
-
-    What this code agent features:
-        -The main goal was to be able to place 2 points (A and B) of which would go back and forth between the two whilst aslo acting as a mobile detector at the same time 
-    
-
-    Neat Features and parts of the code include:
-        - being able to see a path from out two placed points via a --- doted line 
-        - The location for them is also there but its just in the terminal ie (A is place at 43, 38) 
-        - Also feature a "safety net" in the form of "waiting for placement point B" or "You placed B on on land try again"
-        - the deltion process of a path/agent in the map phase of code just right click the first point (A)
-    
-
-    Semi Imporatnt things to make this project easier:
-        - use       Ctrl + K then S to save all files rather than one at a time
-        - as per my notes of what each section does above and how to sorta know where to look use Ctrl + F then "Chris added: " as  I had done this for all my parts of code since there is so much in all these current .cpp and .h files
-
-    
-
-    
-
-    - IS THIS PROJECT A VIDEO OP PICTURE FOR VISUALIZER its odd its liek it runs then it takes pictures at points and thats where we get the json images in the form of pngs 
-
-
-
-
-*/

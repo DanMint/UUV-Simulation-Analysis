@@ -33,8 +33,7 @@ public:
     static constexpr int TARGET      = 3;
     static constexpr int DETECTOR    = 4;
     static constexpr int INTERCEPTOR = 5;
-    static constexpr int PATROL_DEFENDER = 6; 
-    //Chris added this is becasue i needed to double back from the main --- this part is us telling the grid yo 6 means patrol defender without this grid has no idea would crash
+    static constexpr int PATROL_DEFENDER = 6; // grid cell value representing a patrol defender unit
 
     // ─── Constructor / Factory ──────────────────────────────────────
 

@@ -54,7 +54,7 @@ private:
     int   m_panelHeight;
     float m_cellSize;
     
-//Chris Section added: 
+//Patrol defender placement state - used to track the two-click placement of a patrol defender's A/B waypoints
     bool m_patrolWaitingForB = false;
     int  m_patrolPendingRow  = -1;
     int  m_patrolPendingCol  = -1;
