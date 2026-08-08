@@ -12,3 +12,9 @@ GUIDE.md
 __pycache__/
 *.pyc
 *.pyo
+
+# Accidental terminal-output dumps (should never be committed)
+r1.txt
+r2.txt
+py_analyze.txt
+py_visualize.txt
