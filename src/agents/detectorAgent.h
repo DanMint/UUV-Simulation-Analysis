@@ -25,6 +25,7 @@ struct DetectorAgent {
     int sightingCount;      // total (seeker, step) sightings logged
     int freqLowHz  = 0;       // lower bound of detectable frequency range
     int freqHighHz = 999999;  // upper bound — defaults to detect everything
+    float unitCost;         // deployment cost for GA fitness (1-3 scale)
 
     struct Sighting {
         int seekerId;
@@ -33,6 +34,7 @@ struct DetectorAgent {
     std::vector<Sighting> sightings;
 
     DetectorAgent(int id, int row, int col, double sensingRadius);
+    DetectorAgent(int id, int row, int col, double sensingRadius, float unitCost);
 
     /** True if a position is within this detector's sensing radius. */
     bool isInRange(int checkRow, int checkCol) const;

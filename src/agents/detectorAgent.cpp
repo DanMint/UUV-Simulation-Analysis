@@ -5,7 +5,15 @@ DetectorAgent::DetectorAgent(int id, int row, int col, double sensingRadius)
     : id(id), row(row), col(col),
       sensingRadius(sensingRadius),
       alive(true),
-      sightingCount(0) {}
+      sightingCount(0),
+      unitCost(1.0f) {}
+
+DetectorAgent::DetectorAgent(int id, int row, int col, double sensingRadius, float unitCost)
+    : id(id), row(row), col(col),
+      sensingRadius(sensingRadius),
+      alive(true),
+      sightingCount(0),
+      unitCost(unitCost) {}
 
 bool DetectorAgent::isInRange(int checkRow, int checkCol) const {
     double dr = row - checkRow;

@@ -1,0 +1,12 @@
+Saving plots to: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_0.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_1.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_2.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_3.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_4.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_5.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_6.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_7.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_8.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\run_9.png
+Saved: C:\Users\youar\OneDrive\Desktop\.vscode\UUV Fresh\UUV-Simulation-Analysis\paths\visualized_result.png

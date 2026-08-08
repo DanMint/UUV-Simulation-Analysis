@@ -32,6 +32,8 @@
 #include "attackerAgent.h"
 #include "seekerAgent.h"
 #include "vehicleSpecs.h"
+#include "detectorAgent.h"
+#include "interceptorAgent.h"
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -647,6 +649,34 @@ void testSeekerAgentCreate() {
           "SeekerAgent::create with invalid type falls back to bluerov2");
 }
 
+void testDefenderCosts() {
+    testSection("Defender deployment costs (GA fitness)");
+
+    // DetectorAgent default cost
+    DetectorAgent d(0, 5, 5, 4.0);
+    check(d.unitCost == 1.0f, "Detector default unitCost = 1.0 (basic)");
+
+    // DetectorAgent cost-aware constructor
+    DetectorAgent d2(1, 5, 5, 4.0, 3.0f);
+    check(d2.unitCost == 3.0f, "Detector cost-aware constructor sets unitCost = 3.0 (advanced)");
+
+    // InterceptorAgent default cost
+    InterceptorAgent i(0, 5, 5, 3.0);
+    check(i.unitCost == 1.0f, "Interceptor default unitCost = 1.0 (basic)");
+    check(i.engagementCost == InterceptorAgent::DEFAULT_COST_PER_SHOT,
+          "Interceptor default engagementCost = DEFAULT_COST_PER_SHOT");
+
+    // InterceptorAgent vehicle-type constructor (unitCost defaults to 1.0)
+    InterceptorAgent i2(1, 5, 5, 3.0, "hugin");
+    check(i2.unitCost == 1.0f, "Interceptor vehicle-type ctor unitCost defaults to 1.0");
+    check(i2.vehicleType == "hugin", "Interceptor vehicle-type ctor sets vehicleType");
+
+    // InterceptorAgent full cost-aware constructor
+    InterceptorAgent i3(2, 5, 5, 3.0, "hugin", 3.0f, 250000.0f);
+    check(i3.unitCost == 3.0f, "Interceptor cost-aware ctor sets unitCost = 3.0 (advanced)");
+    check(i3.engagementCost == 250000.0f, "Interceptor cost-aware ctor sets engagementCost = $250k/shot");
+}
+
 void testMoveStepWithSpeed() {
     testSection("AttackerAgent::moveStepWithSpeed()");
 
@@ -714,6 +744,7 @@ int main() {
     testSeekerAgentHasPath();
     testSeekerAgentCreate();
     testMoveStepWithSpeed();
+    testDefenderCosts();
 
     std::cout << "\n======================================\n";
     std::cout << "  Results: " << passedTests << " / " << totalTests << " passed\n";

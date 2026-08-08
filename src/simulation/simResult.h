@@ -45,19 +45,19 @@ struct SimResult {
         int firstDetectedAtStep;
         int firstDetectedByDetector;
 
-    // Interception (set by interceptors)
-    bool intercepted;
-    int interceptedByInterceptor;
-    int interceptedAtStep;
+        // Interception (set by interceptors)
+        bool intercepted;
+        int interceptedByInterceptor;
+        int interceptedAtStep;
 
-    // Unit cost of this agent's vehicle (for cost-benefit CSV export).
-    // Populated in Simulation::buildResult() from VehicleSpecs::unitCostMin.
-    float unitCostMin = 0.0f;
+        // Unit cost of this agent's vehicle (for cost-benefit CSV export).
+        // Populated in Simulation::buildResult() from VehicleSpecs::unitCostMin.
+        float unitCostMin = 0.0f;
     };
 
     // ─── Per-target output ──────────────────────────────────────────
 
-struct TargetResult {
+    struct TargetResult {
         int id;
         int row;
         int col;
@@ -75,6 +75,7 @@ struct TargetResult {
         int col;
         double sensingRadius;
         int sightingCount;
+        float unitCost;  ///< deployment cost for GA fitness (1-3 scale)
 
         struct Sighting {
             int seekerId;
@@ -93,6 +94,7 @@ struct TargetResult {
         int killCount;
         int engagementCount;   ///< total shots fired (hits + misses)
         float engagementCost;  ///< cost per shot ($)
+        float unitCost;        ///< deployment cost for GA fitness (1-3 scale)
         std::string vehicleType; ///< optional vehicle model (e.g. "hugin", "yuco")
 
         struct Intercept {
@@ -163,11 +165,32 @@ struct TargetResult {
     //               (every shot counts — hit or miss)
     //   red_cost  = total unit cost of ALL attackers DEPLOYED
     //   loss_exchange_ratio = red_cost / blue_cost
-    //               (>1 = attackers trade up; <1 = defence efficient)
+//               (>1 = attackers trade up; <1 = defence efficient)
 
     float blueCost;          ///< Σ(interceptor engagementCount × engagementCost)
     float redCost;           ///< Σ(unitCostMin of ALL deployed attackers)
     float lossExchangeRatio; ///< redCost / blueCost
+
+    // ─── Vehicle-type cost breakdown (filled by computeSummary) ─────
+    // Per attacker vehicle type: total deployed cost and count. This makes
+    // the "$2M HUGIN vs $1000 QueenHornet" cost structure visible in the
+    // JSON so the GA can reason about which platforms drive red_cost.
+    struct VehicleCostBreakdown {
+        std::string agentType;  ///< vehicle type key (e.g. "hugin", "shahed")
+        int count;              ///< number deployed of this type
+        float totalCost;        ///< Σ unitCostMin for this type
+    };
+    std::vector<VehicleCostBreakdown> vehicleCostBreakdown;
+
+    // ─── GA fitness summary (filled by computeSummary) ──────────────
+    // These are the exact fields the Python GA reads for its fitness
+    // function (effectiveness = P(detected) * P(killed), budget penalty
+    // on total_deployment_cost).
+    double probabilityDetected;   ///< (# attackers ever detected) / (total attackers)
+    double probabilityKilled;     ///< (# attackers intercepted) / (total attackers)
+    float  totalDetectorCost;     ///< Σ detector unitCost (deployment cost)
+    float  totalInterceptorCost;  ///< Σ interceptor unitCost (deployment cost)
+    float  totalDeploymentCost;   ///< totalDetectorCost + totalInterceptorCost
 
     // ─── Methods ────────────────────────────────────────────────────
 

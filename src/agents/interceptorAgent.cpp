@@ -9,6 +9,7 @@ InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius)
       killCount(0),
       engagementCount(0),
       engagementCost(DEFAULT_COST_PER_SHOT),
+      unitCost(1.0f),
       vehicleType("") {}
 
 InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius,
@@ -19,6 +20,19 @@ InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius,
       killCount(0),
       engagementCount(0),
       engagementCost(costPerShotForType(vehicleType)),
+      unitCost(1.0f),
+      vehicleType(vehicleType) {}
+
+InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius,
+                                   const std::string& vehicleType,
+                                   float unitCost, float engagementCost)
+    : id(id), row(row), col(col),
+      killRadius(killRadius),
+      alive(true),
+      killCount(0),
+      engagementCount(0),
+      engagementCost(engagementCost),
+      unitCost(unitCost),
       vehicleType(vehicleType) {}
 
 float InterceptorAgent::costPerShotForType(const std::string& vehicleType) {

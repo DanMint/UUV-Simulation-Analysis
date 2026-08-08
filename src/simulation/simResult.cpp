@@ -109,9 +109,57 @@ void SimResult::computeSummary() {
     }
     redCost = 0.0f;
     for (const auto& a : attackerResults) {
-        redCost += a.unitCostMin;
+redCost += a.unitCostMin;
     }
     lossExchangeRatio = (blueCost > 0.0f) ? redCost / blueCost : 0.0f;
+
+    // ── Vehicle-type cost breakdown ─────────────────────────────────
+    // Group deployed attackers by vehicle type so the GA can see which
+    // platforms drive red_cost (e.g. "$2M HUGIN vs $1000 QueenHornet").
+    vehicleCostBreakdown.clear();
+    for (const auto& a : attackerResults) {
+        bool found = false;
+        for (auto& v : vehicleCostBreakdown) {
+            if (v.agentType == a.agentType) {
+                v.count++;
+                v.totalCost += a.unitCostMin;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            VehicleCostBreakdown v;
+            v.agentType = a.agentType;
+            v.count = 1;
+            v.totalCost = a.unitCostMin;
+            vehicleCostBreakdown.push_back(v);
+        }
+    }
+
+    // ── GA fitness summary ──────────────────────────────────────────
+    // P(detected) = (# attackers ever detected) / (total attackers)
+    // P(killed)   = (# attackers intercepted/killed) / (total attackers)
+    // effectiveness = P(detected) * P(killed)  (computed by the Python GA)
+    // total_deployment_cost = Σ detector unitCost + Σ interceptor unitCost
+    int totalAttackers = static_cast<int>(attackerResults.size());
+    int attackersDetected = 0;
+    int attackersKilled = 0;
+    for (const auto& a : attackerResults) {
+        if (!a.sightings.empty()) attackersDetected++;
+        if (!a.intercepts.empty()) attackersKilled++;
+    }
+    probabilityDetected = (totalAttackers > 0) ? static_cast<double>(attackersDetected) / totalAttackers : 0.0;
+    probabilityKilled   = (totalAttackers > 0) ? static_cast<double>(attackersKilled) / totalAttackers : 0.0;
+
+    totalDetectorCost = 0.0f;
+    for (const auto& d : detectorResults) {
+        totalDetectorCost += d.unitCost;
+    }
+    totalInterceptorCost = 0.0f;
+    for (const auto& ic : interceptorResults) {
+        totalInterceptorCost += ic.unitCost;
+    }
+    totalDeploymentCost = totalDetectorCost + totalInterceptorCost;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -136,6 +184,11 @@ void SimResult::print() const {
     std::cout << "  Blue cost (engagement): $" << static_cast<long long>(blueCost) << std::endl;
     std::cout << "  Red cost (deployed):    $" << static_cast<long long>(redCost) << std::endl;
     std::cout << "  Loss exchange ratio:    " << lossExchangeRatio << std::endl;
+    std::cout << "  P(detected):            " << probabilityDetected << std::endl;
+    std::cout << "  P(killed):              " << probabilityKilled << std::endl;
+    std::cout << "  Deployment cost:        $" << static_cast<long long>(totalDeploymentCost)
+              << " (detectors=" << static_cast<long long>(totalDetectorCost)
+              << ", interceptors=" << static_cast<long long>(totalInterceptorCost) << ")" << std::endl;
 
     std::cout << "\n  Seekers:" << std::endl;
     for (const auto& s : seekerResults) {
@@ -178,6 +231,7 @@ void SimResult::print() const {
             std::cout << "    Detector " << d.id
                       << " at (" << d.row << "," << d.col
                       << "), sensing radius " << d.sensingRadius
+                      << ", cost " << d.unitCost
                       << ": " << d.sightingCount << " sighting(s)";
             std::cout << std::endl;
         }
@@ -190,6 +244,7 @@ void SimResult::print() const {
                       << " at (" << i.row << "," << i.col
                       << "), kill radius " << i.killRadius
                       << ", vehicle " << (i.vehicleType.empty() ? "generic" : i.vehicleType)
+                      << ", cost " << i.unitCost
                       << ": " << i.killCount << " kill(s), "
                       << i.engagementCount << " engagement(s)";
             if (i.killCount > 0) {
@@ -266,7 +321,26 @@ void SimResult::saveJSON(const std::string& filepath) const {
     jsonKey(buf, 2, "avg_steps_to_target",        avgStepsToTarget);                  buf << ",\n";
     jsonKey(buf, 2, "blue_cost",                  blueCost);                           buf << ",\n";
     jsonKey(buf, 2, "red_cost",                   redCost);                            buf << ",\n";
-    jsonKey(buf, 2, "loss_exchange_ratio",        lossExchangeRatio);                  buf << "\n";
+    jsonKey(buf, 2, "loss_exchange_ratio",        lossExchangeRatio);                  buf << ",\n";
+    // ── GA fitness fields (parsed directly by the Python GA) ──
+    jsonKey(buf, 2, "probability_detected",       probabilityDetected);               buf << ",\n";
+    jsonKey(buf, 2, "probability_killed",         probabilityKilled);                 buf << ",\n";
+    jsonKey(buf, 2, "total_detector_cost",        totalDetectorCost);                 buf << ",\n";
+    jsonKey(buf, 2, "total_interceptor_cost",     totalInterceptorCost);             buf << ",\n";
+    jsonKey(buf, 2, "total_deployment_cost",      totalDeploymentCost);              buf << ",\n";
+    // -- Vehicle-type cost breakdown (per platform) --
+    buf << "  \"vehicle_cost_breakdown\": [\n";
+    for (size_t vi = 0; vi < vehicleCostBreakdown.size(); vi++) {
+        const auto& v = vehicleCostBreakdown[vi];
+        buf << "    {\n";
+        jsonKeyStr(buf, 3, "agent_type", v.agentType);  buf << ",\n";
+        jsonKey(buf, 3, "count",         v.count);      buf << ",\n";
+        jsonKey(buf, 3, "total_cost",    v.totalCost);  buf << "\n";
+        buf << "    }";
+        if (vi < vehicleCostBreakdown.size() - 1) buf << ",";
+        buf << "\n";
+    }
+    buf << "  ]\n";
     buf << "  },\n";
 
     // ── Seekers ──
@@ -322,6 +396,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
         jsonKey(buf, 3, "col",             d.col);                            buf << ",\n";
         jsonKey(buf, 3, "sensing_radius",  d.sensingRadius);                  buf << ",\n";
         jsonKey(buf, 3, "sighting_count",  d.sightingCount);                  buf << ",\n";
+        jsonKey(buf, 3, "unit_cost",       d.unitCost);                       buf << ",\n";
         jsonSightingArray(buf, 3, "sightings", d.sightings);                  buf << "\n";
         buf << "    }";
         if (i < detectorResults.size() - 1) buf << ",";
@@ -341,6 +416,7 @@ void SimResult::saveJSON(const std::string& filepath) const {
         jsonKey(buf, 3, "kill_count",  ic.killCount);                      buf << ",\n";
         jsonKey(buf, 3, "engagement_count", ic.engagementCount);          buf << ",\n";
         jsonKey(buf, 3, "engagement_cost",  ic.engagementCost);           buf << ",\n";
+        jsonKey(buf, 3, "unit_cost",        ic.unitCost);                  buf << ",\n";
         jsonKeyStr(buf, 3, "vehicle_type",  ic.vehicleType);              buf << ",\n";
         jsonSightingArray(buf, 3, "intercepts", ic.intercepts);            buf << "\n";
         buf << "    }";
@@ -407,13 +483,10 @@ void SimResult::saveJSON(const std::string& filepath) const {
 //                  missions). Cost is sunk once a unit is committed.
 //    - loss_exchange_ratio = red_cost / blue_cost. <1 = defence efficient;
 //                  >1 = attackers trade up.
-//    - Legacy comparison metrics (seekers_lost, attackers_wasted) are tracked
-//                  in the per-run JSON but not in the CSV to keep the headline
-//                  columns aligned with Lance's formula.
 //    - critical_asset_reached = the DESIGNATED critical target (isCritical)
-    //                  was destroyed. Falls back to "any target destroyed" if
-    //                  no target is flagged critical.
-    //
+//                  was destroyed. Falls back to "any target destroyed" if
+//                  no target is flagged critical.
+//
 // ════════════════════════════════════════════════════════════════════════════════
 
 void SimResult::saveCSV(const std::string& filepath, int runId) const {

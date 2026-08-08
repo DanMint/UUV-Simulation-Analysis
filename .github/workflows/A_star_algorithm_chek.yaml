@@ -1,13 +1,17 @@
 # This workflow checks if the A* algorithm works correctly.
 # The basic test consists of running the simulation with a fixed scenario
 # and comparing the output against stored expected results.
+# This workflow checks that the A* algorithm and the simulation still work
+# correctly after changes. It builds the test_simulation binary from
+# tests/test_simulation.cpp + the core simulation sources, then runs it
+# against the stored baseline results in tests/fixtures/.
 name: A* algorithm check
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, Nadeem-Branch ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, Nadeem-Branch ]
 
 jobs:
   test:
@@ -21,6 +25,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgdal-dev
+
+      - name: Install Python deps (for GA / analysis scripts)
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy matplotlib
 
       - name: Build test binary
         run: |
@@ -44,4 +53,8 @@ jobs:
 
       - name: Run simulation test
         run: ./test_sim
+
+      - name: Compile-check Python scripts
+        run: |
+          python -m py_compile scripts/analyze_costs.py scripts/visualize.py scripts/genetic_algorithm.py
 

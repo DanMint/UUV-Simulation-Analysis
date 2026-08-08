@@ -238,6 +238,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
         SimResult::DetectorResult dr;
         dr.id = d.id; dr.row = d.row; dr.col = d.col;
         dr.sensingRadius = d.sensingRadius; dr.sightingCount = d.sightingCount;
+        dr.unitCost = d.unitCost;
         for (const auto& s : d.sightings) dr.sightings.push_back({s.seekerId, s.step});
         result.detectorResults.push_back(dr);
     }
@@ -247,6 +248,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
         ir.killRadius = i.killRadius; ir.killCount = i.killCount;
         ir.engagementCount = i.engagementCount;
         ir.engagementCost = i.engagementCost;
+        ir.unitCost = i.unitCost;
         ir.vehicleType = i.vehicleType;
         for (const auto& ic : i.intercepts) ir.intercepts.push_back({ic.seekerId, ic.step});
         result.interceptorResults.push_back(ir);

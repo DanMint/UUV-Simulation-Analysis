@@ -5,6 +5,7 @@
 #include "simulation.h"
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <cstdlib>
@@ -68,6 +69,9 @@ void printUsage(const char* progName) {
               << "\nOptional Flags:\n"
               << "  --iterations N     Batch mode: run N iterations\n"
               << "  --noise-step D     Batch mode: add D noise per iteration\n"
+              << "  --repeat N         GA mode: run the SAME scenario N times (fixed noise,\n"
+              << "                     no noise increment) and write one row per run to\n"
+              << "                     runs/ga_batch.csv (for the Python GA fitness estimate)\n"
               << "  --seed S           Fixed RNG seed (0 = auto-random per run)\n"
               << "  --max-steps N      Override max simulation steps (default 2000)\n"
               << "  --no-prompt        Do not wait for Enter on exit (headless/batch)\n";
@@ -88,6 +92,7 @@ int main(int argc, char* argv[]) {
         bool visualize = false;
         int batchIterations = 1;
         double batchNoiseStep = 0.0;
+        int repeatCount = 0;        // 0 = not GA-repeat mode
         unsigned seedOverride = 0;   // 0 = auto-randomize (default)
         bool noPrompt = false;
         int maxSteps = 2000;
@@ -101,6 +106,8 @@ int main(int argc, char* argv[]) {
                 batchIterations = std::max(1, std::stoi(argv[++i]));
             } else if (arg == "--noise-step" && i + 1 < argc) {
                 batchNoiseStep = std::max(0.0, std::stod(argv[++i]));
+            } else if (arg == "--repeat" && i + 1 < argc) {
+                repeatCount = std::max(1, std::stoi(argv[++i]));
             } else if (arg == "--seed" && i + 1 < argc) {
                 seedOverride = std::stoul(argv[++i]);
             } else if (arg == "--no-prompt") {
@@ -241,6 +248,66 @@ int main(int argc, char* argv[]) {
             double noiseIncrement = 0.0;
             double startingNoise = config.getMaxNoiseLevel();
             bool useBatchFlags = (batchIterations > 1 || batchNoiseStep > 0.0);
+
+            // ── GA repeat mode ────────────────────────────────────────
+            // Runs the SAME scenario N times at FIXED noise, writing one
+            // row per run to runs/ga_batch.csv. This is the C++/Python
+            // hand-off: the Python GA calls this many times to estimate
+            // the fitness of a single defender chromosome (each run is a
+            // stochastic sample of P(detected)/P(killed)).
+            if (repeatCount > 0) {
+                std::string runsDir = "runs";
+                std::filesystem::create_directories(runsDir);
+                std::string gaCsv = runsDir + "/ga_batch.csv";
+
+                std::cout << "\n-- GA repeat mode: " << repeatCount
+                          << " run(s) of the SAME scenario (fixed noise "
+                          << startingNoise << ") --\n";
+                std::cout << "  Writing fitness samples to " << gaCsv << "\n\n";
+
+                // Write header once (overwrite any previous GA batch).
+                {
+                    std::ofstream hdr(gaCsv, std::ios::trunc);
+                    if (!hdr.is_open()) {
+                        throw std::runtime_error("Cannot open " + gaCsv);
+                    }
+                    hdr << "run_id,probability_detected,probability_killed,"
+                           "total_deployment_cost,effectiveness\n";
+                    hdr.close();
+                }
+
+                for (int r = 0; r < repeatCount; r++) {
+                    unsigned iterSeed = (seedOverride != 0) ? seedOverride + static_cast<unsigned>(r) : 0;
+
+                    std::cout << "  Run " << (r + 1) << "/" << repeatCount
+                              << "  |  Seed: " << iterSeed << "\n";
+
+                    map.clearAllUnits();
+                    stampUnitsOnGrid(map, config);
+
+                    Simulation iterSim(map, config, maxSteps, iterSeed);
+                    SimResult result = iterSim.run();
+
+                    double effectiveness = result.probabilityDetected * result.probabilityKilled;
+
+                    std::ofstream ga(gaCsv, std::ios::app);
+                    if (!ga.is_open()) {
+                        throw std::runtime_error("Cannot open " + gaCsv);
+                    }
+                    ga << r << ","
+                       << result.probabilityDetected << ","
+                       << result.probabilityKilled << ","
+                       << result.totalDeploymentCost << ","
+                       << effectiveness << "\n";
+                    ga.close();
+                }
+
+                std::cout << "\n========================================\n";
+                std::cout << "  GA batch complete: " << repeatCount
+                          << " samples written to " << gaCsv << "\n";
+                std::cout << "========================================\n\n";
+            }
+            else {
             if (useBatchFlags) { numIterations = batchIterations; noiseIncrement = batchNoiseStep; } else {
 
             std::cout << "\n-- Iteration Configuration --\n";
@@ -303,6 +370,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  Results saved to " << runsDir << "/\n";
                 std::cout << "========================================\n\n";
             }
+            }
         }
 
         if (!noPrompt) {
@@ -318,4 +386,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-

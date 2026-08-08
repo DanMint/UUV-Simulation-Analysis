@@ -38,6 +38,7 @@ struct InterceptorAgent {
     int killCount;         // total successful kills
     int engagementCount;   // total shots fired (hits + misses)
     float engagementCost;  // cost per shot ($)
+    float unitCost;        // deployment cost for GA fitness (1-3 scale)
     std::string vehicleType;  // optional vehicle model (e.g. "hugin", "yuco")
     static constexpr float DEFAULT_COST_PER_SHOT = 50000.0f;  // $50k default per shot
 
@@ -50,6 +51,8 @@ struct InterceptorAgent {
     InterceptorAgent(int id, int row, int col, double killRadius);
     InterceptorAgent(int id, int row, int col, double killRadius,
                      const std::string& vehicleType);
+    InterceptorAgent(int id, int row, int col, double killRadius,
+                     const std::string& vehicleType, float unitCost, float engagementCost);
 
     /**
      * Compute the per-shot cost for a given interceptor vehicle type.
