@@ -65,7 +65,7 @@ void PatrolDefenderAgent::moveTowardWaypoint() {
     if (waypoints.size() < 2) return;
 
     // get current target waypoint - had initally used auto but changed to using .first and .second to get the row/col values of the pair so think waypoints.push_back({r, c});  // r goes into .first, c goes into .second since wer using a pair of ints to store the row/col values of the waypoint
-    //auto [targetRow, targetCol] = waypoints[currentWaypoint];
+   
 
     int targetRow = waypoints[currentWaypoint].first;
     int targetCol = waypoints[currentWaypoint].second;
