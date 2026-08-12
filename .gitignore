@@ -1,20 +1,99 @@
+# IDE and editor
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
-uuv_sim
+
+# Build artifacts
 build/
+windows_build/
+*.o
+*.a
+*.so
+*.exe
+*.dll
+*.lib
+uuv_sim
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.Python
+dist/
+*.egg
+.pytest_cache/
+.tox/
+.coverage
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cmake
+Makefile
+
+# Project outputs and temporary data
 runs/
 paths/
 scenario.json
 grid_cache.txt
-windows_build/
-TODO.md
-GUIDE.md
-__pycache__/
-*.pyc
-*.pyo
+*.log
+*.tmp
+*.bak
 
-# Accidental terminal-output dumps (should never be committed)
+# Terminal and debugging dumps
 r1.txt
 r2.txt
 py_analyze.txt
 py_visualize.txt
+terminal_dump*.txt
+debug*.log
+
+# Coordination and internal documentation
+COORDINATION_MESSAGE_FOR_DAN.txt
+INTERNAL_COORDINATION_NOTES.txt
+*.coordination.txt
+.private/
+_notes/
+_scratch/
+
+# OS and environment
+.env
+.env.local
+*.swp
+.AppleDouble
+Thumbs.db
+
+# IDE cache
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Generated documentation cache
+docs/_build/
+*.generated.md
+
+# Test outputs and coverage
+test_output*.txt
+coverage.xml
+.coverage.*
+
+# Build outputs that shouldn't be versioned
+*.o
+*.obj
+*.out
+*.gch
+Release/
+Debug/
+x64/
