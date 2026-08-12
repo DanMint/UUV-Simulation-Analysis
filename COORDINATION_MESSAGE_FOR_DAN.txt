@@ -1,0 +1,54 @@
+═══════════════════════════════════════════════════════════════════════════════
+COORDINATION MESSAGE: Branch Collision Risk Alert
+═══════════════════════════════════════════════════════════════════════════════
+
+TO: Dan
+FROM: Nadeem
+RE: Potential file overlap with Chris's branch + Sam's PR modifications
+DATE: 2026-08-12
+
+SITUATION:
+───────
+We currently have three concurrent branches/PRs modifying the same core files:
+  1. Nadeem-Branch (my current work)
+  2. Chris's branch (touched some files)
+  3. Sam's PR (recently reviewed by you with emphasis on header comments)
+
+SPECIFIC FILES AT RISK:
+──────────────────────
+Based on Phase 16/17 work, I'm modifying:
+  - src/main.cpp (GA batch mode, csv header expansion)
+  - src/agents/vehicleSpecs.h/cpp (adding Dive-LD vehicle type)
+  - src/agents/attackerAgent.h/cpp (FSM lifecycle refinement)
+  - scripts/genetic_algorithm.py (attacker fitness, Dive-LD integration)
+  - scripts/analyze_costs.py (cost breakdown enhancement)
+
+QUESTION:
+─────────
+Before I push further, I want to confirm:
+  A) Should I merge from main first to check for conflicts?
+  B) Which files (if any) is Chris actively modifying right now?
+  C) What's the merge strategy if Sam's PR lands while I'm on Nadeem-Branch?
+
+ACTION I'M TAKING (safe to do without answer):
+───────────────────────────────────────────────
+- Improving header comments across all key classes (matching Dan's standard from Sam's PR review)
+- Building the Dive-LD scenario as specified in Lauren's planning slides
+- Verifying test count ≥174 and adding new Dive-LD baseline test
+- Polish documentation and demo flow
+
+All this work is *contained to Nadeem-Branch* and doesn't require coordination to proceed safely.
+
+TIMELINE:
+─────────
+I'm doing 4 hours of solid work today:
+  Hour 1: Coordination + headers
+  Hour 2: Dive-LD scenario build
+  Hour 3: Verification + tests
+  Hour 4: Demo prep
+
+Planning to commit at the end of each hour, push to Nadeem-Branch only at day's end.
+
+Please let me know ASAP if there's a merge/conflict strategy I should follow.
+
+Thanks!
