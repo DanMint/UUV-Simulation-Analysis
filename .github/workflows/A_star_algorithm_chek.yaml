@@ -51,10 +51,31 @@ jobs:
             -Isrc/simulation -Isrc/agents \
             $(gdal-config --cflags) -L$(gdal-config --prefix)/lib -lgdal
 
-      - name: Run simulation test
+- name: Run simulation test
         run: ./test_sim
+
+      - name: Build & run attacker/vehicle tests
+        run: |
+          g++ -std=c++20 -O2 \
+            tests/test_attackerAgent.cpp \
+            src/mapCreation/mapCreation.cpp \
+            src/spawnConfig/spawnConfig.cpp \
+            src/pathfinding/pathfinding.cpp \
+            src/simulation/simulation.cpp \
+            src/simulation/simResult.cpp \
+            src/agents/targetAgent.cpp \
+            src/agents/seekerAgent.cpp \
+            src/agents/attackerAgent.cpp \
+            src/agents/detectorAgent.cpp \
+            src/agents/interceptorAgent.cpp \
+            src/agents/vehicleSpecs.cpp \
+            -o test_attacker \
+            -Isrc/mapCreation -Isrc/spawnConfig -Isrc/pathfinding \
+            -Isrc/simulation -Isrc/agents \
+            $(gdal-config --cflags) -L$(gdal-config --prefix)/lib -lgdal
+          ./test_attacker
 
       - name: Compile-check Python scripts
         run: |
-          python -m py_compile scripts/analyze_costs.py scripts/visualize.py scripts/genetic_algorithm.py
+          python -m py_compile scripts/analyze_costs.py scripts/visualize.py scripts/genetic_algorithm.py scripts/make_diveld_scenario.py
 

@@ -272,7 +272,9 @@ int main(int argc, char* argv[]) {
                         throw std::runtime_error("Cannot open " + gaCsv);
                     }
                     hdr << "run_id,probability_detected,probability_killed,"
-                           "total_deployment_cost,effectiveness\n";
+                           "total_deployment_cost,effectiveness,"
+                           "targets_destroyed,total_targets,"
+                           "blue_cost,red_cost,loss_exchange_ratio\n";
                     hdr.close();
                 }
 
@@ -298,7 +300,12 @@ int main(int argc, char* argv[]) {
                        << result.probabilityDetected << ","
                        << result.probabilityKilled << ","
                        << result.totalDeploymentCost << ","
-                       << effectiveness << "\n";
+                       << effectiveness << ","
+                       << result.targetsDestroyed << ","
+                       << static_cast<int>(result.targetResults.size()) << ","
+                       << result.blueCost << ","
+                       << result.redCost << ","
+                       << result.lossExchangeRatio << "\n";
                     ga.close();
                 }
 

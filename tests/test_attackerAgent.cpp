@@ -649,6 +649,29 @@ void testSeekerAgentCreate() {
           "SeekerAgent::create with invalid type falls back to bluerov2");
 }
 
+void testDiveLDSpecs() {
+    testSection("Anduril Dive-LD Specs");
+
+    AttackerAgent a = AttackerAgent::create("diveld", 0, 5, 5);
+    check(a.specs.agentType == "diveld",       "Dive-LD agentType = diveld");
+    check(a.specs.manufacturer == "Anduril Industries", "Dive-LD manufacturer = Anduril Industries");
+    check(a.specs.speedKnotsMin == 1.f,        "Dive-LD min speed = 1 kn");
+    check(a.specs.speedKnotsMax == 3.f,        "Dive-LD max speed = 3 kn");
+    check(a.specs.emissionFreqLowHz  == 200000, "Dive-LD freq low = 200k Hz");
+    check(a.specs.emissionFreqHighHz == 400000, "Dive-LD freq high = 400k Hz");
+    check(a.specs.shallowWaterCapable == true,  "Dive-LD shallow water capable");
+    check(a.specs.isAerial == false,            "Dive-LD is not aerial");
+    check(a.specs.isSurfaceVessel == false,     "Dive-LD is not a surface vessel");
+    check(a.specs.unitCostMin == 500000.f,      "Dive-LD cost min = $500k");
+    check(a.specs.unitCostMax == 1000000.f,     "Dive-LD cost max = $1M");
+    check(a.specs.stepDelay == 4,              "Dive-LD stepDelay = 4 (1-3 kn)");
+    check(a.isDetectableByHydrophone() == true, "Dive-LD is hydrophone-detectable (UUV)");
+
+    VehicleSpecs s = getVehicleSpecs("diveld");
+    check(s.shortCode() == "DV", "diveld shortCode -> DV");
+    check(s.costCategory() == "premium", "Dive-LD ($750k avg) -> premium");
+}
+
 void testDefenderCosts() {
     testSection("Defender deployment costs (GA fitness)");
 
@@ -741,10 +764,11 @@ int main() {
     testRecordSightingAndIntercept();
     testKillProbability();
 
-    testSeekerAgentHasPath();
+testSeekerAgentHasPath();
     testSeekerAgentCreate();
     testMoveStepWithSpeed();
     testDefenderCosts();
+    testDiveLDSpecs();
 
     std::cout << "\n======================================\n";
     std::cout << "  Results: " << passedTests << " / " << totalTests << " passed\n";

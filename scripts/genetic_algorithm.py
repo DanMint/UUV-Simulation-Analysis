@@ -57,6 +57,7 @@ VEHICLES = {
     "tb2":         {"cost_min": 2000000, "aerial": True,  "surface": False},
     "queenhornet": {"cost_min": 1000,    "aerial": True,  "surface": False},
     "shahed":      {"cost_min": 20000,   "aerial": True,  "surface": False},
+    "diveld":      {"cost_min": 500000, "aerial": False, "surface": False},
 }
 
 # Detector / interceptor deployment cost (1-3 scale, used by SimResult)
@@ -123,6 +124,9 @@ def chromo_to_scenario_defender(base: dict, chromo, defender_zones, n_det, n_int
     sc["units"] = [u for u in sc.get("units", [])
                    if u.get("type") not in ("detector", "interceptor")]
 
+    if not pool:
+        raise ValueError("Defender zone has no water cells to place detectors")
+
     for i in range(n_det):
         idx = chromo[i] % len(pool)
         r, c = pool[idx]
@@ -149,7 +153,10 @@ def chromo_to_scenario_attacker(base: dict, chromo, attacker_zones, n_atk):
     vtypes = list(VEHICLES.keys())
     # Strip existing attackers/seekers
     sc["units"] = [u for u in sc.get("units", [])
-                   if u.get("type") not in ("attacker",)]
+                   if u.get("type") not in ("attacker", "seeker")]
+
+    if not pool:
+        raise ValueError("Attacker zone has no water cells to place attackers")
 
     for i in range(n_atk):
         cell_idx = chromo[2 * i] % len(pool)
@@ -213,21 +220,19 @@ def evaluate_attacker(base, chromo, attacker_zones, n_atk,
     if not rows:
         return 0.0, 0.0
 
-    # Attacker fitness: approximate from ga_batch (which stores P(detected)
-    # and P(killed) of the DEFENCE). For attacker optimisation we invert:
-    # attackers want targets destroyed & low cost. We read the CSV rows but
-    # the key metric for attackers is target destruction — approximated here
-    # from (1 - p_kill) as a proxy for "attacker survival".
-    p_survive = 1.0 - np.mean([r["probability_killed"] for r in rows])
+    # Attacker fitness: measured from real simulated outcomes.
+    # ga_batch.csv (Phase 16) now carries per-run target destruction so the
+    # attacker optimiser can reward actually destroying the harbour asset(s),
+    # not a guessed survival proxy. We also account for attacker unit cost
+    # (red_cost from the CSV) so cheap swarm attackers score better.
+    t_destroyed = np.sum([r.get("targets_destroyed", 0) for r in rows])
+    t_total = np.sum([r.get("total_targets", 0) for r in rows])
+    destroy_rate = t_destroyed / max(t_total, 1e-9)
 
-    cost = 0.0
-    vtypes = list(VEHICLES.keys())
-    for i in range(n_atk):
-        vt_idx = chromo[2 * i + 1] % len(vtypes)
-        cost += VEHICLES[vtypes[vt_idx]]["cost_min"]
+    cost = float(np.mean([r.get("red_cost", 0.0) for r in rows]))
 
     penalty = lam * (cost / max(budget, 1e-9))
-    fitness = p_survive - penalty if p_survive > 0 else 0.0
+    fitness = destroy_rate - penalty if destroy_rate > 0 else 0.0
     return fitness, cost
 
 
@@ -382,8 +387,8 @@ def run_ga(args):
         print(f"  Deployment cost: {details[best_idx][2]:.2f}")
         sc = chromo_to_scenario_defender(base, best_chromo, zones, n_det, n_int)
     else:
-        print(f"  Attacker survival proxy: {details[best_idx][1]:.4f}")
-        print(f"  Attacker cost: {details[best_idx][2]:.2f}")
+        print(f"  Target destruction rate: {details[best_idx][1]:.4f}")
+        print(f"  Attacker cost (red): {details[best_idx][2]:.2f}")
         sc = chromo_to_scenario_attacker(base, best_chromo, zones, n_atk)
 
     best_scenario_path = os.path.join(workdir, "ga_best_scenario.json")

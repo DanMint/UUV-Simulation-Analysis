@@ -109,7 +109,7 @@ void SimResult::computeSummary() {
     }
     redCost = 0.0f;
     for (const auto& a : attackerResults) {
-redCost += a.unitCostMin;
+        redCost += a.unitCostMin;
     }
     lossExchangeRatio = (blueCost > 0.0f) ? redCost / blueCost : 0.0f;
 
@@ -498,7 +498,7 @@ void SimResult::saveCSV(const std::string& filepath, int runId) const {
 
     float redCost = 0.0f;
     for (const auto& a : attackerResults) {
-        redCost += a.unitCostMin;  // cost of ALL attackers deployed
+                redCost += a.unitCostMin;  // cost of ALL attackers deployed
     }
 
     int totalTargets = static_cast<int>(targetResults.size());

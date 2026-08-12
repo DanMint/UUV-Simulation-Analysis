@@ -94,6 +94,7 @@ struct VehicleSpecs {
         if (agentType == "yuco")        return "YU";
         if (agentType == "nemosens")    return "NS";
         if (agentType == "hugin")       return "HU";
+        if (agentType == "diveld")      return "DV";
         if (agentType == "tb2")         return "T2";
         if (agentType == "queenhornet") return "QH";
         if (agentType == "shahed")      return "SH";

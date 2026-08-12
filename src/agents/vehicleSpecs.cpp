@@ -96,6 +96,27 @@ const auto& getSpecRegistry() {
             3  /* 2-5 kn → medium */)},
 
         // ══════════════════════════════════════════════════════════════════════
+        //  Reference baseline AUV (team planning doc: "3 Anduril Dive-LD AUVs
+        //  come from three different directions"). The baseline attacker every
+        //  defender configuration is tested against for GA fitness evaluation.
+        //
+        //  ⚠ SPEC ESTIMATES: Anduril does not publish exact Dive-LD figures.
+        //  Values below are conservative estimates consistent with a long-
+        //  endurance, low-signature mine-countermeasure AUV, and are marked
+        //  accordingly. They are reasonable placeholders, NOT sourced figures.
+        //  - speed:   long-endurance platforms trade speed for endurance (≈1-3 kn)
+        //  - cost:    marketed as a low-cost HUGIN alternative; est. $0.5M-$1.0M
+        //  - acoustic: plausible UUV emission band, consistent with hugin/yuco
+        //  ══════════════════════════════════════════════════════════════════════
+        {"diveld", makeSpecs(
+            "diveld", "Anduril Industries",
+            1.0f, 3.0f,             // ESTIMATE: slow long-endurance AUV
+            200000, 400000,         // ESTIMATE: plausible UUV emission band
+            /*shallow=*/true, /*aerial=*/false, /*surface=*/false,
+            500000.0f, 1000000.0f,  // ESTIMATE: low-cost HUGIN alternative
+            4  /* 1-3 kn → slowest, like bluerov2 */)},
+
+        // ══════════════════════════════════════════════════════════════════════
         //  USVs  (Unmanned Surface Vessels) — NOT hydrophone-detectable
         // ══════════════════════════════════════════════════════════════════════
         {"blueboat", makeSpecs(
@@ -150,4 +171,3 @@ VehicleSpecs getVehicleSpecs(const std::string& type) {
     }
     throw std::invalid_argument("Unknown vehicle type: " + type);
 }
-
