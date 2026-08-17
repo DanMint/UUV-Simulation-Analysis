@@ -1,19 +1,20 @@
 /**
  * test_diveld_scenario.cpp
  *
- * Phase 17 Unit Test: Dive-LD Baseline Scenario Validation
+ * Phase 17 Unit Test: Dive-LD Baseline Scenario End-to-End Validation
  *
  * Purpose:
  *   Validates that 3 Anduril Dive-LD AUVs can be spawned from 3 directions,
- *   navigate to a central target, and engage successfully.
- *   
+ *   navigate through the real simulator to a central target, and the
+ *   simulation completes successfully.
+ *
  * Scenario:
  *   - 3x Dive-LD AUVs attacking from north, south, and east
  *   - 1x critical target in center
  *   - 2x detectors, 1x interceptor (defender)
  *
  * Exit Codes:
- *   0 = PASS  (all 3 Dive-LD attackers reachable, target engaged)
+ *   0 = PASS  (simulation ran, all 3 attackers active from distinct cells)
  *   1 = FAIL  (validation check failed)
  *   2 = ERROR (file loading, parsing, or simulation error)
  */
@@ -30,29 +31,23 @@
 #include <string>
 #include <cmath>
 #include <vector>
+#include <algorithm>
+#include <set>
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  DIVE-LD VALIDATION
+//  DIVE-LD END-TO-END VALIDATION
 // ════════════════════════════════════════════════════════════════════════════════
 
 int main(int argc, char* argv[]) {
     try {
-        // Default paths
-        std::string gridPath    = "grid_cache.txt";
         std::string scenarioPath = "scenarios/diveld_baseline_complete.json";
-        std::string cacheDir    = ".";
 
-        // Allow override
-        if (argc > 1) gridPath = argv[1];
-        if (argc > 2) scenarioPath = argv[2];
-        if (argc > 3) cacheDir = argv[3];
+        if (argc > 1) scenarioPath = argv[1];
 
         std::cout << "═══════════════════════════════════════════════════════════════" << std::endl;
-        std::cout << "  Phase 17: Dive-LD Baseline Scenario Validation" << std::endl;
+        std::cout << "  Phase 17: Dive-LD Baseline Scenario E2E Validation" << std::endl;
         std::cout << "═══════════════════════════════════════════════════════════════" << std::endl;
-        std::cout << "Grid:      " << gridPath << std::endl;
-        std::cout << "Scenario:  " << scenarioPath << std::endl;
-        std::cout << "Cache:     " << cacheDir << std::endl;
+        std::cout << "Scenario: " << scenarioPath << std::endl;
         std::cout << "───────────────────────────────────────────────────────────────" << std::endl;
 
         // ════════════════════════════════════════════════════════════════════════
@@ -69,7 +64,6 @@ int main(int argc, char* argv[]) {
         std::cout << "  - Aerial:    " << (diveldSpecs.isAerial ? "Yes" : "No") << std::endl;
         std::cout << "  - Surface:   " << (diveldSpecs.isSurfaceVessel ? "Yes" : "No") << std::endl;
 
-        // Validate Dive-LD specs
         if (diveldSpecs.speedKnotsMin < 0.5f || diveldSpecs.speedKnotsMax < 2.0f) {
             std::cerr << "✗ Dive-LD speed specs invalid (expected 1-3 kn, got "
                       << diveldSpecs.speedKnotsMin << "-" << diveldSpecs.speedKnotsMax << ")" << std::endl;
@@ -86,104 +80,148 @@ int main(int argc, char* argv[]) {
         std::cout << "  → Specs validated ✓" << std::endl;
 
         // ════════════════════════════════════════════════════════════════════════
-        // 2. Load scenario
+        // 2. Load scenario via SpawnConfig
         // ════════════════════════════════════════════════════════════════════════
-        std::cout << "\n✓ Step 2: Load Dive-LD scenario" << std::endl;
-        std::ifstream sceneFile(scenarioPath);
-        if (!sceneFile.is_open()) {
-            std::cerr << "✗ Cannot open scenario: " << scenarioPath << std::endl;
+        std::cout << "\n✓ Step 2: Load scenario via SpawnConfig" << std::endl;
+        SpawnConfig config = SpawnConfig::loadJSON(scenarioPath);
+
+        auto attackers = config.getUnitsByType("attacker");
+        auto targets   = config.getUnitsByType("target");
+        auto detectors = config.getUnitsByType("detector");
+        auto interceptors = config.getUnitsByType("interceptor");
+
+        std::cout << "  - Attackers:    " << attackers.size() << std::endl;
+        std::cout << "  - Targets:      " << targets.size() << std::endl;
+        std::cout << "  - Detectors:    " << detectors.size() << std::endl;
+        std::cout << "  - Interceptors: " << interceptors.size() << std::endl;
+
+        if (attackers.size() != 3) {
+            std::cerr << "✗ Expected 3 attackers, found " << attackers.size() << std::endl;
+            return 1;
+        }
+
+        // Verify 3 distinct starting cells
+        std::set<std::pair<int,int>> startCells;
+        for (const auto& a : attackers) {
+            startCells.insert({a.row, a.col});
+        }
+        if (startCells.size() != 3) {
+            std::cerr << "✗ Attackers do not occupy 3 distinct starting cells" << std::endl;
+            return 1;
+        }
+        std::cout << "  → 3 distinct attacker spawn positions confirmed ✓" << std::endl;
+
+        // Verify all are Dive-LD
+        for (const auto& a : attackers) {
+            if (a.vehicleType != "diveld") {
+                std::cerr << "✗ Unexpected attacker vehicle type: " << a.vehicleType << std::endl;
+                return 1;
+            }
+        }
+        std::cout << "  → All attackers are Dive-LD ✓" << std::endl;
+
+        // Verify critical target
+        bool hasCritical = false;
+        for (const auto& t : targets) {
+            if (t.isCritical) hasCritical = true;
+        }
+        if (!hasCritical) {
+            std::cerr << "✗ No critical target marked" << std::endl;
+            return 1;
+        }
+        std::cout << "  → Critical target confirmed ✓" << std::endl;
+
+        if (detectors.size() < 2 || interceptors.size() < 1) {
+            std::cerr << "✗ Insufficient defenders (need >=2 detectors, >=1 interceptor)" << std::endl;
+            return 1;
+        }
+        std::cout << "  → Defender config valid ✓" << std::endl;
+
+        // ════════════════════════════════════════════════════════════════════════
+        // 3. Reconstruct map from embedded grid data and run simulation
+        // ════════════════════════════════════════════════════════════════════════
+        std::cout << "\n✓ Step 3: Run simulation end-to-end" << std::endl;
+
+        if (!config.hasMapData()) {
+            std::cerr << "✗ Scenario has no embedded map data" << std::endl;
             return 2;
         }
-        std::string sceneContent((std::istreambuf_iterator<char>(sceneFile)),
-                                  std::istreambuf_iterator<char>());
-        sceneFile.close();
-        std::cout << "  - Scenario file loaded" << std::endl;
 
-        // Verify scenario contains 3 Dive-LD attackers
-        int diveldCount = 0;
-        size_t pos = 0;
-        while ((pos = sceneContent.find("\"diveld\"", pos)) != std::string::npos) {
-            diveldCount++;
-            pos++;
-        }
-        std::cout << "  - Dive-LD attackers found: " << diveldCount << std::endl;
-        if (diveldCount != 3) {
-            std::cerr << "✗ Expected 3 Dive-LD attackers, found " << diveldCount << std::endl;
-            return 1;
-        }
-        std::cout << "  → 3 Dive-LD attackers confirmed ✓" << std::endl;
+        const MapInfo& info = config.getMapInfo();
+        MapCreation map = MapCreation::fromGridData(
+            config.getGrid(), info.cellsN, info.canvasWidth, info.canvasHeight);
 
-        // ════════════════════════════════════════════════════════════════════════
-        // 3. Verify scenario metadata
-        // ════════════════════════════════════════════════════════════════════════
-        std::cout << "\n✓ Step 3: Verify scenario metadata" << std::endl;
-        if (sceneContent.find("\"scenario_name\": \"diveld_baseline_complete\"") != std::string::npos) {
-            std::cout << "  - Scenario name: diveld_baseline_complete" << std::endl;
+        for (const auto& unit : config.getUnits()) {
+            int t = MapCreation::WATER;
+            if (unit.type == "seeker")      t = MapCreation::SEEKER;
+            else if (unit.type == "target") t = MapCreation::TARGET;
+            else if (unit.type == "detector")   t = MapCreation::DETECTOR;
+            else if (unit.type == "interceptor") t = MapCreation::INTERCEPTOR;
+            else if (unit.type == "attacker")   t = MapCreation::ATTACKER;
+            if (t != MapCreation::WATER) {
+                map.placeUnit(unit.row, unit.col, t);
+            }
         }
-        if (sceneContent.find("\"phase\": \"Phase 17\"") != std::string::npos) {
-            std::cout << "  - Phase: Phase 17 ✓" << std::endl;
-        }
-        std::cout << "  → Metadata validated ✓" << std::endl;
 
-        // ════════════════════════════════════════════════════════════════════════
-        // 4. Verify critical target exists
-        // ════════════════════════════════════════════════════════════════════════
-        std::cout << "\n✓ Step 4: Verify critical target" << std::endl;
-        if (sceneContent.find("\"is_critical\": true") != std::string::npos) {
-            std::cout << "  - Critical target: Yes ✓" << std::endl;
-        } else {
-            std::cerr << "✗ No critical target marked in scenario" << std::endl;
+        Simulation sim(map, config, 2000, 42);
+        SimResult result = sim.run();
+
+        std::cout << "  - Total steps: " << result.totalSteps << std::endl;
+        std::cout << "  - Targets destroyed: " << result.targetsDestroyed << "/" << result.targetResults.size() << std::endl;
+        std::cout << "  - Attackers alive: " << result.attackersAlive << "/" << result.attackerResults.size() << std::endl;
+
+        if (result.totalSteps == 0) {
+            std::cerr << "✗ Simulation ran 0 steps" << std::endl;
             return 1;
         }
 
-        // ════════════════════════════════════════════════════════════════════════
-        // 5. Verify defender configuration
-        // ════════════════════════════════════════════════════════════════════════
-        std::cout << "\n✓ Step 5: Verify defender configuration" << std::endl;
-        int detectorCount = 0, interceptorCount = 0;
-        pos = 0;
-        while ((pos = sceneContent.find("\"type\": \"detector\"", pos)) != std::string::npos) {
-            detectorCount++;
-            pos++;
-        }
-        pos = 0;
-        while ((pos = sceneContent.find("\"type\": \"interceptor\"", pos)) != std::string::npos) {
-            interceptorCount++;
-            pos++;
-        }
-        std::cout << "  - Detectors: " << detectorCount << std::endl;
-        std::cout << "  - Interceptors: " << interceptorCount << std::endl;
-        if (detectorCount >= 2 && interceptorCount >= 1) {
-            std::cout << "  → Defender config valid ✓" << std::endl;
-        } else {
-            std::cerr << "✗ Insufficient defenders (need ≥2 detectors, ≥1 interceptor)" << std::endl;
+        if (result.attackerResults.size() != 3) {
+            std::cerr << "✗ Expected 3 attacker results, found " << result.attackerResults.size() << std::endl;
             return 1;
         }
 
-        // ════════════════════════════════════════════════════════════════════════
-        // 6. Verify map configuration
-        // ════════════════════════════════════════════════════════════════════════
-        std::cout << "\n✓ Step 6: Verify map configuration" << std::endl;
-        if (sceneContent.find("\"shp_path\": \"Maps/pearlHarbour/Harbour_Depth_Area.shp\"") != std::string::npos) {
-            std::cout << "  - Map: Pearl Harbour ✓" << std::endl;
-        } else {
-            std::cerr << "✗ Unexpected map" << std::endl;
+        // Verify all 3 attackers were active: either moved, reached target, or were intercepted
+        int activeCount = 0;
+        for (const auto& ar : result.attackerResults) {
+            bool moved = (ar.stepsTaken > 0);
+            bool reached = ar.missionSuccess;
+            bool intercepted = !ar.sightings.empty() || !ar.intercepts.empty();
+            if (moved || reached || intercepted) {
+                activeCount++;
+            }
+        }
+        if (activeCount < 3) {
+            std::cerr << "✗ Only " << activeCount << "/3 attackers showed activity (moved/reached/intercepted)" << std::endl;
             return 1;
         }
-        std::cout << "  → Map validated ✓" << std::endl;
+        std::cout << "  → All 3 attackers active from distinct starting cells ✓" << std::endl;
+
+        // Verify critical target tracking
+        bool criticalTracked = false;
+        for (const auto& tr : result.targetResults) {
+            if (tr.isCritical) {
+                criticalTracked = true;
+                std::cout << "  - Critical target destroyed: " << (tr.destroyed ? "yes" : "no") << std::endl;
+            }
+        }
+        if (!criticalTracked) {
+            std::cerr << "✗ Critical target not found in results" << std::endl;
+            return 1;
+        }
+        std::cout << "  → Critical target tracked in results ✓" << std::endl;
 
         // ════════════════════════════════════════════════════════════════════════
         // Summary
         // ════════════════════════════════════════════════════════════════════════
         std::cout << "\n═══════════════════════════════════════════════════════════════" << std::endl;
-        std::cout << "  ✓ ALL DIVE-LD BASELINE VALIDATIONS PASSED" << std::endl;
+        std::cout << "  ✓ ALL DIVE-LD BASELINE E2E VALIDATIONS PASSED" << std::endl;
         std::cout << "═══════════════════════════════════════════════════════════════" << std::endl;
         std::cout << "\nSummary:" << std::endl;
         std::cout << "  - Dive-LD specs: Valid (1-3 kn, $0.5M-$1.0M, UUV)" << std::endl;
-        std::cout << "  - Baseline scenario: Valid (3x attackers from 3 directions)" << std::endl;
-        std::cout << "  - Critical target: Confirmed at center" << std::endl;
-        std::cout << "  - Defenders: 2 detectors + 1 interceptor" << std::endl;
-        std::cout << "  - Map: Pearl Harbour (100x100 grid)" << std::endl;
+        std::cout << "  - Simulation: Ran " << result.totalSteps << " steps" << std::endl;
+        std::cout << "  - Attackers: 3 active from distinct starting cells" << std::endl;
+        std::cout << "  - Critical target: Tracked in results" << std::endl;
+        std::cout << "  - Defenders: " << detectors.size() << " detectors, " << interceptors.size() << " interceptor(s)" << std::endl;
         std::cout << "\nPhase 17 Reference Baseline Ready for GA Fitness Evaluation" << std::endl;
 
         return 0;

@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UUV Simulation Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .header {
+            background: #1e293b;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .container {
+            padding: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        .card h3 {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+        .card .change {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        .positive { color: #22c55e; }
+        .negative { color: #ef4444; }
+        .chart-container {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .chart-container h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #e2e8f0;
+        }
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .btn-secondary {
+            background: #475569;
+            color: #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: #64748b;
+        }
+        select, input {
+            padding: 0.5rem 1rem;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+        }
+        .timeline {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .timeline h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .event {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            border-left: 3px solid #3b82f6;
+            margin-bottom: 0.5rem;
+            background: #0f172a;
+            border-radius: 0 6px 6px 0;
+        }
+        .event.detection { border-left-color: #f59e0b; }
+        .event.intercept { border-left-color: #ef4444; }
+        .event.target_destroyed { border-left-color: #22c55e; }
+        .event-time {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            min-width: 60px;
+        }
+        .event-desc {
+            font-size: 0.875rem;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #94a3b8;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>UUV Simulation Analysis Dashboard</h1>
+        <div class="status">
+            <div class="status-dot"></div>
+            <span id="connectionStatus">Connected</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <select id="runSelect">
+                <option value="">Select a simulation run...</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadRun()">Load Run</button>
+            <button class="btn btn-secondary" onclick="refreshData()">Refresh</button>
+        </div>
+
+        <div id="runDetails" class="hidden">
+            <div class="grid">
+                <div class="card">
+                    <h3>Total Steps</h3>
+                    <div class="value" id="totalSteps">-</div>
+                </div>
+                <div class="card">
+                    <h3>Targets Destroyed</h3>
+                    <div class="value" id="targetsDestroyed">-</div>
+                </div>
+                <div class="card">
+                    <h3>Detection Rate</h3>
+                    <div class="value" id="detectionRate">-</div>
+                </div>
+                <div class="card">
+                    <h3>Kill Rate</h3>
+                    <div class="value" id="killRate">-</div>
+                </div>
+                <div class="card">
+                    <h3>Blue Cost (Defense)</h3>
+                    <div class="value" id="blueCost">-</div>
+                </div>
+                <div class="card">
+                    <h3>Red Cost (Attack)</h3>
+                    <div class="value" id="redCost">-</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Agent Positions Over Time</h3>
+                <canvas id="positionsChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3>Fitness Trends (GA)</h3>
+                <canvas id="fitnessChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3>Cost Breakdown</h3>
+                <canvas id="costChart"></canvas>
+            </div>
+
+            <div class="timeline">
+                <h3>Event Timeline</h3>
+                <div id="eventTimeline">
+                    <div class="loading">Select a run to view events</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentRunId = null;
+        let positionsChart = null;
+        let fitnessChart = null;
+        let costChart = null;
+
+        // Load runs on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRuns();
+        });
+
+        async function loadRuns() {
+            try {
+                const response = await fetch(`${API_BASE}/api/runs`);
+                const runs = await response.json();
+
+                const select = document.getElementById('runSelect');
+                select.innerHTML = '<option value="">Select a simulation run...</option>';
+
+                runs.forEach(run => {
+                    const option = document.createElement('option');
+                    option.value = run.run_id;
+                    option.textContent = `Run #${run.run_id} - ${run.scenario_name} (${run.created_at})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load runs:', error);
+            }
+        }
+
+        async function loadRun() {
+            const runId = document.getElementById('runSelect').value;
+            if (!runId) return;
+
+            currentRunId = runId;
+            document.getElementById('runDetails').classList.remove('hidden');
+
+            try {
+                // Load run details
+                const [runResponse, stepsResponse, eventsResponse] = await Promise.all([
+                    fetch(`${API_BASE}/api/runs/${runId}`),
+                    fetch(`${API_BASE}/api/runs/${runId}/steps`),
+                    fetch(`${API_BASE}/api/runs/${runId}/events`),
+                ]);
+
+                const runData = await runResponse.json();
+                const stepsData = await stepsResponse.json();
+                const eventsData = await eventsResponse.json();
+
+                updateStats(runData.run);
+                updateCharts(stepsData, eventsData);
+                updateTimeline(eventsData);
+            } catch (error) {
+                console.error('Failed to load run:', error);
+            }
+        }
+
+        function updateStats(run) {
+            document.getElementById('totalSteps').textContent = run.total_steps || 0;
+            document.getElementById('targetsDestroyed').textContent =
+                `${run.targets_destroyed || 0} / ${run.total_targets || 0}`;
+            document.getElementById('detectionRate').textContent =
+                `${((run.probability_detected || 0) * 100).toFixed(1)}%`;
+            document.getElementById('killRate').textContent =
+                `${((run.probability_killed || 0) * 100).toFixed(1)}%`;
+            document.getElementById('blueCost').textContent =
+                `$${(run.blue_cost || 0).toLocaleString()}`;
+            document.getElementById('redCost').textContent =
+                `$${(run.red_cost || 0).toLocaleString()}`;
+        }
+
+        function updateCharts(stepsData, eventsData) {
+            // Positions chart
+            const positionsCtx = document.getElementById('positionsChart').getContext('2d');
+            if (positionsChart) positionsChart.destroy();
+
+            const datasets = [];
+            const agentTypes = {};
+
+            stepsData.forEach(step => {
+                step.agents.forEach(agent => {
+                    const key = `${agent.agent_type}_${agent.agent_id}`;
+                    if (!agentTypes[key]) {
+                        agentTypes[key] = {
+                            label: `${agent.agent_type} ${agent.agent_id}`,
+                            data: [],
+                            borderColor: getColor(agent.agent_type),
+                            backgroundColor: getColor(agent.agent_type),
+                            pointRadius: 3,
+                        };
+                        datasets.push(agentTypes[key]);
+                    }
+                    agentTypes[key].data.push({
+                        x: step.step,
+                        y: agent.x + agent.y * 100,
+                    });
+                });
+            });
+
+            positionsChart = new Chart(positionsCtx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Agent Positions Over Time',
+                            color: '#e2e8f0',
+                        },
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Step', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                        },
+                        y: {
+                            title: { display: true, text: 'Position', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                        },
+                    },
+                },
+            });
+
+            // Fitness chart
+            const fitnessCtx = document.getElementById('fitnessChart').getContext('2d');
+            if (fitnessChart) fitnessChart.destroy();
+
+            fitnessChart = new Chart(fitnessCtx, {
+                type: 'line',
+                data: {
+                    labels: stepsData.map(s => s.step),
+                    datasets: [{
+                        label: 'Active Agents',
+                        data: stepsData.map(s => s.agents.filter(a => a.alive).length),
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Active Agents Over Time',
+                            color: '#e2e8f0',
+                        },
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Step', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                        },
+                        y: {
+                            title: { display: true, text: 'Count', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                        },
+                    },
+                },
+            });
+
+            // Cost chart
+            const costCtx = document.getElementById('costChart').getContext('2d');
+            if (costChart) costChart.destroy();
+
+            costChart = new Chart(costCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Defense (Blue)', 'Attack (Red)'],
+                    datasets: [{
+                        data: [
+                            runData.run.blue_cost || 0,
+                            runData.run.red_cost || 0,
+                        ],
+                        backgroundColor: ['#3b82f6', '#ef4444'],
+                        borderColor: ['#2563eb', '#dc2626'],
+                        borderWidth: 2,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Cost Distribution',
+                            color: '#e2e8f0',
+                        },
+                        legend: {
+                            labels: { color: '#94a3b8' },
+                        },
+                    },
+                },
+            });
+        }
+
+        function updateTimeline(events) {
+            const container = document.getElementById('eventTimeline');
+            if (!events || events.length === 0) {
+                container.innerHTML = '<div class="loading">No events recorded</div>';
+                return;
+            }
+
+            container.innerHTML = events.map(event => `
+                <div class="event ${event.event_type}">
+                    <div class="event-time">Step ${event.step}</div>
+                    <div class="event-desc">
+                        ${formatEvent(event)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatEvent(event) {
+            switch (event.event_type) {
+                case 'detection':
+                    return `Detector ${event.agent_b_id} detected agent ${event.agent_a_id}`;
+                case 'intercept':
+                    return `Interceptor ${event.agent_b_id} intercepted agent ${event.agent_a_id}`;
+                case 'target_destroyed':
+                    return `Target destroyed by agent ${event.agent_a_id}`;
+                default:
+                    return `Event: ${event.event_type}`;
+            }
+        }
+
+        function getColor(agentType) {
+            const colors = {
+                seeker: '#38bdf8',
+                target: '#22c55e',
+                detector: '#f59e0b',
+                interceptor: '#ef4444',
+                attacker: '#a855f7',
+            };
+            return colors[agentType] || '#94a3b8';
+        }
+
+        function refreshData() {
+            if (currentRunId) {
+                loadRun();
+            }
+        }
+
+        // WebSocket for real-time GA updates
+        const ws = new WebSocket(`ws://${window.location.host}/ws/ga/1`);
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'ga_update') {
+                console.log('GA Update:', data);
+            }
+        };
+        ws.onclose = () => {
+            document.getElementById('connectionStatus').textContent = 'Disconnected';
+            setTimeout(() => location.reload(), 3000);
+        };
+    </script>
+</body>
+</html>

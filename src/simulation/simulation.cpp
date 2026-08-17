@@ -1,4 +1,5 @@
 #include "simulation.h"
+#include "simulationRecorder.h"
 #include <cmath>
 #include <iomanip>
 #include <limits>
@@ -8,8 +9,10 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
                        unsigned seed)
     : m_map(map), m_maxSteps(maxSteps),
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
-      m_finished(false), m_step(0), m_pf(nullptr),
-      m_seed(seed), m_rng(seed)
+      m_finished(false), m_step(0), m_pf(nullptr), m_recorder(nullptr),
+      m_seed(seed), m_rng(seed),
+      m_detectorGrid(50.0),   // 50-cell buckets for detector queries
+      m_interceptorGrid(50.0) // 50-cell buckets for interceptor queries
 {
     int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, attackerId = 0;
     double detRadius = config.getDetectorRadius();
@@ -57,17 +60,24 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
     if (m_detectors.empty() && !m_interceptors.empty()) {
         std::cout << "  WARNING: interceptors present but no detectors.\n";
     }
+
+    // Pre-reserve result vectors to avoid reallocations during buildResult()
+    m_seekers.reserve(20);
+    m_targets.reserve(10);
+    m_detectors.reserve(20);
+    m_interceptors.reserve(20);
+    m_attackers.reserve(20);
 }
 
 int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
     int bestIdx = -1;
-    double bestDist = std::numeric_limits<double>::max();
+    double bestDistSq = std::numeric_limits<double>::max();
     for (int i = 0; i < static_cast<int>(m_targets.size()); i++) {
         if (!m_targets[i].alive) continue;
         double dr = seeker.row - m_targets[i].row;
         double dc = seeker.col - m_targets[i].col;
-        double dist = std::sqrt(dr * dr + dc * dc);
-        if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        double distSq = dr * dr + dc * dc;
+        if (distSq < bestDistSq) { bestDistSq = distSq; bestIdx = i; }
     }
     return bestIdx;
 }
@@ -77,11 +87,21 @@ bool Simulation::checkCollision(const SeekerAgent& seeker, const TargetAgent& ta
 }
 
 void Simulation::updateDetectorTracks(int currentStep) {
+    // Rebuild spatial index for detectors (cheap: O(D) insertions)
+    m_detectorGrid.clear();
+    for (int d = 0; d < static_cast<int>(m_detectors.size()); d++) {
+        if (m_detectors[d].alive) {
+            m_detectorGrid.insert(d, m_detectors[d].row, m_detectors[d].col);
+        }
+    }
+
     for (auto& seeker : m_seekers) {
         if (!seeker.alive || seeker.reachedTarget) continue;
-        for (auto& detector : m_detectors) {
-            if (!detector.alive) continue;
-            if (!detector.isInRange(seeker.row, seeker.col)) continue;
+        auto nearby = m_detectorGrid.query(seeker.row, seeker.col,
+                                           m_detectors.empty() ? 0.0 : m_detectors[0].sensingRadius);
+        for (int dIdx : nearby) {
+            auto& detector = m_detectors[dIdx];
+            if (!detector.isInRangeSq(seeker.row, seeker.col)) continue;
             detector.recordSighting(seeker.id, currentStep);
             if (!seeker.detected) {
                 seeker.detected = true;
@@ -93,12 +113,14 @@ void Simulation::updateDetectorTracks(int currentStep) {
     for (auto& attacker : m_attackers) {
         if (!attacker.alive || attacker.reachedTarget) continue;
         if (!attacker.isDetectableByHydrophone()) continue;
-        for (auto& detector : m_detectors) {
-            if (!detector.alive) continue;
-            if (!detector.isInRange(attacker.row, attacker.col)) continue;
+        auto nearby = m_detectorGrid.query(attacker.row, attacker.col,
+                                           m_detectors.empty() ? 0.0 : m_detectors[0].sensingRadius);
+        for (int dIdx : nearby) {
+            auto& detector = m_detectors[dIdx];
+            if (!detector.isInRangeSq(attacker.row, attacker.col)) continue;
             if (!attacker.isInFrequencyRange(detector.freqLowHz, detector.freqHighHz)) continue;
-            // Log every sighting (including repeats) — same as for seekers.
             detector.recordSighting(attacker.id, currentStep);
+            attacker.recordSighting(detector.id, currentStep);
             if (!attacker.detected) {
                 attacker.detected = true;
                 attacker.firstDetectedAtStep = currentStep;
@@ -109,16 +131,15 @@ void Simulation::updateDetectorTracks(int currentStep) {
 }
 
 void Simulation::checkInterceptorEngagements(int currentStep) {
-    std::uniform_real_distribution<double> roll(0.0, 1.0);
     for (auto& seeker : m_seekers) {
         if (!seeker.alive || seeker.reachedTarget) continue;
         if (!seeker.detected) continue;
         for (auto& interceptor : m_interceptors) {
             if (!interceptor.alive) continue;
-            if (!interceptor.isInRange(seeker.row, seeker.col)) continue;
+            if (!interceptor.isInRangeSq(seeker.row, seeker.col)) continue;
             interceptor.engagementCount++;
-            double pKill = interceptor.killProbability(seeker.row, seeker.col);
-            double r = roll(m_rng);
+            double pKill = interceptor.killProbabilitySq(seeker.row, seeker.col, interceptor.killRadiusSq);
+            double r = m_roll(m_rng);
             if (r < pKill) {
                 seeker.alive = false;
                 seeker.intercepted = true;
@@ -134,15 +155,16 @@ void Simulation::checkInterceptorEngagements(int currentStep) {
         if (!attacker.detected) continue;
         for (auto& interceptor : m_interceptors) {
             if (!interceptor.alive) continue;
-            if (!interceptor.isInRange(attacker.row, attacker.col)) continue;
+            if (!interceptor.isInRangeSq(attacker.row, attacker.col)) continue;
             interceptor.engagementCount++;
-            double pKill = interceptor.killProbability(attacker.row, attacker.col);
-            double r = roll(m_rng);
+            double pKill = interceptor.killProbabilitySq(attacker.row, attacker.col, interceptor.killRadiusSq);
+            double r = m_roll(m_rng);
             if (r < pKill) {
                 attacker.alive = false;
                 attacker.intercepted = true;
                 attacker.interceptedByInterceptor = interceptor.id;
                 attacker.interceptedAtStep = currentStep;
+                attacker.intercepts.push_back({interceptor.id, currentStep});
                 interceptor.recordIntercept(attacker.id, currentStep);
                 break;
             }
@@ -285,13 +307,13 @@ void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
             attacker.stepDelayCounter = 0;
         }
         int bestTarget = -1;
-        double bestDist = std::numeric_limits<double>::max();
+        double bestDistSq = std::numeric_limits<double>::max();
         for (int i = 0; i < static_cast<int>(m_targets.size()); i++) {
             if (!m_targets[i].alive) continue;
             double dr = attacker.row - m_targets[i].row;
             double dc = attacker.col - m_targets[i].col;
-            double dist = std::sqrt(dr * dr + dc * dc);
-            if (dist < bestDist) { bestDist = dist; bestTarget = i; }
+            double distSq = dr * dr + dc * dc;
+            if (distSq < bestDistSq) { bestDistSq = distSq; bestTarget = i; }
         }
         if (bestTarget < 0) continue;
         attacker.targetId = m_targets[bestTarget].id;
@@ -364,15 +386,18 @@ void Simulation::executeOneStepInternal(int step, bool verbose) {
         }
     }
 
-    // Condition C: All actively-missioning attackers finished
+    // Condition C: All attackers finished
     bool allAttackersFinished = true;
     for (const auto& a : m_attackers) {
-        if (a.fsmState == AgentFSMState::S4_EXECUTE ||
-            a.fsmState == AgentFSMState::S5_LOG_RESULT ||
-            a.fsmState == AgentFSMState::S6_UPDATE_SHARED) {
-            allAttackersFinished = false;
-            break;
-        }
+        if (!a.alive) continue;
+        if (a.reachedTarget) continue;
+        if (a.fsmState == AgentFSMState::S7_DEACTIVATE) continue;
+        if (a.fsmState == AgentFSMState::S8_COMPLETE) continue;
+        if (a.fsmState == AgentFSMState::S9_RESET) continue;
+        if (a.fsmState == AgentFSMState::FALLBACK) continue;
+        if (a.fsmState == AgentFSMState::ABORT) continue;
+        allAttackersFinished = false;
+        break;
     }
 
     if (allSeekersFinished && allAttackersFinished)
@@ -421,6 +446,7 @@ bool Simulation::stepOnce() {
     m_step++;
     if (m_step > m_maxSteps) { m_finished = true; return false; }
     executeOneStepInternal(m_step, true);
+    if (m_recorder) m_recorder->recordStep(*this, m_step);
     return !m_finished;
 }
 
@@ -443,6 +469,7 @@ SimResult Simulation::run() {
                       << " | Targets alive: " << alive << std::endl;
         }
         executeOneStepInternal(m_step, false);
+        if (m_recorder) m_recorder->recordStep(*this, m_step);
     }
 
     int finalStep = m_step;
@@ -475,3 +502,48 @@ SimResult Simulation::run() {
     result.computeSummary();
     return result;
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  BATCH API FOR GA DIRECT INTEGRATION
+// ════════════════════════════════════════════════════════════════════════════════
+
+std::vector<SimResult> Simulation::runBatch(const std::vector<SpawnConfig>& configs,
+                                             int maxSteps, unsigned baseSeed) {
+    std::vector<SimResult> results;
+    results.reserve(configs.size());
+
+    for (size_t i = 0; i < configs.size(); i++) {
+        unsigned seed = (baseSeed != 0) ? baseSeed + static_cast<unsigned>(i) : 0;
+        MapCreation map = MapCreation::fromGridData(
+            configs[i].getGrid(),
+            configs[i].getMapInfo().cellsN,
+            configs[i].getMapInfo().canvasWidth,
+            configs[i].getMapInfo().canvasHeight);
+
+        for (const auto& unit : configs[i].getUnits()) {
+            int t = MapCreation::WATER;
+            if (unit.type == "seeker")      t = MapCreation::SEEKER;
+            else if (unit.type == "target") t = MapCreation::TARGET;
+            else if (unit.type == "detector")   t = MapCreation::DETECTOR;
+            else if (unit.type == "interceptor") t = MapCreation::INTERCEPTOR;
+            else if (unit.type == "attacker")   t = MapCreation::ATTACKER;
+            if (t != MapCreation::WATER) {
+                map.placeUnit(unit.row, unit.col, t);
+            }
+        }
+
+        Simulation sim(map, configs[i], maxSteps, seed);
+        results.push_back(sim.run());
+    }
+
+    return results;
+}
+
+size_t Simulation::getRecorderStepCount() const {
+    return m_recorder ? m_recorder->stepCount() : 0;
+}
+
+bool Simulation::saveRecording(const std::string& filepath) const {
+    return m_recorder ? m_recorder->saveJSON(filepath) : false;
+}
+

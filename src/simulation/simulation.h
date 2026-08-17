@@ -13,6 +13,9 @@
 #include "spawnConfig.h"
 #include "simResult.h"
 #include "attackerAgent.h"
+#include "../utils/spatialGrid.h"
+
+class SimulationRecorder;  // forward declaration
 
 /**
  * Simulation
@@ -56,6 +59,14 @@ public:
     /** Retrieve the RNG seed used for this run (for reproducibility/replay). */
     unsigned getSeed() const { return m_seed; }
 
+    /** Set an optional recorder for step-by-step state capture. */
+    void setRecorder(SimulationRecorder* recorder) { m_recorder = recorder; }
+
+    /** Save recording to JSON if recorder is attached. */
+    bool saveRecording(const std::string& filepath) const;
+
+    size_t getRecorderStepCount() const;
+
     Simulation(const Simulation&) = delete;
     Simulation& operator=(const Simulation&) = delete;
 
@@ -93,6 +104,16 @@ public:
     /** Build the final result struct from current agent state. Public for visualizer. */
     SimResult buildResult(int totalSteps) const;
 
+    // -- Batch API for GA direct integration (avoids subprocess overhead) --
+    /**
+     * Run multiple simulations from scenario configs in batch.
+     * Each result is independent; seeds are derived from the base seed + index.
+     * This is the direct-library alternative to `uuv_sim.exe --repeat N`.
+     */
+    static std::vector<SimResult> runBatch(const std::vector<SpawnConfig>& configs,
+                                            int maxSteps = 2000,
+                                            unsigned baseSeed = 0);
+
     // Const accessors for visualizer
     const std::vector<SeekerAgent>&      getSeekers()      const { return m_seekers; }
     const std::vector<TargetAgent>&      getTargets()      const { return m_targets; }
@@ -115,8 +136,13 @@ private:
 
     unsigned m_seed;            ///< RNG seed used for this run (reproducible)
     mutable std::mt19937 m_rng;
+    std::uniform_real_distribution<double> m_roll{0.0, 1.0};  // pre-constructed distribution
 
     Pathfinding* m_pf;  // persistent pathfinder (reused across steps)
+    mutable SpatialGrid m_detectorGrid;   // spatial index for detector range queries
+    mutable SpatialGrid m_interceptorGrid; // spatial index for interceptor range queries
+
+    SimulationRecorder* m_recorder;  // optional state recorder for replay
 
     /** Nearest living target to a seeker (Euclidean). -1 if none. */
     int findNearestTarget(const SeekerAgent& seeker) const;

@@ -1,0 +1,31 @@
+# Doxygen configuration for UUV-Simulation-Analysis
+# Generate docs with: doxygen Doxyfile
+
+PROJECT_NAME           = "UUV Simulation Analysis"
+PROJECT_NUMBER         = 0.2.0
+OUTPUT_DIRECTORY       = docs/doxygen
+CREATE_SUBDIRS         = NO
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+INPUT                  = src include README.md CHANGELOG.md
+FILE_PATTERNS          = *.h *.cpp *.md
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+EXTRACT_ANON_NSPACES   = NO
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_FRIEND_COMPOUNDS  = NO
+HIDE_IN_BODY_DOCS      = NO
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+SOURCE_BROWSER         = NO
+ALPHABETICAL_INDEX     = YES
+GENERATE_TREEVIEW      = YES
+TREEVIEW_WIDTH         = 250
+USE_MDFILE_AS_MAINPAGE = README.md

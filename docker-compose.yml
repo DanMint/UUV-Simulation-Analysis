@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  uuv-sim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./scenarios:/app/scenarios
+      - ./runs:/app/runs
+    environment:
+      - UUV_SEED=42
+    command: ["--scenario", "scenarios/diveld_baseline_complete.json", "--no-prompt"]
+
+  uuv-ga-attacker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./scenarios:/app/scenarios
+      - ./runs:/app/runs
+      - ./scripts:/app/scripts
+    environment:
+      - UUV_SEED=42
+    command: ["python3", "scripts/uuv_sim_cli.py", "ga", "attacker", "scenarios/diveld_baseline_complete.json", "--generations", "10"]
+
+  uuv-ga-defender:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./scenarios:/app/scenarios
+      - ./runs:/app/runs
+      - ./scripts:/app/scripts
+    environment:
+      - UUV_SEED=42
+    command: ["python3", "scripts/uuv_sim_cli.py", "ga", "defender", "scenarios/diveld_baseline_complete.json", "--generations", "10"]

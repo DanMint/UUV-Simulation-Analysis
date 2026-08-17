@@ -51,8 +51,16 @@ namespace {
 
 AttackerAgent::AttackerAgent(int id, int row, int col)
     : SeekerAgent(id, row, col),
-      specs(getVehicleSpecs("bluerov2"))   // safe default — overwritten by create() if called via factory
+      specs(getVehicleSpecs("bluerov2")),
+      fsmState(AgentFSMState::S0_IDLE),
+      stepDelayCounter(0),
+      everSucceeded(false),
+      killCount(0),
+      milestone25(false), milestone50(false), milestone75(false)
 {
+    sightings.reserve(50);
+    intercepts.reserve(20);
+    moveHistory.reserve(2500);
     std::cout << logPrefix(specs.agentType, id) << " S0: IDLE — awaiting spawn\n";
 }
 

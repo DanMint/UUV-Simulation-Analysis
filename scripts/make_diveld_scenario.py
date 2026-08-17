@@ -98,14 +98,22 @@ def build_scenario(base_path, out_path, seed):
         {"type": "attacker", "row": sw[0], "col": sw[1], "vehicle_type": "diveld"},
     ]
     targets = [
-        {"type": "target", "row": target[0], "col": target[1], "vehicle_type": "diveld"},
+        {"type": "target", "row": target[0], "col": target[1]},
     ]
 
     # The simulation engine requires at least one seeker to drive a
-    # simulation run. Add a single Dive-LD seeker near the harbour asset
+    # simulation run. Add a single Dive-LD seeker near the harbor asset
     # so the baseline scenario can execute headless. The 3 Dive-LD
     # attackers remain the focus of the scenario.
-    seeker = {"type": "seeker", "row": target[0] + 2, "col": target[1],
+    seeker_r = target[0] + 2
+    seeker_c = target[1]
+    if not (0 <= seeker_r < len(grid) and 0 <= seeker_c < len(grid[0]) and grid[seeker_r][seeker_c] == WATER):
+        candidates = [(r, c) for (r, c) in water
+                      if abs(r - target[0]) <= 3 and abs(c - target[1]) <= 3]
+        if not candidates:
+            candidates = water
+        seeker_r, seeker_c = random.Random(seed + 1).choice(candidates)
+    seeker = {"type": "seeker", "row": seeker_r, "col": seeker_c,
               "vehicle_type": "diveld"}
 
     scenario = {

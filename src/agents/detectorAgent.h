@@ -21,6 +21,7 @@ struct DetectorAgent {
     int row;
     int col;
     double sensingRadius;   // detection range in cells (Euclidean)
+    double sensingRadiusSq; // cached squared detection radius
     bool alive;
     int sightingCount;      // total (seeker, step) sightings logged
     int freqLowHz  = 0;       // lower bound of detectable frequency range
@@ -36,8 +37,8 @@ struct DetectorAgent {
     DetectorAgent(int id, int row, int col, double sensingRadius);
     DetectorAgent(int id, int row, int col, double sensingRadius, float unitCost);
 
-    /** True if a position is within this detector's sensing radius. */
-    bool isInRange(int checkRow, int checkCol) const;
+    /** True if a position is within this detector's sensing radius (squared-distance). */
+    bool isInRangeSq(int checkRow, int checkCol) const;
 
     /** Log a sighting of a seeker at a given step. */
     void recordSighting(int seekerId, int step);

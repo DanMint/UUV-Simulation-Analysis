@@ -29,6 +29,8 @@
 #include <string>
 #include <cmath>
 #include <vector>
+#include <algorithm>
+#include <set>
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  BASELINE LOADER
@@ -185,6 +187,14 @@ int main(int argc, char* argv[]) {
         if (!pass) failures++;
     };
 
+    auto checkInt = [&](const std::string& name, int actual, int expected) {
+        checks++;
+        bool pass = (actual == expected);
+        std::cout << "  " << (pass ? "PASS" : "FAIL") << "  "
+                  << name << ": got " << actual << ", expected " << expected << "\n";
+        if (!pass) failures++;
+    };
+
     try {
         // ── Load ─────────────────────────────────────────────────────
         std::cout << "[TEST] Loading grid:     " << gridPath << "\n";
@@ -195,6 +205,15 @@ int main(int argc, char* argv[]) {
 
         std::cout << "[TEST] Loading baseline: " << baselinePath << "\n";
         BaselineData baseline = loadBaseline(baselinePath);
+
+        std::vector<std::vector<int>> cleanGrid = config.getGrid();
+        for (auto& row : cleanGrid) {
+            for (auto& cell : row) {
+                if (cell == 2 || cell == 3 || cell == 4 || cell == 5 || cell == 7)
+                    cell = 0;
+            }
+        }
+        const MapInfo& info = config.getMapInfo();
 
         // ── Stamp units ──────────────────────────────────────────────
         for (const auto& unit : config.getUnits()) {
@@ -237,6 +256,180 @@ int main(int argc, char* argv[]) {
             checkBool(p + ".destroyed",        a.destroyed, e.destroyed);
             check(p + ".destroyed_at_step",    a.destroyedAtStep, e.destroyedAtStep);
             check(p + ".destroyed_by_seeker",  a.destroyedBySeeker, e.destroyedBySeeker);
+        }
+
+        // ── Edge case: zero detectors, interceptors present ──────────
+        std::cout << "\n[TEST] === Edge Cases ===\n";
+        map.clearAllUnits();
+        SpawnConfig edge1;
+        edge1.addUnit("seeker", 32, 76);
+        edge1.addUnit("target", 13, 15);
+        edge1.addUnit("interceptor", 14, 15);
+        edge1.setInterceptorRadius(3.0);
+        for (const auto& unit : edge1.getUnits()) {
+            int t = MapCreation::WATER;
+            if (unit.type == "seeker")      t = MapCreation::SEEKER;
+            else if (unit.type == "target") t = MapCreation::TARGET;
+            else if (unit.type == "interceptor") t = MapCreation::INTERCEPTOR;
+            if (t != MapCreation::WATER) map.placeUnit(unit.row, unit.col, t);
+        }
+        {
+            Simulation edgeSim(map, edge1, 2000, 99);
+            SimResult edgeResult = edgeSim.run();
+            check("zero_detectors_total_steps", edgeResult.totalSteps > 0, true);
+            check("zero_detectors_seekers_reached", edgeResult.seekersThatReached, 1);
+        }
+
+        // ── Edge case: zero interceptors, detectors present ──────────
+        map.clearAllUnits();
+        SpawnConfig edge2;
+        edge2.addUnit("seeker", 32, 76);
+        edge2.addUnit("target", 13, 15);
+        edge2.addUnit("detector", 14, 15);
+        edge2.setDetectorRadius(4.0);
+        for (const auto& unit : edge2.getUnits()) {
+            int t = MapCreation::WATER;
+            if (unit.type == "seeker")      t = MapCreation::SEEKER;
+            else if (unit.type == "target") t = MapCreation::TARGET;
+            else if (unit.type == "detector")   t = MapCreation::DETECTOR;
+            if (t != MapCreation::WATER) map.placeUnit(unit.row, unit.col, t);
+        }
+        {
+            Simulation edgeSim(map, edge2, 2000, 99);
+            SimResult edgeResult = edgeSim.run();
+            check("zero_interceptors_total_steps", edgeResult.totalSteps > 0, true);
+            check("zero_interceptors_seekers_reached", edgeResult.seekersThatReached, 1);
+        }
+
+        // ── Edge case: critical target tracked in CSV output ─────────
+        {
+            SpawnConfig critConfig;
+            critConfig.setMapData(info, cleanGrid);
+            critConfig.addUnit("seeker", 32, 76);
+            critConfig.addUnit("target", 13, 15, "", true);
+            critConfig.setDetectorRadius(4.0);
+            critConfig.setInterceptorRadius(3.0);
+
+            MapCreation critMap = MapCreation::fromGridData(
+                cleanGrid, info.cellsN, info.canvasWidth, info.canvasHeight);
+            for (const auto& unit : critConfig.getUnits()) {
+                int t = MapCreation::WATER;
+                if (unit.type == "seeker")      t = MapCreation::SEEKER;
+                else if (unit.type == "target") t = MapCreation::TARGET;
+                if (t != MapCreation::WATER) critMap.placeUnit(unit.row, unit.col, t);
+            }
+
+            Simulation critSim(critMap, critConfig, 2000, 99);
+            SimResult critResult = critSim.run();
+            critResult.computeSummary();
+
+            std::string csvPath = "tests/fixtures/critical_test.csv";
+            std::ofstream csvOut(csvPath, std::ios::trunc);
+            if (csvOut.is_open()) csvOut.close();
+
+            critResult.saveCSV(csvPath, 0);
+
+            std::ifstream csvFile(csvPath);
+            std::string csvLine;
+            bool foundCritical = false;
+            bool criticalVal = false;
+            if (csvFile.is_open()) {
+                std::getline(csvFile, csvLine);
+                std::getline(csvFile, csvLine);
+                size_t pos = 0;
+                int fieldIndex = 0;
+                while ((pos = csvLine.find(',', pos)) != std::string::npos) {
+                    fieldIndex++;
+                    if (fieldIndex == 6) {
+                        std::string val = csvLine.substr(pos + 1);
+                        size_t nextComma = val.find(',');
+                        if (nextComma != std::string::npos) val = val.substr(0, nextComma);
+                        criticalVal = (val == "true" || val == "1");
+                        foundCritical = true;
+                        break;
+                    }
+                    pos++;
+                }
+                csvFile.close();
+            }
+            checkBool("critical_asset_reached_in_csv", foundCritical && criticalVal, true);
+        }
+
+        // ── Edge case: GA batch mode (--repeat) produces valid CSV ─────
+        {
+            SpawnConfig gaConfig;
+            gaConfig.setMapData(config.getMapInfo(), cleanGrid);
+            gaConfig.addUnit("seeker", 32, 76);
+            gaConfig.addUnit("target", 13, 15);
+            gaConfig.setDetectorRadius(4.0);
+            gaConfig.setInterceptorRadius(3.0);
+
+            std::string gaCsv = "tests/fixtures/ga_batch_test.csv";
+            {
+                std::ofstream out(gaCsv, std::ios::trunc);
+                if (out.is_open()) out.close();
+            }
+
+            MapCreation gaMap = MapCreation::fromGridData(
+                cleanGrid, info.cellsN, info.canvasWidth, info.canvasHeight);
+            for (const auto& unit : gaConfig.getUnits()) {
+                int t = MapCreation::WATER;
+                if (unit.type == "seeker")      t = MapCreation::SEEKER;
+                else if (unit.type == "target") t = MapCreation::TARGET;
+                if (t != MapCreation::WATER) gaMap.placeUnit(unit.row, unit.col, t);
+            }
+
+            Simulation gaSim(gaMap, gaConfig, 2000, 99);
+            SimResult gaResult = gaSim.run();
+            gaResult.computeSummary();
+            gaResult.saveCSV(gaCsv, 0);
+
+            std::ifstream csvFile(gaCsv);
+            std::string header;
+            if (csvFile.is_open()) {
+                std::getline(csvFile, header);
+                csvFile.close();
+            }
+            bool hasHeader = header.find("run_id") != std::string::npos &&
+                             header.find("blue_cost") != std::string::npos &&
+                             header.find("red_cost") != std::string::npos &&
+                             header.find("loss_exchange_ratio") != std::string::npos &&
+                             header.find("targets_destroyed") != std::string::npos &&
+                             header.find("total_targets") != std::string::npos &&
+                             header.find("critical_asset_reached") != std::string::npos &&
+                             header.find("total_steps") != std::string::npos &&
+                             header.find("mission_success_rate") != std::string::npos &&
+                             header.find("interceptor_engagements") != std::string::npos;
+            checkBool("ga_batch_csv_header_valid", hasHeader, true);
+        }
+
+        // ── Edge case: Simulation::runBatch() direct C++ API ───────────
+        {
+            std::vector<SpawnConfig> batchConfigs;
+            for (int i = 0; i < 3; i++) {
+                SpawnConfig sc;
+                sc.setMapData(config.getMapInfo(), cleanGrid);
+                sc.addUnit("seeker", 32, 76);
+                sc.addUnit("target", 13, 15);
+                sc.setDetectorRadius(4.0);
+                sc.setInterceptorRadius(3.0);
+                batchConfigs.push_back(sc);
+            }
+
+            auto batchResults = Simulation::runBatch(batchConfigs, 2000, 99);
+            checkInt("runBatch_count", static_cast<int>(batchResults.size()), 3);
+
+            bool allHaveSummary = true;
+            bool allHaveSeekers = true;
+            bool allHaveTargets = true;
+            for (const auto& r : batchResults) {
+                if (r.totalSteps <= 0) allHaveSummary = false;
+                if (r.seekerResults.empty()) allHaveSeekers = false;
+                if (r.targetResults.empty()) allHaveTargets = false;
+            }
+            checkBool("runBatch_all_have_summary", allHaveSummary, true);
+            checkBool("runBatch_all_have_seekers", allHaveSeekers, true);
+            checkBool("runBatch_all_have_targets", allHaveTargets, true);
         }
 
         // ── Verdict ──────────────────────────────────────────────────

@@ -6,8 +6,8 @@ SeekerAgent::SeekerAgent(int id, int row, int col)
     : id(id), row(row), col(col),
       spawnRow(row), spawnCol(col),
       alive(true), reachedTarget(false),
-      specs(getVehicleSpecs("bluerov2")),  // default specs
-      pathIndex(0), targetId(-1),
+      specs(getVehicleSpecs("bluerov2")),
+      path(), pathIndex(0), targetId(-1),
       stepsTaken(0), pathCost(0.0), nodesExpanded(0),
       detected(false),
       firstDetectedAtStep(-1),
@@ -16,7 +16,8 @@ SeekerAgent::SeekerAgent(int id, int row, int col)
       interceptedByInterceptor(-1),
       interceptedAtStep(-1)
 {
-    // Record starting position
+    path.reserve(200);
+    moveHistory.reserve(2500);
     moveHistory.push_back({row, col});
 }
 

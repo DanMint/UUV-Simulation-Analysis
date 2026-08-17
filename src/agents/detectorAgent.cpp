@@ -4,6 +4,7 @@
 DetectorAgent::DetectorAgent(int id, int row, int col, double sensingRadius)
     : id(id), row(row), col(col),
       sensingRadius(sensingRadius),
+      sensingRadiusSq(sensingRadius * sensingRadius),
       alive(true),
       sightingCount(0),
       unitCost(1.0f) {}
@@ -11,14 +12,15 @@ DetectorAgent::DetectorAgent(int id, int row, int col, double sensingRadius)
 DetectorAgent::DetectorAgent(int id, int row, int col, double sensingRadius, float unitCost)
     : id(id), row(row), col(col),
       sensingRadius(sensingRadius),
+      sensingRadiusSq(sensingRadius * sensingRadius),
       alive(true),
       sightingCount(0),
       unitCost(unitCost) {}
 
-bool DetectorAgent::isInRange(int checkRow, int checkCol) const {
+bool DetectorAgent::isInRangeSq(int checkRow, int checkCol) const {
     double dr = row - checkRow;
     double dc = col - checkCol;
-    return std::sqrt(dr * dr + dc * dc) <= sensingRadius;
+    return (dr * dr + dc * dc) <= sensingRadiusSq;
 }
 
 void DetectorAgent::recordSighting(int seekerId, int step) {

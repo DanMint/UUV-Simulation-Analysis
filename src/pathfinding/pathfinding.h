@@ -28,65 +28,51 @@ public:
     /**
      * Construct with a reference to the grid.
      * Grid must outlive this object.
+     * Pre-allocates reusable flat buffers for A* to eliminate heap allocations.
      */
     Pathfinding(const std::vector<std::vector<int>>& grid);
 
-    /**
-     * Find optimal path from start to destination using A* with Octile heuristic.
-     *
-     * @return Vector of (row, col) from start to destination (inclusive).
-     *         Empty if no path exists.
-     */
+    ~Pathfinding() = default;
+
+    Pathfinding(const Pathfinding&) = delete;
+    Pathfinding& operator=(const Pathfinding&) = delete;
+
     std::vector<Pos> findPath(int startRow, int startCol,
                               int destRow, int destCol) const;
 
-    /** Check if cell is within grid bounds. */
     bool isValid(int row, int col) const;
-
-    /** Check if cell is passable (not land). */
     bool isPassable(int row, int col) const;
-
-    /** Get the number of nodes expanded in the last search (for analysis). */
     int getLastNodesExpanded() const;
-
-    /** Get the total path cost of the last search (for analysis). */
     double getLastPathCost() const;
 
 private:
     const std::vector<std::vector<int>>& m_grid;
     int m_rows;
     int m_cols;
-
-    // Stats from the last search (mutable so findPath can stay const)
     mutable int m_lastNodesExpanded;
     mutable double m_lastPathCost;
 
-    /**
-     * Octile distance heuristic.
-     *
-     * For 8-directional movement with diagonal cost √2:
-     *   dx = |col - destCol|
-     *   dy = |row - destRow|
-     *   h  = max(dx, dy) + (√2 - 1) × min(dx, dy)
-     *
-     * This is the tightest admissible heuristic for 8-way grids.
-     * Always ≤ true cost, so A* is guaranteed optimal.
-     */
+    // Pre-allocated flat buffers for A* (eliminates per-call allocations)
+    mutable std::vector<double> m_gFlat;
+    mutable std::vector<double> m_fFlat;
+    mutable std::vector<char> m_closedFlat;      // char avoids vector<bool> specialization
+    mutable std::vector<Pos> m_parentFlat;
+    mutable std::vector<std::pair<double, int>> m_openFlat;  // (f, idx) for binary heap
+
     static double octileHeuristic(int row, int col, int destRow, int destCol);
 
-    /** Trace path from destination back to start using parent map. */
-    static std::vector<Pos> tracePath(
-        const std::vector<std::vector<Pos>>& parents,
-        int destRow, int destCol);
+    // Flat-index helpers
+    static inline int idx(int row, int col, int cols) noexcept { return row * cols + col; }
+    static inline int rowFromIdx(int idx, int cols) noexcept { return idx / cols; }
+    static inline int colFromIdx(int idx, int cols) noexcept { return idx % cols; }
 
-    // 8 directions: cardinal + diagonal
-    static constexpr int DIR_COUNT = 8;
-    static constexpr int DR[DIR_COUNT] = { -1, 1, 0, 0, -1, -1, 1, 1 };
-    static constexpr int DC[DIR_COUNT] = { 0, 0, -1, 1, -1, 1, -1, 1 };
-    // Cost: 1.0 for cardinal (first 4), sqrt(2) for diagonal (last 4)
-    static constexpr double MOVE_COST[DIR_COUNT] = {
-        1.0, 1.0, 1.0, 1.0, 1.41421356, 1.41421356, 1.41421356, 1.41421356
-    };
+    // Binary heap operations on flat array
+    void heapPush(double f, int nodeIdx) const;
+    std::pair<double, int> heapPop() const;
+    bool heapEmpty() const;
+
+    std::vector<Pos> tracePath(
+        int destRow, int destCol) const;
 };
 
 #endif // PATHFINDING_H

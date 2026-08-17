@@ -5,6 +5,7 @@
 InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius)
     : id(id), row(row), col(col),
       killRadius(killRadius),
+      killRadiusSq(killRadius * killRadius),
       alive(true),
       killCount(0),
       engagementCount(0),
@@ -16,6 +17,7 @@ InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius,
                                    const std::string& vehicleType)
     : id(id), row(row), col(col),
       killRadius(killRadius),
+      killRadiusSq(killRadius * killRadius),
       alive(true),
       killCount(0),
       engagementCount(0),
@@ -28,6 +30,7 @@ InterceptorAgent::InterceptorAgent(int id, int row, int col, double killRadius,
                                    float unitCost, float engagementCost)
     : id(id), row(row), col(col),
       killRadius(killRadius),
+      killRadiusSq(killRadius * killRadius),
       alive(true),
       killCount(0),
       engagementCount(0),
@@ -57,22 +60,24 @@ float InterceptorAgent::costPerShotForType(const std::string& vehicleType) {
     }
 }
 
-bool InterceptorAgent::isInRange(int checkRow, int checkCol) const {
+bool InterceptorAgent::isInRangeSq(int checkRow, int checkCol) const {
     double dr = row - checkRow;
     double dc = col - checkCol;
-    return std::sqrt(dr * dr + dc * dc) <= killRadius;
+    return (dr * dr + dc * dc) <= killRadiusSq;
 }
 
-double InterceptorAgent::killProbability(int checkRow, int checkCol) const {
+double InterceptorAgent::killProbabilitySq(int checkRow, int checkCol, double radiusSq) const {
     double dr = row - checkRow;
     double dc = col - checkCol;
-    double dist = std::sqrt(dr * dr + dc * dc);
-    if (dist > killRadius) return 0.0;
+    double distSq = dr * dr + dc * dc;
+    if (distSq > radiusSq) return 0.0;
 
-    double ratio = (killRadius > 0.0) ? dist / killRadius : 0.0;
-    if (ratio <= 0.5) return 0.90;  // inner 50% of radius
-    if (ratio <= 0.7) return 0.60;  // 50-70% of radius
-    return 0.50;                    // 70-100% of radius
+    double dist = std::sqrt(distSq);
+    double radius = std::sqrt(radiusSq);
+    double ratio = (radius > 0.0) ? dist / radius : 0.0;
+    if (ratio <= 0.5) return 0.90;
+    if (ratio <= 0.7) return 0.60;
+    return 0.50;
 }
 
 void InterceptorAgent::recordIntercept(int seekerId, int step) {

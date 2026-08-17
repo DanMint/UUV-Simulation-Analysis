@@ -1,0 +1,58 @@
+# Example YAML scenario configuration
+# This is a human-friendly alternative to JSON scenarios
+
+map:
+  shp_path: ""
+  width: 50
+  height: 50
+  cells_n: 50
+
+units:
+  - type: seeker
+    row: 5
+    col: 5
+    vehicle_type: bluerov2
+
+  - type: seeker
+    row: 8
+    col: 8
+    vehicle_type: tb2
+
+  - type: target
+    row: 40
+    col: 40
+    is_critical: true
+
+  - type: target
+    row: 45
+    col: 35
+    is_critical: false
+
+  - type: detector
+    row: 25
+    col: 25
+    sensing_radius: 8.0
+
+  - type: interceptor
+    row: 30
+    col: 30
+    kill_radius: 5.0
+    vehicle_type: hugin
+
+# Environmental parameters
+noise_level: 0.5
+
+# GA search zones (optional)
+defender_zones:
+  - name: harbor_entrance
+    min_row: 10
+    max_row: 40
+    min_col: 10
+    max_col: 40
+
+attacker_zones:
+  - name: approach_corridor
+    min_row: 0
+    max_row: 15
+    min_col: 0
+    max_col: 15

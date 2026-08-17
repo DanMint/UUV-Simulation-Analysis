@@ -62,17 +62,19 @@ struct InterceptorAgent {
      */
     static float costPerShotForType(const std::string& vehicleType);
 
-    /** True if a position is within this interceptor's kill radius. */
-    bool isInRange(int checkRow, int checkCol) const;
+    /** True if a position is within this interceptor's kill radius (squared-distance). */
+    bool isInRangeSq(int checkRow, int checkCol) const;
 
     /**
      * Distance-tiered kill probability at the given position.
-     * Returns 0.0 if the target is outside killRadius.
+     * Uses precomputed killRadiusSq for branchless fast path.
      */
-    double killProbability(int checkRow, int checkCol) const;
+    double killProbabilitySq(int checkRow, int checkCol, double radiusSq) const;
 
     /** Log a successful intercept of a seeker at a given step. */
     void recordIntercept(int seekerId, int step);
+
+    double killRadiusSq;  // cached squared kill radius
 };
 
 #endif // INTERCEPTOR_AGENT_H

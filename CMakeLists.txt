@@ -19,6 +19,7 @@ add_executable(uuv_sim
     src/simulationVisualizer/simulationVisualizer.cpp
     src/pathfinding/pathfinding.cpp
     src/simulation/simulation.cpp
+    src/simulation/simulationRecorder.cpp
     src/simulation/simResult.cpp
     src/agents/targetAgent.cpp
     src/agents/seekerAgent.cpp
@@ -36,6 +37,7 @@ target_include_directories(uuv_sim PRIVATE
     src/simulationVisualizer
     src/pathfinding
     src/simulation
+    src/utils
 )
 
 # ------------------------------------------------------------
@@ -56,32 +58,147 @@ else()
 endif()
 
 # ------------------------------------------------------------
-# GDAL — use gdal-config directly (avoids Homebrew's massive
-# CMake config transitive dependency resolution which hangs)
+# GDAL — prefer CMake config, fall back to gdal-config on macOS
 # ------------------------------------------------------------
-find_program(GDAL_CONFIG gdal-config REQUIRED)
-
-execute_process(
-    COMMAND ${GDAL_CONFIG} --cflags
-    OUTPUT_VARIABLE GDAL_CFLAGS
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-execute_process(
-    COMMAND ${GDAL_CONFIG} --prefix
-    OUTPUT_VARIABLE GDAL_PREFIX
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-message(STATUS "Using gdal-config: ${GDAL_CONFIG}")
-message(STATUS "GDAL_CFLAGS: ${GDAL_CFLAGS}")
-message(STATUS "GDAL_PREFIX: ${GDAL_PREFIX}")
-
-separate_arguments(GDAL_CFLAGS)
-target_compile_options(uuv_sim PRIVATE ${GDAL_CFLAGS})
-target_link_directories(uuv_sim PRIVATE ${GDAL_PREFIX}/lib)
-target_link_libraries(uuv_sim PRIVATE gdal)
+find_package(GDAL CONFIG QUIET)
+if (GDAL_FOUND)
+    message(STATUS "Found GDAL ${GDAL_VERSION} (CMake config)")
+    target_link_libraries(uuv_sim PRIVATE GDAL::GDAL)
+else()
+    find_program(GDAL_CONFIG gdal-config REQUIRED)
+    execute_process(
+        COMMAND ${GDAL_CONFIG} --cflags
+        OUTPUT_VARIABLE GDAL_CFLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND ${GDAL_CONFIG} --prefix
+        OUTPUT_VARIABLE GDAL_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    message(STATUS "Using gdal-config: ${GDAL_CONFIG}")
+    message(STATUS "GDAL_CFLAGS: ${GDAL_CFLAGS}")
+    message(STATUS "GDAL_PREFIX: ${GDAL_PREFIX}")
+    separate_arguments(GDAL_CFLAGS)
+    target_compile_options(uuv_sim PRIVATE ${GDAL_CFLAGS})
+    target_link_directories(uuv_sim PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(uuv_sim PRIVATE gdal)
+endif()
 
 # Helpful on Apple Silicon if you ever accidentally mix archs
 if (APPLE)
     message(STATUS "CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}")
 endif()
+
+# ─── Tests ─────────────────────────────────────────────────────────────────────
+enable_testing()
+
+add_executable(test_attackerAgent
+    tests/test_attackerAgent.cpp
+    src/agents/attackerAgent.cpp
+    src/agents/vehicleSpecs.cpp
+    src/agents/seekerAgent.cpp
+    src/agents/detectorAgent.cpp
+    src/agents/interceptorAgent.cpp
+    src/pathfinding/pathfinding.cpp
+)
+target_include_directories(test_attackerAgent PRIVATE
+    src/agents
+    src/mapCreation
+    src/pathfinding
+)
+target_link_libraries(test_attackerAgent PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_attackerAgent PRIVATE GDAL::GDAL)
+else()
+    target_link_directories(test_attackerAgent PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_attackerAgent PRIVATE gdal)
+endif()
+
+add_executable(test_simulation
+    tests/test_simulation.cpp
+    src/mapCreation/mapCreation.cpp
+    src/spawnConfig/spawnConfig.cpp
+    src/simulation/simulation.cpp
+    src/simulation/simulationRecorder.cpp
+    src/simulation/simResult.cpp
+    src/pathfinding/pathfinding.cpp
+    src/agents/targetAgent.cpp
+    src/agents/seekerAgent.cpp
+    src/agents/attackerAgent.cpp
+    src/agents/detectorAgent.cpp
+    src/agents/interceptorAgent.cpp
+    src/agents/vehicleSpecs.cpp
+)
+target_include_directories(test_simulation PRIVATE
+    src/agents
+    src/mapCreation
+    src/spawnConfig
+    src/pathfinding
+    src/simulation
+    src/utils
+)
+target_link_libraries(test_simulation PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_simulation PRIVATE GDAL::GDAL)
+else()
+    target_link_directories(test_simulation PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_simulation PRIVATE gdal)
+endif()
+
+add_executable(test_diveld_scenario
+    tests/test_diveld_scenario.cpp
+    src/mapCreation/mapCreation.cpp
+    src/spawnConfig/spawnConfig.cpp
+    src/simulation/simulation.cpp
+    src/simulation/simulationRecorder.cpp
+    src/simulation/simResult.cpp
+    src/pathfinding/pathfinding.cpp
+    src/agents/targetAgent.cpp
+    src/agents/seekerAgent.cpp
+    src/agents/attackerAgent.cpp
+    src/agents/detectorAgent.cpp
+    src/agents/interceptorAgent.cpp
+    src/agents/vehicleSpecs.cpp
+)
+target_include_directories(test_diveld_scenario PRIVATE
+    src/agents
+    src/mapCreation
+    src/spawnConfig
+    src/pathfinding
+    src/simulation
+    src/utils
+)
+target_link_libraries(test_diveld_scenario PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_diveld_scenario PRIVATE GDAL::GDAL)
+else()
+    target_link_directories(test_diveld_scenario PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_diveld_scenario PRIVATE gdal)
+endif()
+
+add_test(NAME test_attackerAgent COMMAND test_attackerAgent)
+add_test(NAME test_simulation COMMAND test_simulation)
+add_test(NAME test_diveld_scenario COMMAND test_diveld_scenario)
+
+add_executable(test_logger
+    tests/test_logger.cpp
+)
+target_include_directories(test_logger PRIVATE
+    src/utils
+)
+add_test(NAME test_logger COMMAND test_logger)
+
+add_executable(test_spatialGrid
+    tests/test_spatialGrid.cpp
+)
+target_include_directories(test_spatialGrid PRIVATE
+    src/utils
+)
+add_test(NAME test_spatialGrid COMMAND test_spatialGrid)

@@ -86,6 +86,7 @@ docs/_build/
 
 # Test outputs and coverage
 test_output*.txt
+tests/fixtures/*.csv
 coverage.xml
 .coverage.*
 

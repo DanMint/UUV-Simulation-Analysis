@@ -152,6 +152,45 @@ This is the core military doctrine the simulation models:
 
 This forces the simulation to answer: *"How many seekers can get through the defence?"*
 
+## Key Algorithms
+
+### A\* Pathfinding
+
+Every seeker and attacker uses A\* to find the shortest path to its assigned target.
+The heuristic is **Octile distance** (tightest admissible for 8-directional grids):
+
+```
+h(n) = max(dx, dy) + (√2 - 1) × min(dx, dy)
+```
+
+Movement costs:
+- Cardinal (up/down/left/right): `1.0`
+- Diagonal: `√2 ≈ 1.414`
+
+Paths are recomputed when:
+- The target is destroyed (seeker re-targets to nearest living target)
+- Environmental noise displaces the agent (path invalidated)
+
+### Noise Model
+
+Wave/wind noise randomly displaces agents each step:
+- Magnitude: uniform `[-maxNoise, +maxNoise]` in rows and cols
+- **Bresenham line-of-sight enforced**: the agent cannot jump over land
+- Path is invalidated on displacement (must recompute via A\*)
+
+### Interceptor Kill Probability Tiers
+
+Distance-tiered probabilistic engagement model:
+
+| Zone | Distance ratio | Kill chance |
+|------|---------------|-------------|
+| Inner | 0% – 50% of radius | **90%** |
+| Mid | 50% – 70% of radius | **60%** |
+| Outer | 70% – 100% of radius | **50%** |
+| Beyond radius | > 100% | **0%** |
+
+This models real weapon systems: closer = deadlier.
+
 ## Batch Mode (Multiple Noise Levels)
 
 When running without `--visualize`, you get an interactive prompt:
@@ -197,9 +236,6 @@ The simulation tracks two cost metrics for the loss-exchange ratio:
 (`$50k` each = `$200k` blue cost) → loss exchange ratio = `1.0` (breakeven).
 If 3 interceptors fire 12 shots (`$600k` blue) to stop 10 Shaheds (`$200k` red) →
 ratio = `0.33` → inefficient defence (blue spending 3× red's deployed cost).
-
-**Legacy columns** (`seekers_lost_cost`, `attackers_wasted_cost`) are available
-in the per-run JSON output for comparison with the old "losses" framing.
 
 ### CSV columns
 
@@ -316,3 +352,16 @@ python scripts/make_diveld_scenario.py --out scenarios/diveld_baseline.json --se
 - SFML 3 API (all `setPosition(Vector2f)`, `font.openFromFile()`, `event->is<T>()`)
 
 All VSCode IntelliSense errors in `simulationVisualizer.cpp` and `mapVisualizer.cpp` are **false positives** — the IDE cannot resolve `#include <SFML/Graphics.hpp>` because vcpkg include paths aren't configured in VSCode's `c_cpp_properties.json`. The actual build succeeds.
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| "cannot open source file SFML/Graphics.hpp" | VSCode IntelliSense doesn't know vcpkg paths | Ignore — build succeeds |
+| Map is all land | Shapefile not found or empty | Check path to `.shp` file |
+| No units on map | Spawn tool closed without placing anything | Place at least 1 seeker + 1 target |
+| Simulation finishes immediately | No seekers or no targets placed | Add seekers and targets |
+| "No valid A\* path" error | Unit placed on land cell or on another unit | Place on water cells only |
+| Window title says nothing | Font file not found | Console shows which fonts were tried |
+| Visualizer is black screen | SFML driver issue | Update GPU drivers |
+| "Unknown vehicle type" | Typo in scenario JSON or command | Use: `bluerov2`, `riptide`, `blueboat`, `yuco`, `nemosens`, `hugin`, `tb2`, `queenhornet`, `shahed`, `diveld` |
