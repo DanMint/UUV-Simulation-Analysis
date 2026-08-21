@@ -98,3 +98,7 @@ coverage.xml
 Release/
 Debug/
 x64/
+
+sim_full.txt
+*.db
+
