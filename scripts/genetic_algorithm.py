@@ -220,14 +220,20 @@ def _run_simulator(sim_exe: str, scenario_path: str, repeat: int, seed: int, wor
     if os.path.exists(csv_path):
         os.remove(csv_path)
 
-    cmd = [sim_exe, "--scenario", scenario_path, "--repeat", str(repeat),
+    cmd = [sim_exe, "--scenario", os.path.abspath(scenario_path), "--repeat", str(repeat),
            "--seed", str(seed), "--no-prompt"]
+
+    env = os.environ.copy()
+    gdal_bin = r"C:\gdal\bin"
+    vcpkg_bin = r"C:\vcpkg\installed\x64-windows\bin"
+    release_dir = os.path.abspath(os.path.join(os.path.dirname(sim_exe)))
+    env["PATH"] = gdal_bin + os.pathsep + vcpkg_bin + os.pathsep + release_dir + os.pathsep + env.get("PATH", "")
 
     start = time.time()
     try:
         result = subprocess.run(cmd, cwd=workdir, check=True,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               timeout=300)
+                               timeout=300, env=env)
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"Simulator timed out after 300s: {' '.join(cmd)}")
     except subprocess.CalledProcessError as e:

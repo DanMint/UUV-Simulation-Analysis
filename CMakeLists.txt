@@ -64,6 +64,12 @@ find_package(GDAL CONFIG QUIET)
 if (GDAL_FOUND)
     message(STATUS "Found GDAL ${GDAL_VERSION} (CMake config)")
     target_link_libraries(uuv_sim PRIVATE GDAL::GDAL)
+elseif(WIN32)
+    message(STATUS "GDAL CMake config not found, using hardcoded path: C:/gdal")
+    set(GDAL_PREFIX "C:/gdal")
+    target_include_directories(uuv_sim PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(uuv_sim PRIVATE "${GDAL_PREFIX}/lib")
+    target_link_libraries(uuv_sim PRIVATE gdal_i)
 else()
     find_program(GDAL_CONFIG gdal-config REQUIRED)
     execute_process(
@@ -77,9 +83,6 @@ else()
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     message(STATUS "Using gdal-config: ${GDAL_CONFIG}")
-    message(STATUS "GDAL_CFLAGS: ${GDAL_CFLAGS}")
-    message(STATUS "GDAL_PREFIX: ${GDAL_PREFIX}")
-    separate_arguments(GDAL_CFLAGS)
     target_compile_options(uuv_sim PRIVATE ${GDAL_CFLAGS})
     target_link_directories(uuv_sim PRIVATE ${GDAL_PREFIX}/lib)
     target_link_libraries(uuv_sim PRIVATE gdal)
@@ -114,7 +117,7 @@ if (GDAL_FOUND)
     target_link_libraries(test_attackerAgent PRIVATE GDAL::GDAL)
 else()
     target_link_directories(test_attackerAgent PRIVATE ${GDAL_PREFIX}/lib)
-    target_link_libraries(test_attackerAgent PRIVATE gdal)
+    target_link_libraries(test_attackerAgent PRIVATE gdal_i)
 endif()
 
 add_executable(test_simulation
@@ -146,8 +149,9 @@ target_link_libraries(test_simulation PRIVATE
 if (GDAL_FOUND)
     target_link_libraries(test_simulation PRIVATE GDAL::GDAL)
 else()
-    target_link_directories(test_simulation PRIVATE ${GDAL_PREFIX}/lib)
-    target_link_libraries(test_simulation PRIVATE gdal)
+    target_include_directories(test_simulation PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(test_simulation PRIVATE "${GDAL_PREFIX}/lib")
+    target_link_libraries(test_simulation PRIVATE gdal_i)
 endif()
 
 add_executable(test_diveld_scenario
@@ -179,13 +183,14 @@ target_link_libraries(test_diveld_scenario PRIVATE
 if (GDAL_FOUND)
     target_link_libraries(test_diveld_scenario PRIVATE GDAL::GDAL)
 else()
-    target_link_directories(test_diveld_scenario PRIVATE ${GDAL_PREFIX}/lib)
-    target_link_libraries(test_diveld_scenario PRIVATE gdal)
+    target_include_directories(test_diveld_scenario PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(test_diveld_scenario PRIVATE "${GDAL_PREFIX}/lib")
+    target_link_libraries(test_diveld_scenario PRIVATE gdal_i)
 endif()
 
-add_test(NAME test_attackerAgent COMMAND test_attackerAgent)
-add_test(NAME test_simulation COMMAND test_simulation)
-add_test(NAME test_diveld_scenario COMMAND test_diveld_scenario)
+add_test(NAME test_attackerAgent COMMAND test_attackerAgent WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_simulation COMMAND test_simulation WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_diveld_scenario COMMAND test_diveld_scenario WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_logger
     tests/test_logger.cpp
@@ -193,7 +198,7 @@ add_executable(test_logger
 target_include_directories(test_logger PRIVATE
     src/utils
 )
-add_test(NAME test_logger COMMAND test_logger)
+add_test(NAME test_logger COMMAND test_logger WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_spatialGrid
     tests/test_spatialGrid.cpp
@@ -201,4 +206,4 @@ add_executable(test_spatialGrid
 target_include_directories(test_spatialGrid PRIVATE
     src/utils
 )
-add_test(NAME test_spatialGrid COMMAND test_spatialGrid)
+add_test(NAME test_spatialGrid COMMAND test_spatialGrid WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -102,3 +102,10 @@ x64/
 sim_full.txt
 *.db
 
+
+# GA test outputs
+ga_*_scenario.json
+ga_convergence.png
+ga_diversity.png
+ga_history.csv
+
