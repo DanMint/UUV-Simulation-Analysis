@@ -54,7 +54,7 @@ SeekerAgent SeekerAgent::create(const std::string& type, int id, int row, int co
     SeekerAgent seeker(id, row, col);
     try {
         seeker.specs = getVehicleSpecs(type);
-    } catch (const std::invalid_argument& e) {
+    } catch (const std::invalid_argument&) {
         // Use default (bluerov2) if type is invalid
     }
     return seeker;

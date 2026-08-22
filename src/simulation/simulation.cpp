@@ -295,7 +295,7 @@ SimResult Simulation::buildResult(int totalSteps) const {
 void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
     for (auto& attacker : m_attackers) {
         if (attacker.fsmState == AgentFSMState::S9_RESET) continue;
-        if (!attacker.alive) { attacker.tick(pf); continue; }
+        if (!attacker.alive) { static_cast<void>(attacker.tick(pf)); continue; }
         if (attacker.targetId >= 0 &&
             attacker.targetId < static_cast<int>(m_targets.size()) &&
             !m_targets[attacker.targetId].alive) {
@@ -318,7 +318,7 @@ void Simulation::updateAttackerStates(int currentStep, const Pathfinding& pf) {
         if (bestTarget < 0) continue;
         attacker.targetId = m_targets[bestTarget].id;
         attacker.setMissionTarget(m_targets[bestTarget].row, m_targets[bestTarget].col);
-        attacker.tick(pf);
+        static_cast<void>(attacker.tick(pf));
     }
 }
 

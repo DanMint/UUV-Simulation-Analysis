@@ -48,10 +48,10 @@ public:
      */
     std::vector<int> query(int row, int col, double radius) const {
         std::vector<int> result;
-        const int minR = cellCoord(row - radius);
-        const int maxR = cellCoord(row + radius);
-        const int minC = cellCoord(col - radius);
-        const int maxC = cellCoord(col + radius);
+        const int minR = cellCoord(static_cast<int>(row - radius));
+        const int maxR = cellCoord(static_cast<int>(row + radius));
+        const int minC = cellCoord(static_cast<int>(col - radius));
+        const int maxC = cellCoord(static_cast<int>(col + radius));
 
         for (int cr = minR; cr <= maxR; ++cr) {
             for (int cc = minC; cc <= maxC; ++cc) {
