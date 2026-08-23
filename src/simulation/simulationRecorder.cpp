@@ -214,6 +214,18 @@ bool SimulationRecorder::saveJSON(const std::string& filepath) const {
     }
     oss << "]";
 
+    oss << ",\"agentStats\":[";
+    const auto stats = agentStats();
+    for (size_t i = 0; i < stats.size(); ++i) {
+        if (i) oss << ",";
+        oss << "{\"id\":" << std::get<0>(stats[i]) << ",";
+        oss << "\"type\":\"" << std::get<1>(stats[i]) << "\",";
+        oss << "\"pathLength\":" << std::get<2>(stats[i]) << ",";
+        oss << "\"timeAlive\":" << std::get<3>(stats[i]) << ",";
+        oss << "\"aliveAtEnd\":" << std::get<4>(stats[i]) << "}";
+    }
+    oss << "]";
+
     oss << "}";
 
     ofs << oss.str();
@@ -294,4 +306,48 @@ bool SimulationRecorder::saveBinary(const std::string& filepath) const {
 void SimulationRecorder::clear() noexcept {
     m_steps.clear();
     m_eventStream.clear();
+}
+
+std::vector<std::tuple<int, int, int, int>> SimulationRecorder::filteredEvents() const {
+    std::vector<std::tuple<int, int, int, int>> out;
+    for (size_t i = 0; i < m_eventStream.size(); i += 4) {
+        int type = m_eventStream[i + 1];
+        if ((m_eventFilterMask & type) == 0) continue;
+        out.emplace_back(m_eventStream[i], type, m_eventStream[i + 2], m_eventStream[i + 3]);
+    }
+    return out;
+}
+
+std::vector<std::tuple<int, std::string, int, int, int>> SimulationRecorder::agentStats() const {
+    std::vector<std::tuple<int, std::string, int, int, int>> out;
+    if (m_steps.empty()) return out;
+    const auto& first = m_steps.front();
+    const auto& last = m_steps.back();
+    const int total = static_cast<int>(m_steps.size());
+
+    auto push = [&](int id, std::string type, float x0, float y0, float x1, float y1, bool alive) {
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        int pathLen = static_cast<int>(std::sqrt(dx * dx + dy * dy));
+        int timeAlive = 0;
+        for (const auto& s : m_steps) {
+            bool a = false;
+            if (type == "seeker" && id < static_cast<int>(s.seekerAlive.size())) a = s.seekerAlive[id];
+            else if (type == "target" && id < static_cast<int>(s.targetAlive.size())) a = s.targetAlive[id];
+            else if (type == "attacker" && id < static_cast<int>(s.attackerAlive.size())) a = s.attackerAlive[id];
+            if (a) timeAlive++;
+        }
+        out.emplace_back(id, std::move(type), pathLen, timeAlive, alive ? 1 : 0);
+    };
+
+    for (int i = 0; i < static_cast<int>(first.seekerX.size()); ++i) {
+        push(i, "seeker", first.seekerX[i], first.seekerY[i], last.seekerX[i], last.seekerY[i], last.seekerAlive[i]);
+    }
+    for (int i = 0; i < static_cast<int>(first.targetX.size()); ++i) {
+        push(i, "target", first.targetX[i], first.targetY[i], last.targetX[i], last.targetY[i], last.targetAlive[i]);
+    }
+    for (int i = 0; i < static_cast<int>(first.attackerX.size()); ++i) {
+        push(i, "attacker", first.attackerX[i], first.attackerY[i], last.attackerX[i], last.attackerY[i], last.attackerAlive[i]);
+    }
+    return out;
 }

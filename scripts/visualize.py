@@ -156,6 +156,10 @@ if __name__ == "__main__":
     runs = sys.argv[1] if len(sys.argv) > 1 else os.path.join(base, "runs")
     scen = sys.argv[2] if len(sys.argv) > 2 else os.path.join(base, "scenario.json")
     out = os.path.join(base, "paths")
+    if not os.path.isabs(runs):
+        runs = os.path.join(base, runs)
+    if not os.path.isabs(scen):
+        scen = os.path.join(base, scen)
     plot_runs(runs, scen, out)
 
 
@@ -250,15 +254,4 @@ def plot_ga_scenario(scenario_path: str, out_path: str) -> None:
     plt.savefig(out_path, dpi=150)
     plt.close()
     print(f"Saved GA scenario: {out_path}")
-
-
-if __name__ == "__main__":
-    import csv
-    import json
-    from matplotlib.colors import ListedColormap
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    runs = sys.argv[1] if len(sys.argv) > 1 else os.path.join(base, "runs")
-    scen = sys.argv[2] if len(sys.argv) > 2 else os.path.join(base, "scenario.json")
-    out = os.path.join(base, "paths")
-    plot_runs(runs, scen, out)
 

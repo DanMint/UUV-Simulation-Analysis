@@ -6,13 +6,14 @@
 #include <iostream>
 
 Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps,
-                       unsigned seed)
+                       unsigned seed, int heartbeatLogInterval)
     : m_map(map), m_maxSteps(maxSteps),
       m_maxNoiseLevel(config.getMaxNoiseLevel()),
       m_finished(false), m_step(0), m_pf(nullptr), m_recorder(nullptr),
       m_seed(seed), m_rng(seed),
       m_detectorGrid(50.0),   // 50-cell buckets for detector queries
-      m_interceptorGrid(50.0) // 50-cell buckets for interceptor queries
+      m_interceptorGrid(50.0), // 50-cell buckets for interceptor queries
+      m_heartbeatLogInterval(heartbeatLogInterval)
 {
     int seekerId = 0, targetId = 0, detectorId = 0, interceptorId = 0, attackerId = 0;
     double detRadius = config.getDetectorRadius();
@@ -67,6 +68,10 @@ Simulation::Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps
     m_detectors.reserve(20);
     m_interceptors.reserve(20);
     m_attackers.reserve(20);
+}
+
+void Simulation::setEventFilter(int mask) {
+    if (m_recorder) m_recorder->setEventFilter(mask);
 }
 
 int Simulation::findNearestTarget(const SeekerAgent& seeker) const {
@@ -445,6 +450,13 @@ bool Simulation::stepOnce() {
     }
     m_step++;
     if (m_step > m_maxSteps) { m_finished = true; return false; }
+    if (m_heartbeatLogInterval > 0 && m_step % m_heartbeatLogInterval == 0) {
+        int alive = 0;
+        for (const auto& t : m_targets) if (t.alive) alive++;
+        std::cout << "[HEARTBEAT] Step: " << m_step
+                  << " | Attackers: " << m_attackers.size()
+                  << " | Targets alive: " << alive << std::endl;
+    }
     executeOneStepInternal(m_step, true);
     if (m_recorder) m_recorder->recordStep(*this, m_step);
     return !m_finished;
@@ -461,7 +473,7 @@ SimResult Simulation::run() {
 
     while (!m_finished && m_step < m_maxSteps) {
         m_step++;
-        if (m_step % 50 == 0) {
+        if (m_heartbeatLogInterval > 0 && m_step % m_heartbeatLogInterval == 0) {
             int alive = 0;
             for (const auto& t : m_targets) if (t.alive) alive++;
             std::cout << "[HEARTBEAT] Step: " << m_step

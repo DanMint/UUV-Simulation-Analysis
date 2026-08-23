@@ -177,6 +177,45 @@
             color: #94a3b8;
         }
         .hidden { display: none; }
+        .agent-detail {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .agent-detail h3 {
+            margin: 0 0 0.5rem;
+            color: #e2e8f0;
+        }
+        .agent-detail pre {
+            background: #1e293b;
+            padding: 0.75rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            color: #e2e8f0;
+        }
+        .event-log {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.8rem;
+        }
+        .event-log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #1e293b;
+        }
+        .export-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -246,12 +285,57 @@
                     <div class="loading">Select a run to view events</div>
                 </div>
             </div>
+
+            <div class="timeline" id="replaySection" style="display:none;">
+                <h3>Simulation Replay</h3>
+                <div class="replay-controls" style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="btnPlayPause" onclick="togglePlayPause()">Play</button>
+                    <button class="btn btn-secondary" onclick="stepReplay(-1)">⏮ Step Back</button>
+                    <button class="btn btn-secondary" onclick="stepReplay(1)">Step Forward ⏭</button>
+                    <span style="color:#94a3b8;font-size:0.875rem;">Step:</span>
+                    <input type="range" id="stepSlider" min="0" max="0" value="0" style="flex:1;min-width:200px;" oninput="sliderReplay(this.value)">
+                    <span id="stepLabel" style="color:#e2e8f0;font-size:0.875rem;min-width:60px;">0 / 0</span>
+                    <span style="color:#94a3b8;font-size:0.875rem;">Speed:</span>
+                    <select id="replaySpeed" onchange="updateReplaySpeed()">
+                        <option value="2000">0.5x</option>
+                        <option value="1000" selected>1x</option>
+                        <option value="500">2x</option>
+                        <option value="250">4x</option>
+                    </select>
+                </div>
+                <div id="replayAgents" class="loading">Load a run to enable replay</div>
+            </div>
+
+            <div class="timeline">
+                <h3>Agent Detail (click an agent in the positions chart)</h3>
+                <div id="agentDetail" class="agent-detail">
+                    <div class="loading">Click a point in the positions chart to inspect an agent.</div>
+                </div>
+            </div>
+
+            <div class="timeline">
+                <h3>Real-time Event Log</h3>
+                <div id="eventLog" class="event-log">
+                    <div class="loading">Events will appear here during simulation.</div>
+                </div>
+            </div>
+
+            <div class="export-bar">
+                <button class="btn btn-secondary" onclick="exportCurrentView('png')">Export View as PNG</button>
+                <button class="btn btn-secondary" onclick="exportCurrentView('csv')">Export Steps as CSV</button>
+                <button class="btn btn-secondary" onclick="exportCurrentView('json')">Export Run as JSON</button>
+            </div>
         </div>
     </div>
 
     <script>
         const API_BASE = window.location.origin;
         let currentRunId = null;
+        let replayData = null;
+        let replayStep = 0;
+        let replayTimer = null;
+        let replayPlaying = false;
+        let replaySpeed = 1000;
         let positionsChart = null;
         let fitnessChart = null;
         let costChart = null;
@@ -302,6 +386,8 @@
                 updateStats(runData.run);
                 updateCharts(stepsData, eventsData);
                 updateTimeline(eventsData);
+                appendEventLog(eventsData);
+                initReplay(stepsData);
             } catch (error) {
                 console.error('Failed to load run:', error);
             }
@@ -354,6 +440,14 @@
                 data: { datasets },
                 options: {
                     responsive: true,
+                    onClick: (evt, items) => {
+                        if (!items || !items.length) return;
+                        const idx = items[0].index;
+                        const dataset = datasets[items[0].datasetIndex];
+                        const agentType = dataset.label.split(' ')[0];
+                        const agentId = dataset.label.split(' ')[1];
+                        showAgentDetail(agentType, agentId);
+                    },
                     plugins: {
                         title: {
                             display: true,
@@ -492,9 +586,151 @@
             return colors[agentType] || '#94a3b8';
         }
 
+        function showAgentDetail(agentType, agentId) {
+            const container = document.getElementById('agentDetail');
+            if (!replayData) {
+                container.innerHTML = '<div class="loading">Load a run first.</div>';
+                return;
+            }
+            const points = [];
+            replayData.forEach(step => {
+                const a = step.agents.find(x => x.agent_type === agentType && x.agent_id === agentId);
+                if (a) points.push({ step: step.step, x: a.x, y: a.y, alive: a.alive });
+            });
+            if (!points.length) {
+                container.innerHTML = '<div class="loading">Agent not found.</div>';
+                return;
+            }
+            const last = points[points.length - 1];
+            container.innerHTML = `
+                <h3 style="color:${getColor(agentType)}">${agentType} ${agentId}</h3>
+                <pre>Steps seen: ${points.length}
+First: (${points[0].x}, ${points[0].y}) at step ${points[0].step}
+Last:  (${last.x}, ${last.y}) at step ${last.step}
+Alive at end: ${last.alive}</pre>
+            `;
+        }
+
+        function appendEventLog(eventsData) {
+            const container = document.getElementById('eventLog');
+            if (!eventsData || eventsData.length === 0) {
+                container.innerHTML = '<div class="loading">No events recorded.</div>';
+                return;
+            }
+            container.innerHTML = eventsData.map(ev => `
+                <div class="event-log-entry">
+                    <span style="color:#94a3b8">[${ev.step}]</span>
+                    <span style="color:${ev.event_type === 'detection' ? '#f59e0b' : ev.event_type === 'intercept' ? '#ef4444' : '#22c55e'}">${ev.event_type.toUpperCase()}</span>
+                    ${formatEvent(ev)}
+                </div>
+            `).join('');
+        }
+
+        async function exportCurrentView(format) {
+            if (!currentRunId) {
+                alert('Load a run first.');
+                return;
+            }
+            let url = `${API_BASE}/api/runs/${currentRunId}/export?format=${format}`;
+            if (format === 'csv') {
+                url = `${API_BASE}/api/runs/${currentRunId}/steps?format=csv`;
+            }
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `run_${currentRunId}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
         function refreshData() {
             if (currentRunId) {
                 loadRun();
+            }
+        }
+
+        async function initReplay(steps) {
+            replayData = steps;
+            replayStep = 0;
+            const slider = document.getElementById('stepSlider');
+            slider.max = steps.length - 1;
+            slider.value = 0;
+            document.getElementById('replaySection').style.display = 'block';
+            renderReplayStep();
+        }
+
+        function renderReplayStep() {
+            if (!replayData || replayStep < 0 || replayStep >= replayData.length) return;
+            const step = replayData[replayStep];
+            document.getElementById('stepLabel').textContent = `${step.step} / ${replayData.length}`;
+            document.getElementById('stepSlider').value = replayStep;
+
+            const container = document.getElementById('replayAgents');
+            if (!step.agents || step.agents.length === 0) {
+                container.innerHTML = '<div class="loading">No agents at this step</div>';
+                return;
+            }
+
+            container.innerHTML = step.agents.map(a => {
+                const color = getColor(a.agent_type);
+                return `<div style="display:inline-flex;align-items:center;gap:0.5rem;margin:0.25rem 0.5rem;padding:0.25rem 0.5rem;background:#0f172a;border-radius:4px;border-left:3px solid ${color};">
+                    <span style="color:${color};font-weight:600;">${a.agent_type} ${a.agent_id}</span>
+                    <span style="color:#94a3b8;">(${a.x}, ${a.y})</span>
+                    <span style="color:#e2e8f0;">alive=${a.alive}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function togglePlayPause() {
+            if (replayPlaying) {
+                clearInterval(replayTimer);
+                replayPlaying = false;
+                document.getElementById('btnPlayPause').textContent = 'Play';
+            } else {
+                replayPlaying = true;
+                document.getElementById('btnPlayPause').textContent = 'Pause';
+                replayTimer = setInterval(() => {
+                    if (replayStep < replayData.length - 1) {
+                        replayStep++;
+                        renderReplayStep();
+                    } else {
+                        clearInterval(replayTimer);
+                        replayPlaying = false;
+                        document.getElementById('btnPlayPause').textContent = 'Play';
+                    }
+                }, replaySpeed);
+            }
+        }
+
+        function stepReplay(delta) {
+            if (!replayData) return;
+            const newStep = replayStep + delta;
+            if (newStep >= 0 && newStep < replayData.length) {
+                replayStep = newStep;
+                renderReplayStep();
+            }
+        }
+
+        function sliderReplay(value) {
+            if (!replayData) return;
+            replayStep = parseInt(value, 10);
+            renderReplayStep();
+        }
+
+        function updateReplaySpeed() {
+            replaySpeed = parseInt(document.getElementById('replaySpeed').value, 10);
+            if (replayPlaying) {
+                clearInterval(replayTimer);
+                replayTimer = setInterval(() => {
+                    if (replayStep < replayData.length - 1) {
+                        replayStep++;
+                        renderReplayStep();
+                    } else {
+                        clearInterval(replayTimer);
+                        replayPlaying = false;
+                        document.getElementById('btnPlayPause').textContent = 'Play';
+                    }
+                }, replaySpeed);
             }
         }
 

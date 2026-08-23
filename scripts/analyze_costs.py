@@ -242,6 +242,9 @@ def report(rows, runs_dir: str):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        print(__doc__.strip())
+        sys.exit(0)
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     runs_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(base, "runs")
     rows = load_summary(runs_dir)

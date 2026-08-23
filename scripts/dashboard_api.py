@@ -225,6 +225,36 @@ async def get_run_events(run_id: int, step: Optional[int] = None):
         for e in events
     ]
 
+@app.get("/api/runs/{run_id}/export")
+async def export_run(run_id: int, format: str = "json"):
+    """Export run data in various formats."""
+    run = db.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_dir = os.path.join("runs")
+    base_name = f"run_{run_id}"
+
+    if format == "json":
+        path = os.path.join(run_dir, f"{base_name}.json")
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Run JSON not found")
+        return FileResponse(path, media_type="application/json", filename=f"{base_name}.json")
+
+    if format == "csv":
+        path = os.path.join(run_dir, "summary.csv")
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Summary CSV not found")
+        return FileResponse(path, media_type="text/csv", filename=f"{base_name}.csv")
+
+    if format == "png":
+        path = os.path.join("paths", f"run_{run_id}.png")
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Run plot not found")
+        return FileResponse(path, media_type="image/png", filename=f"{base_name}.png")
+
+    raise HTTPException(status_code=400, detail="Unsupported format. Use json, csv, or png.")
+
 # ════════════════════════════════════════════════════════════════════════════════
 #  GA ENDPOINTS
 # ════════════════════════════════════════════════════════════════════════════════

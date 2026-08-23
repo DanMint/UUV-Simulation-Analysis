@@ -85,6 +85,15 @@ public:
     /** Record a custom event (detection, intercept, etc.). */
     void recordEvent(int step, int eventType, int agentA, int agentB);
 
+    /** Set event filter: only these event types are recorded. */
+    void setEventFilter(int mask) noexcept { m_eventFilterMask = mask; }
+
+    /** Get filtered events as a list of dicts with step/type/agent_a/agent_b. */
+    std::vector<std::tuple<int, int, int, int>> filteredEvents() const;
+
+    /** Get per-agent statistics collected during the run. */
+    std::vector<std::tuple<int, std::string, int, int, int>> agentStats() const;
+
     /** Save the complete recording to a JSON file. */
     bool saveJSON(const std::string& filepath) const;
 
@@ -104,6 +113,7 @@ private:
     RunMetadata m_metadata;
     std::vector<StepSnapshot> m_steps;
     std::vector<int> m_eventStream;
+    int m_eventFilterMask{0x7};
 
     static constexpr int EVENT_DETECTION = 1;
     static constexpr int EVENT_INTERCEPT = 2;

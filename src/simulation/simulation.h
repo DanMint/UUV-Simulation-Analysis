@@ -51,9 +51,11 @@ public:
      * @param config    Scenario configuration
      * @param maxSteps  Step limit before forced termination
      * @param seed      RNG seed for reproducible runs (default: random_device)
+     * @param heartbeatLogInterval  Log a heartbeat every N steps (0 to disable)
      */
     Simulation(MapCreation& map, const SpawnConfig& config, int maxSteps = 2000,
-               unsigned seed = std::random_device{}());
+               unsigned seed = std::random_device{}(),
+               int heartbeatLogInterval = 0);
     ~Simulation() { delete m_pf; }
 
     /** Retrieve the RNG seed used for this run (for reproducibility/replay). */
@@ -61,6 +63,9 @@ public:
 
     /** Set an optional recorder for step-by-step state capture. */
     void setRecorder(SimulationRecorder* recorder) { m_recorder = recorder; }
+
+    /** Set event filter mask on the attached recorder. */
+    void setEventFilter(int mask);
 
     /** Save recording to JSON if recorder is attached. */
     bool saveRecording(const std::string& filepath) const;
@@ -143,6 +148,7 @@ private:
     mutable SpatialGrid m_interceptorGrid; // spatial index for interceptor range queries
 
     SimulationRecorder* m_recorder;  // optional state recorder for replay
+    int m_heartbeatLogInterval;      ///< heartbeat logging interval (0 = disabled)
 
     /** Nearest living target to a seeker (Euclidean). -1 if none. */
     int findNearestTarget(const SeekerAgent& seeker) const;
