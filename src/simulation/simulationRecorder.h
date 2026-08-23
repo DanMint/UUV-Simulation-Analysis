@@ -109,16 +109,16 @@ public:
 
     static std::string timestampNow();
 
+    static constexpr int EVENT_DETECTION = 1;
+    static constexpr int EVENT_INTERCEPT = 2;
+    static constexpr int EVENT_TARGET_DESTROYED = 4;
+    static constexpr int EVENT_SEEKER_REACHED = 8;
+
 private:
     RunMetadata m_metadata;
     std::vector<StepSnapshot> m_steps;
     std::vector<int> m_eventStream;
-    int m_eventFilterMask{0x7};
-
-    static constexpr int EVENT_DETECTION = 1;
-    static constexpr int EVENT_INTERCEPT = 2;
-    static constexpr int EVENT_TARGET_DESTROYED = 3;
-    static constexpr int EVENT_SEEKER_REACHED = 4;
+    int m_eventFilterMask{0xF};
 
     void serializeStep(std::ostringstream& oss, const StepSnapshot& step) const;
 };

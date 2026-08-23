@@ -341,6 +341,72 @@ python scripts/make_diveld_scenario.py --out scenarios/diveld_baseline.json --se
 .\windows_build\build\Release\uuv_sim.exe --scenario scenarios/diveld_baseline.json --iterations 1 --seed 42 --no-prompt
 ```
 
+## New Features
+
+### Simulation Recording & Replay
+
+The simulator can now record complete simulation state at each step for later replay and analysis:
+
+```powershell
+# Run with recording enabled
+.\windows_build\build\Release\uuv_sim.exe --scenario scenarios/diveld_baseline_complete.json --record
+
+# Outputs:
+#   runs/recording_0.json  - Full step-by-step state
+#   runs/run_0.json        - Final results
+#   runs/summary.csv       - Aggregated metrics
+```
+
+Recording JSON includes:
+- Agent positions, alive status, and detection state per step
+- Event stream (detections, interceptions, target destructions)
+- Per-agent statistics (path length, time alive, alive at end)
+
+### Web Dashboard
+
+A FastAPI-based dashboard provides real-time visualization and analysis:
+
+```powershell
+# Start the dashboard API
+python scripts/dashboard_api.py
+
+# Open in browser
+http://localhost:8000
+```
+
+Dashboard features:
+- Run selection and summary statistics
+- Agent position charts over time
+- Simulation replay controls (play/pause, step forward/back, speed control)
+- Agent detail panel (click any agent in the chart to see trajectory)
+- Real-time event log
+- Export buttons (PNG, CSV, JSON)
+
+### Configurable Heartbeat Logging
+
+Simulations can now log heartbeat messages at configurable intervals:
+
+```powershell
+# Log heartbeat every 100 steps
+.\windows_build\build\Release\uuv_sim.exe --scenario scenarios/diveld_baseline_complete.json --heartbeat-interval 100
+```
+
+### Event Filtering
+
+The recorder supports event type filtering for targeted analysis:
+
+```cpp
+// Only record detection and intercept events
+recorder.setEventFilter(SimulationRecorder::EVENT_DETECTION | SimulationRecorder::EVENT_INTERCEPT);
+```
+
+### Python Scripts
+
+- `analyze_ga.py` — Analyze GA convergence, Pareto fronts, and best scenarios
+- `analyze_costs.py` — Cost-benefit analysis of simulation batches
+- `visualize.py` — Plot simulation runs and recordings
+- `dashboard_api.py` — Web dashboard with replay and export
+
 ## Build Status
 
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)]()

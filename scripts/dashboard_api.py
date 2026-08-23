@@ -27,6 +27,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
 # Add scripts directory to path
@@ -37,20 +38,6 @@ from database import Database, import_recording
 # ════════════════════════════════════════════════════════════════════════════════
 #  APP SETUP
 # ════════════════════════════════════════════════════════════════════════════════
-
-app = FastAPI(
-    title="UUV Simulation Analysis API",
-    description="REST API for simulation results, GA progress, and analysis",
-    version="1.0.0",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Database instance
 db = Database(os.environ.get("UUV_DB_PATH", "data/uuv_sim.db"))
@@ -77,6 +64,26 @@ class ConnectionManager:
                     pass
 
 manager = ConnectionManager()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    db.close()
+
+app = FastAPI(
+    title="UUV Simulation Analysis API",
+    description="REST API for simulation results, GA progress, and analysis",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  MODELS
@@ -462,10 +469,6 @@ async def serve_dashboard():
 # ════════════════════════════════════════════════════════════════════════════════
 #  LIFECYCLE
 # ════════════════════════════════════════════════════════════════════════════════
-
-@app.on_event("shutdown")
-async def shutdown():
-    db.close()
 
 if __name__ == "__main__":
     import uvicorn

@@ -207,3 +207,89 @@ target_include_directories(test_spatialGrid PRIVATE
     src/utils
 )
 add_test(NAME test_spatialGrid COMMAND test_spatialGrid WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_mapCreation
+    tests/test_mapCreation.cpp
+    src/mapCreation/mapCreation.cpp
+    src/pathfinding/pathfinding.cpp
+)
+target_include_directories(test_mapCreation PRIVATE
+    src/mapCreation
+    src/pathfinding
+)
+target_link_libraries(test_mapCreation PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_mapCreation PRIVATE GDAL::GDAL)
+else()
+    target_include_directories(test_mapCreation PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(test_mapCreation PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_mapCreation PRIVATE gdal_i)
+endif()
+add_test(NAME test_mapCreation COMMAND test_mapCreation WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_spawnConfig
+    tests/test_spawnConfig.cpp
+    src/spawnConfig/spawnConfig.cpp
+)
+target_include_directories(test_spawnConfig PRIVATE
+    src/spawnConfig
+)
+add_test(NAME test_spawnConfig COMMAND test_spawnConfig WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_pathfinding
+    tests/test_pathfinding.cpp
+    src/pathfinding/pathfinding.cpp
+    src/mapCreation/mapCreation.cpp
+)
+target_include_directories(test_pathfinding PRIVATE
+    src/pathfinding
+    src/mapCreation
+)
+target_link_libraries(test_pathfinding PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_pathfinding PRIVATE GDAL::GDAL)
+else()
+    target_include_directories(test_pathfinding PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(test_pathfinding PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_pathfinding PRIVATE gdal_i)
+endif()
+add_test(NAME test_pathfinding COMMAND test_pathfinding WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_simulationRecorder
+    tests/test_simulationRecorder.cpp
+    src/mapCreation/mapCreation.cpp
+    src/spawnConfig/spawnConfig.cpp
+    src/simulation/simulation.cpp
+    src/simulation/simulationRecorder.cpp
+    src/simulation/simResult.cpp
+    src/pathfinding/pathfinding.cpp
+    src/agents/targetAgent.cpp
+    src/agents/seekerAgent.cpp
+    src/agents/attackerAgent.cpp
+    src/agents/detectorAgent.cpp
+    src/agents/interceptorAgent.cpp
+    src/agents/vehicleSpecs.cpp
+)
+target_include_directories(test_simulationRecorder PRIVATE
+    src/agents
+    src/mapCreation
+    src/spawnConfig
+    src/pathfinding
+    src/simulation
+    src/utils
+)
+target_link_libraries(test_simulationRecorder PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_simulationRecorder PRIVATE GDAL::GDAL)
+else()
+    target_include_directories(test_simulationRecorder PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(test_simulationRecorder PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_simulationRecorder PRIVATE gdal_i)
+endif()
+add_test(NAME test_simulationRecorder COMMAND test_simulationRecorder WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

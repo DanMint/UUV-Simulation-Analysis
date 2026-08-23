@@ -63,8 +63,8 @@ def test_ga_runs(sim_exe: str, side: str, quick: bool = True) -> tuple[bool, str
     gens = 2 if quick else 4
     repeat = 2 if quick else 3
     args = [
-        "./genetic_algorithm.py",
-        "--scenario", "../scenarios/diveld_baseline_complete.json",
+        "scripts/genetic_algorithm.py",
+        "--scenario", "scenarios/diveld_baseline_complete.json",
         "--side", side,
         "--pop", str(pop),
         "--gens", str(gens),
@@ -88,18 +88,18 @@ def test_ga_runs(sim_exe: str, side: str, quick: bool = True) -> tuple[bool, str
 
 def test_output_files_exist() -> tuple[bool, List[str]]:
     required = [
-        "../scenarios/ga_history.csv",
-        "../scenarios/ga_convergence.png",
-        "../scenarios/ga_best_scenario.json",
+        "scenarios/ga_history.csv",
+        "scenarios/ga_convergence.png",
+        "scenarios/ga_best_scenario.json",
     ]
     missing = [f for f in required if not os.path.exists(f)]
     return len(missing) == 0, missing
 
 
 def test_csv_valid() -> tuple[bool, str]:
-    csv_path = "../scenarios/runs/ga_batch.csv"
+    csv_path = "scenarios/runs/ga_batch.csv"
     if not os.path.exists(csv_path):
-        return False, "ga_batch.csv not found at ../scenarios/runs/ga_batch.csv"
+        return False, "ga_batch.csv not found at scenarios/runs/ga_batch.csv"
 
     with open(csv_path, newline="") as f:
         reader = csv.DictReader(f)
@@ -118,7 +118,7 @@ def test_csv_valid() -> tuple[bool, str]:
 
 
 def test_best_scenario_loadable() -> tuple[bool, str]:
-    path = "../scenarios/ga_best_scenario.json"
+    path = "scenarios/ga_best_scenario.json"
     if not os.path.exists(path):
         return False, "ga_best_scenario.json not found"
     try:
@@ -134,7 +134,7 @@ def test_best_scenario_loadable() -> tuple[bool, str]:
 
 
 def test_fitness_range(side: str) -> tuple[bool, str]:
-    hist_path = "../scenarios/ga_history.csv"
+    hist_path = "scenarios/ga_history.csv"
     if not os.path.exists(hist_path):
         return False, "ga_history.csv not found"
 
