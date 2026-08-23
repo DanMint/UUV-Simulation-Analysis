@@ -107,6 +107,69 @@ def enrich_from_json(rows, runs_dir: str):
     return rows
 
 
+def load_vehicle_breakdowns(runs_dir: str) -> List[dict]:
+    """Load vehicle_cost_breakdown from all run JSONs."""
+    if not os.path.isdir(runs_dir):
+        return []
+    candidates = sorted(
+        (f for f in os.listdir(runs_dir)
+         if f.endswith(".json") and f != "summary.json"),
+        key=_natural_key,
+    )
+    breakdowns = []
+    for fname in candidates:
+        path = os.path.join(runs_dir, fname)
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            for v in data.get("summary", {}).get("vehicle_cost_breakdown", []):
+                v["run_id"] = fname
+                breakdowns.append(v)
+        except Exception:
+            continue
+    return breakdowns
+
+
+def report_vehicle_breakdown(breakdowns: List[dict], runs_dir: str):
+    if not breakdowns:
+        return
+
+    import matplotlib.pyplot as plt
+
+    types = [b["agent_type"] for b in breakdowns]
+    costs = [b["total_cost"] for b in breakdowns]
+    counts = [b["count"] for b in breakdowns]
+
+    unique_types = sorted(set(types))
+    total_by_type = {t: sum(c for ty, c in zip(types, costs) if ty == t) for t in unique_types}
+    count_by_type = {t: sum(c for ty, c in zip(types, counts) if ty == t) for t in unique_types}
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    ax1.pie([total_by_type[t] for t in unique_types], labels=unique_types, autopct="%1.1f%%",
+            startangle=90)
+    ax1.set_title("Red Cost Share by Vehicle Type")
+
+    avg_cost = [total_by_type[t] / max(count_by_type[t], 1) for t in unique_types]
+    ax2.bar(unique_types, [count_by_type[t] for t in unique_types], color="#1E64DC", alpha=0.8)
+    ax2.set_xlabel("Vehicle type")
+    ax2.set_ylabel("Units deployed")
+    ax2.set_title("Deployment Count by Vehicle Type")
+    ax2.tick_params(axis="x", rotation=45)
+    ax2.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+    out = os.path.join(runs_dir, "vehicle_cost_breakdown.png")
+    plt.savefig(out, dpi=150)
+    plt.close()
+    print(f"Saved: {out}")
+
+    print("\nVehicle cost breakdown:")
+    for t in unique_types:
+        print(f"  {t:15s}: {count_by_type[t]:3d} units, ${total_by_type[t]:>12,.0f} total, "
+              f"${avg_cost[unique_types.index(t)]:>10,.0f}/unit")
+
+
 def report(rows, runs_dir: str):
     if not rows:
         return
@@ -252,4 +315,6 @@ if __name__ == "__main__":
         sys.exit(1)
     rows = enrich_from_json(rows, runs_dir)
     report(rows, runs_dir)
+    breakdowns = load_vehicle_breakdowns(runs_dir)
+    report_vehicle_breakdown(breakdowns, runs_dir)
 

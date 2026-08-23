@@ -27,16 +27,16 @@ class Individual:
         self.fitness = 0.0
 
     def dominates(self, other: 'Individual') -> bool:
-        """Check if this individual dominates another (Pareto dominance)."""
+        """Check if this individual strictly dominates another (Pareto dominance)."""
         if len(self.objectives) != len(other.objectives):
             raise ValueError("Objective count mismatch")
 
         at_least_one_better = False
         for s, o in zip(self.objectives, other.objectives):
+            if s < o:
+                return False
             if s > o:
                 at_least_one_better = True
-            elif s < o:
-                return False
         return at_least_one_better
 
     def __repr__(self):

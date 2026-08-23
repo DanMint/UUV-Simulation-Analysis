@@ -48,7 +48,7 @@ class ResourceConstraint:
         total_penalty = 0.0
         for unit_type, max_count in self.max_units.items():
             actual = unit_counts.get(unit_type, 0)
-            if actual > max_count:
+            if max_count > 0 and actual > max_count:
                 total_penalty += self.weight * (actual - max_count) / max_count
         return total_penalty
 

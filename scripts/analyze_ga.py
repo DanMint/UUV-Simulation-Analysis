@@ -35,7 +35,9 @@ def load_ga_history(workdir: str):
     rows = []
     with open(path, newline="") as f:
         for row in csv.DictReader(f):
-            rows.append({k: float(v) if k != "generation" else int(v) for k, v in row.items()})
+            rows.append({k: _num(row.get(k)) for k, v in row.items()})
+            if "generation" in rows[-1]:
+                rows[-1]["generation"] = int(rows[-1]["generation"])
     return rows
 
 
@@ -131,6 +133,24 @@ def report_best_scenario(best, workdir: str):
     for ic in interceptors:
         print(f"  generic     at ({ic['row']:>3}, {ic['col']:>3})")
     print("=" * 56)
+
+    if attackers:
+        import matplotlib.pyplot as plt
+        from collections import Counter
+        vtypes = [a.get("vehicle_type", "unknown") for a in attackers]
+        counts = Counter(vtypes)
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(counts.keys(), counts.values(), color="#1E64DC", alpha=0.8)
+        ax.set_xlabel("Vehicle type")
+        ax.set_ylabel("Count")
+        ax.set_title("Best Scenario: Attacker Vehicle Type Distribution")
+        ax.tick_params(axis="x", rotation=45)
+        ax.grid(True, alpha=0.3, axis="y")
+        plt.tight_layout()
+        out = os.path.join(workdir, "ga_best_vehicle_types.png")
+        plt.savefig(out, dpi=150)
+        plt.close()
+        print(f"Saved: {out}")
 
 
 def main():

@@ -123,13 +123,15 @@ class BenchmarkResult:
 
 def run_ga(args: list) -> tuple[bool, dict]:
     """Run GA and return (success, result_dict)."""
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ga_script = os.path.join(project_root, "scripts", "genetic_algorithm.py")
     try:
         result = subprocess.run(
-            [sys.executable, "scripts/genetic_algorithm.py"] + args,
+            [sys.executable, ga_script] + args,
             capture_output=True,
             text=True,
             timeout=180,
-            cwd=os.getcwd(),
+            cwd=project_root,
         )
         return result.returncode == 0, {"returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
     except subprocess.TimeoutExpired:
