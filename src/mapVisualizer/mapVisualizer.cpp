@@ -260,6 +260,49 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
     float half = m_cellSize * 0.45f;
     if (half < 2.5f) half = 2.5f;
 
+    auto drawDiamond = [&](sf::Color fill) {
+        float side = half * 1.4f;
+        sf::RectangleShape d(sf::Vector2f(side, side));
+        d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
+        d.setRotation(sf::degrees(45.f));
+        d.setFillColor(fill);
+        d.setOutlineColor(sf::Color::White);
+        d.setOutlineThickness(1.5f);
+        window.draw(d);
+    };
+
+    auto attackerColor = [](const std::string& vt) {
+        if      (vt == "bluerov2")    return sf::Color(255, 140, 60);
+        else if (vt == "riptide")     return sf::Color(210, 255, 60);
+        else if (vt == "blueboat")    return sf::Color(60, 220, 130);
+        else if (vt == "yuco")        return sf::Color(0, 220, 200);
+        else if (vt == "nemosens")    return sf::Color(255, 80, 200);
+        else if (vt == "hugin")       return sf::Color(140, 70, 20);
+        else if (vt == "tb2")         return sf::Color(0, 255, 255);
+        else if (vt == "queenhornet") return sf::Color(200, 180, 255);
+        else if (vt == "shahed")      return sf::Color(255, 190, 220);
+        return sf::Color(255, 140, 60);
+    };
+
+    auto labelFor = [](const std::string& type, const std::string& vt) -> std::string {
+        if (type == "seeker")      return "S";
+        if (type == "target")      return "T";
+        if (type == "detector")    return "D";
+        if (type == "interceptor") return "I";
+        if (type == "attacker") {
+            if      (vt == "bluerov2")    return "BR";
+            else if (vt == "riptide")     return "RP";
+            else if (vt == "blueboat")    return "BB";
+            else if (vt == "yuco")        return "YU";
+            else if (vt == "nemosens")    return "NS";
+            else if (vt == "hugin")       return "HU";
+            else if (vt == "tb2")         return "T2";
+            else if (vt == "queenhornet") return "QH";
+            else if (vt == "shahed")      return "SH";
+        }
+        return "BR";
+    };
+
     for (const auto& unit : m_config.getUnits()) {
         float cx = (unit.col + 0.5f) * m_cellSize;
         float cy = (unit.row + 0.5f) * m_cellSize;
@@ -284,68 +327,23 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
             window.draw(sq);
         }
         else if (unit.type == "detector") {
-            float side = half * 1.4f;
-            sf::RectangleShape d(sf::Vector2f(side, side));
-            d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
-            d.setPosition(sf::Vector2f(cx, cy));
-            d.setRotation(sf::degrees(45.f));
-            d.setFillColor(DETECTOR_COLOR);
-            d.setOutlineColor(sf::Color::White);
-            d.setOutlineThickness(1.5f);
-            window.draw(d);
+            drawDiamond(DETECTOR_COLOR);
         }
         else if (unit.type == "interceptor") {
-            float side = half * 1.4f;
-            sf::RectangleShape d(sf::Vector2f(side, side));
-            d.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
-            d.setPosition(sf::Vector2f(cx, cy));
-            d.setRotation(sf::degrees(45.f));
-            d.setFillColor(INTERCEPTOR_COLOR);
-            d.setOutlineColor(sf::Color::White);
-            d.setOutlineThickness(1.5f);
-            window.draw(d);
+            drawDiamond(INTERCEPTOR_COLOR);
         }
         else if (unit.type == "attacker") {
-            sf::Color attackerColor(255, 140, 60); // default: bluerov2 orange
-            if      (unit.vehicleType == "bluerov2")    attackerColor = sf::Color(255, 140, 60);  // orange
-            else if (unit.vehicleType == "riptide")     attackerColor = sf::Color(210, 255, 60);  // lime/chartreuse
-            else if (unit.vehicleType == "blueboat")    attackerColor = sf::Color(60, 220, 130);  // emerald green
-            else if (unit.vehicleType == "yuco")        attackerColor = sf::Color(0, 220, 200);   // turquoise
-            else if (unit.vehicleType == "nemosens")    attackerColor = sf::Color(255, 80, 200);  // hot pink
-            else if (unit.vehicleType == "hugin")       attackerColor = sf::Color(140, 70, 20);   // brown
-            else if (unit.vehicleType == "tb2")         attackerColor = sf::Color(0, 255, 255);   // cyan (aerial)
-            else if (unit.vehicleType == "queenhornet") attackerColor = sf::Color(200, 180, 255); // lavender (aerial)
-            else if (unit.vehicleType == "shahed")      attackerColor = sf::Color(255, 190, 220); // pale pink (aerial)
-
             sf::CircleShape tri(half, 3);
             tri.setOrigin(sf::Vector2f(half, half));
             tri.setPosition(sf::Vector2f(cx, cy));
-            tri.setFillColor(attackerColor);
+            tri.setFillColor(attackerColor(unit.vehicleType));
             tri.setOutlineColor(sf::Color::White);
             tri.setOutlineThickness(1.5f);
             window.draw(tri);
         }
 
-        // Label letter
         if (font != nullptr && m_cellSize >= 14.0f) {
-            std::string lbl;
-            if      (unit.type == "seeker")      lbl = "S";
-            else if (unit.type == "target")      lbl = "T";
-            else if (unit.type == "detector")    lbl = "D";
-            else if (unit.type == "interceptor") lbl = "I";
-            else if (unit.type == "attacker") {
-                if      (unit.vehicleType == "bluerov2")    lbl = "BR";
-                else if (unit.vehicleType == "riptide")     lbl = "RP";
-                else if (unit.vehicleType == "blueboat")    lbl = "BB";
-                else if (unit.vehicleType == "yuco")        lbl = "YU";
-                else if (unit.vehicleType == "nemosens")    lbl = "NS";
-                else if (unit.vehicleType == "hugin")       lbl = "HU";
-                else if (unit.vehicleType == "tb2")         lbl = "T2";
-                else if (unit.vehicleType == "queenhornet") lbl = "QH";
-                else if (unit.vehicleType == "shahed")      lbl = "SH";
-                else                                        lbl = "BR";
-            }
-
+            std::string lbl = labelFor(unit.type, unit.vehicleType);
             unsigned int fs = static_cast<unsigned int>(m_cellSize * 0.45f);
             if (fs < 8) fs = 8;
             sf::Text txt(*font, lbl, fs);
@@ -359,6 +357,7 @@ void MapVisualizer::drawUnits(sf::RenderWindow& window, sf::Font* font) const {
         }
     }
 }
+
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  drawHover  (zone mode suppresses cell highlight; interceptor preview added)
