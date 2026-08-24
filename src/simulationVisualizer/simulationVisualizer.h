@@ -51,7 +51,6 @@ private:
     // Animation state
     bool m_paused;
     int  m_delayMs;           // delay per step in ms (10-1000)
-    bool m_finished;
     bool m_showLegend;
 
     // Trail data for drawing path histories (capped at MAX_TRAIL_POINTS per agent)

@@ -47,7 +47,6 @@ SimulationVisualizer::SimulationVisualizer(const MapCreation& map, Simulation& s
       m_panelHeight(44),
       m_paused(false),
       m_delayMs(600),
-      m_finished(false),
       m_showLegend(false)
 {
     m_cellSize = static_cast<float>(m_windowSize) / m_map.getCellsN();
