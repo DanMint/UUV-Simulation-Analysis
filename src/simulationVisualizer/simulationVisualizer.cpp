@@ -95,39 +95,29 @@ void SimulationVisualizer::drawGrid(sf::RenderWindow& window) const {
 // ════════════════════════════════════════════════════════════════════════════════
 
 void SimulationVisualizer::drawTrails(sf::RenderWindow& window) const {
-    for (const auto& trail : m_seekerTrails) {
-        if (trail.size() < 2) continue;
-        int total = static_cast<int>(trail.size());
-        int count = std::min(total, MAX_TRAIL_POINTS);
-        int start = total - count;
-        sf::VertexArray lines(sf::PrimitiveType::LineStrip, count);
-        for (int i = 0; i < count; i++) {
-            int idx = start + i;
-            float alpha = 50 + (155.0f * i / std::max(count, 1));
-            lines[i].position = sf::Vector2f(
-                (trail[idx].col + 0.5f) * m_cellSize,
-                (trail[idx].row + 0.5f) * m_cellSize);
-            lines[i].color = sf::Color(220, 30, 30, static_cast<std::uint8_t>(alpha));
+    auto drawTrailSet = [&](const std::vector<std::vector<TrailPoint>>& trails,
+                            sf::Color baseColor) {
+        for (const auto& trail : trails) {
+            if (trail.size() < 2) continue;
+            int total = static_cast<int>(trail.size());
+            int count = std::min(total, MAX_TRAIL_POINTS);
+            int start = total - count;
+            sf::VertexArray lines(sf::PrimitiveType::LineStrip, count);
+            for (int i = 0; i < count; i++) {
+                int idx = start + i;
+                float alpha = 50 + (155.0f * i / std::max(count, 1));
+                lines[i].position = sf::Vector2f(
+                    (trail[idx].col + 0.5f) * m_cellSize,
+                    (trail[idx].row + 0.5f) * m_cellSize);
+                lines[i].color = sf::Color(baseColor.r, baseColor.g, baseColor.b,
+                                           static_cast<std::uint8_t>(alpha));
+            }
+            window.draw(lines);
         }
-        window.draw(lines);
-    }
+    };
 
-    for (const auto& trail : m_attackerTrails) {
-        if (trail.size() < 2) continue;
-        int total = static_cast<int>(trail.size());
-        int count = std::min(total, MAX_TRAIL_POINTS);
-        int start = total - count;
-        sf::VertexArray lines(sf::PrimitiveType::LineStrip, count);
-        for (int i = 0; i < count; i++) {
-            int idx = start + i;
-            float alpha = 50 + (155.0f * i / std::max(count, 1));
-            lines[i].position = sf::Vector2f(
-                (trail[idx].col + 0.5f) * m_cellSize,
-                (trail[idx].row + 0.5f) * m_cellSize);
-            lines[i].color = sf::Color(255, 140, 60, static_cast<std::uint8_t>(alpha));
-        }
-        window.draw(lines);
-    }
+    drawTrailSet(m_seekerTrails, sf::Color(220, 30, 30));
+    drawTrailSet(m_attackerTrails, sf::Color(255, 140, 60));
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

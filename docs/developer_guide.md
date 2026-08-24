@@ -98,6 +98,32 @@ The Python GA tools call the C++ simulator via subprocess (or direct batch API).
 4. Run `ctest` to ensure all tests pass
 5. Submit a pull request
 
+## Recent Features
+
+### Simulation Recording & Replay
+- `--record` flag enables full step-by-step state capture
+- Recordings saved to `runs/recording_N.json` with agent positions, events, and stats
+- Event filtering supported (detections, intercepts, destructions)
+
+### Cost-Benefit Analysis
+- `blue_cost` = interceptor engagement spend (shots fired × cost per shot)
+- `red_cost` = total unit cost of all deployed attackers
+- `loss_exchange_ratio` = red_cost / blue_cost
+- Vehicle-type cost breakdowns in JSON output
+- Python analysis scripts: `analyze_costs.py`, `analyze_sensitivity.py`
+
+### Genetic Algorithm Integration
+- Defender optimizer: placement of detectors + interceptors
+- Attacker optimizer: placement + vehicle type selection
+- Island model with migration for parallel sub-populations
+- Fitness = effectiveness − λ × (deployment_cost / budget)
+- Batch mode: `--repeat N` writes `runs/ga_batch.csv` for Python GA
+
+### Web Dashboard
+- FastAPI-based dashboard at `http://localhost:8000`
+- Run selection, agent position charts, replay controls
+- Export buttons for PNG, CSV, JSON
+
 ## Performance Optimization
 
 The simulation engine has been optimized with:

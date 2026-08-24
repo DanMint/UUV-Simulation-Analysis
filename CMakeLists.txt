@@ -293,3 +293,38 @@ else()
     target_link_libraries(test_simulationRecorder PRIVATE gdal_i)
 endif()
 add_test(NAME test_simulationRecorder COMMAND test_simulationRecorder WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_stress
+    tests/test_stress.cpp
+    src/mapCreation/mapCreation.cpp
+    src/spawnConfig/spawnConfig.cpp
+    src/simulation/simulation.cpp
+    src/simulation/simulationRecorder.cpp
+    src/simulation/simResult.cpp
+    src/pathfinding/pathfinding.cpp
+    src/agents/targetAgent.cpp
+    src/agents/seekerAgent.cpp
+    src/agents/attackerAgent.cpp
+    src/agents/detectorAgent.cpp
+    src/agents/interceptorAgent.cpp
+    src/agents/vehicleSpecs.cpp
+)
+target_include_directories(test_stress PRIVATE
+    src/agents
+    src/mapCreation
+    src/spawnConfig
+    src/pathfinding
+    src/simulation
+    src/utils
+)
+target_link_libraries(test_stress PRIVATE
+    SFML::Graphics SFML::Window SFML::System
+)
+if (GDAL_FOUND)
+    target_link_libraries(test_stress PRIVATE GDAL::GDAL)
+else()
+    target_include_directories(test_stress PRIVATE "${GDAL_PREFIX}/include")
+    target_link_directories(test_stress PRIVATE ${GDAL_PREFIX}/lib)
+    target_link_libraries(test_stress PRIVATE gdal_i)
+endif()
+add_test(NAME test_stress COMMAND test_stress WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
