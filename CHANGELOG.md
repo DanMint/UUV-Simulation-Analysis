@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Seeker spawned on land cell in `diveld_baseline_complete.json`
 - `windows_build/CMakeLists.txt` stale GDAL configuration
 - CMake test targets missing proper GDAL linking
+- `simulationRecorder.h` event type bitmask constants (1,2,3,4) caused incorrect filtering
+- `dashboard_api.py` deprecated `on_event("shutdown")` replaced with `lifespan` handler
+- `analyze_ga.py` float conversion bug for generation field
+- `multi_objective_ga.py` self-domination bug in `dominates()`
+- `ga_constraints.py` divide-by-zero in ResourceConstraint
+- `benchmark_ga.py` working directory and script path resolution
+- `main.cpp` duplicate argc check and stray debug output
+- CTest working directory issues for tests using relative paths
 
 ### Changed
 - C++ cost model: detectors/interceptors use `unitCost=1.0` (consistent with Python GA)
@@ -50,6 +58,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Python GA fitness functions use numpy for numerical stability
 - `analyze_costs.py` updated to handle GA batch CSV format
 - `visualize.py` added `diveld` color mapping
+- `simulationVisualizer.cpp` refactored trail drawing to eliminate duplication
+- `mapVisualizer.cpp` refactored radius drawing to eliminate duplication
+- Added 4 new test files: test_mapCreation, test_spawnConfig, test_pathfinding, test_simulationRecorder
+- Added test_stress.cpp for large-scale simulation stability testing
+- All tests run from repo root via CTest WORKING_DIRECTORY property
+
+### Added
+- `scripts/analyze_sensitivity.py` - Parameter sensitivity analysis tool
+- `scripts/analyze_costs.py` vehicle-type cost breakdown plots
+- `docs/developer_guide.md` recent features section
+- `CONTRIBUTING.md` with build/test/PR guidelines
 
 ## [0.1.0] - 2025-01-15
 
