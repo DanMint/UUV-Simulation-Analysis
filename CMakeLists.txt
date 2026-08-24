@@ -88,6 +88,22 @@ else()
     target_link_libraries(uuv_sim PRIVATE gdal)
 endif()
 
+# ------------------------------------------------------------
+# Runtime DLL deployment — copy GDAL + vcpkg runtime deps
+# ------------------------------------------------------------
+if(WIN32)
+    set(RUNTIME_DEST $<TARGET_FILE_DIR:uuv_sim>)
+    add_custom_command(TARGET uuv_sim POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "C:/gdal/bin"
+            "${RUNTIME_DEST}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "C:/vcpkg/installed/x64-windows/bin"
+            "${RUNTIME_DEST}"
+        COMMENT "Copying GDAL and vcpkg runtime DLLs to output directory"
+    )
+endif()
+
 # Helpful on Apple Silicon if you ever accidentally mix archs
 if (APPLE)
     message(STATUS "CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}")
