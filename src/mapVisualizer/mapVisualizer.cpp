@@ -97,38 +97,40 @@ void MapVisualizer::drawGrid(sf::RenderWindow& window) const {
 
 void MapVisualizer::drawDetectorRadii(sf::RenderWindow& window) const {
     float pixelRadius = static_cast<float>(m_config.getDetectorRadius()) * m_cellSize;
-    for (const auto& unit : m_config.getUnits()) {
-        if (unit.type != "detector") continue;
-        sf::CircleShape c(pixelRadius);
-        c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
-        c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
-                                   (unit.row + 0.5f) * m_cellSize));
-        c.setFillColor(DETECTOR_RADIUS_COLOR);
-        c.setOutlineColor(sf::Color(255, 180, 0, 100));
-        c.setOutlineThickness(1.5f);
-        c.setPointCount(48);
-        window.draw(c);
-    }
+    auto drawRadius = [&](const std::string& type, sf::Color fill, sf::Color outline) {
+        for (const auto& unit : m_config.getUnits()) {
+            if (unit.type != type) continue;
+            sf::CircleShape c(pixelRadius);
+            c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
+            c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
+                                       (unit.row + 0.5f) * m_cellSize));
+            c.setFillColor(fill);
+            c.setOutlineColor(outline);
+            c.setOutlineThickness(1.5f);
+            c.setPointCount(48);
+            window.draw(c);
+        }
+    };
+    drawRadius("detector", DETECTOR_RADIUS_COLOR, sf::Color(255, 180, 0, 100));
 }
-
-// ════════════════════════════════════════════════════════════════════════════════
-//  drawInterceptorRadii  (added in last session — unchanged)
-// ════════════════════════════════════════════════════════════════════════════════
 
 void MapVisualizer::drawInterceptorRadii(sf::RenderWindow& window) const {
     float pixelRadius = static_cast<float>(m_config.getInterceptorRadius()) * m_cellSize;
-    for (const auto& unit : m_config.getUnits()) {
-        if (unit.type != "interceptor") continue;
-        sf::CircleShape c(pixelRadius);
-        c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
-        c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
-                                   (unit.row + 0.5f) * m_cellSize));
-        c.setFillColor(INTERCEPTOR_RADIUS_COLOR);
-        c.setOutlineColor(sf::Color(160, 80, 255, 120));
-        c.setOutlineThickness(1.5f);
-        c.setPointCount(48);
-        window.draw(c);
-    }
+    auto drawRadius = [&](const std::string& type, sf::Color fill, sf::Color outline) {
+        for (const auto& unit : m_config.getUnits()) {
+            if (unit.type != type) continue;
+            sf::CircleShape c(pixelRadius);
+            c.setOrigin(sf::Vector2f(pixelRadius, pixelRadius));
+            c.setPosition(sf::Vector2f((unit.col + 0.5f) * m_cellSize,
+                                       (unit.row + 0.5f) * m_cellSize));
+            c.setFillColor(fill);
+            c.setOutlineColor(outline);
+            c.setOutlineThickness(1.5f);
+            c.setPointCount(48);
+            window.draw(c);
+        }
+    };
+    drawRadius("interceptor", INTERCEPTOR_RADIUS_COLOR, sf::Color(160, 80, 255, 120));
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

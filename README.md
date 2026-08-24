@@ -404,6 +404,7 @@ recorder.setEventFilter(SimulationRecorder::EVENT_DETECTION | SimulationRecorder
 
 - `analyze_ga.py` — Analyze GA convergence, Pareto fronts, and best scenarios
 - `analyze_costs.py` — Cost-benefit analysis of simulation batches
+- `analyze_sensitivity.py` — Parameter sensitivity analysis (vary sensing radius, kill radius, noise, unit counts)
 - `visualize.py` — Plot simulation runs and recordings
 - `dashboard_api.py` — Web dashboard with replay and export
 
@@ -412,9 +413,16 @@ recorder.setEventFilter(SimulationRecorder::EVENT_DETECTION | SimulationRecorder
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
 
 - `uuv_sim` → ✅ Builds, links, and runs
+- `test_attackerAgent` → ✅ Passes
 - `test_simulation` → ✅ Passes
-- `test_attacker` → ✅ Passes
-- `test_diveld_scenario` → ✅ Passes (Phase 17 Dive-LD integration test)
+- `test_diveld_scenario` → ✅ Passes (Dive-LD integration)
+- `test_logger` → ✅ Passes
+- `test_spatialGrid` → ✅ Passes
+- `test_mapCreation` → ✅ Passes
+- `test_spawnConfig` → ✅ Passes
+- `test_pathfinding` → ✅ Passes
+- `test_simulationRecorder` → ✅ Passes
+- `test_stress` → ✅ Passes (200×200 map, 45 agents, 1000 steps)
 - SFML 3 API (all `setPosition(Vector2f)`, `font.openFromFile()`, `event->is<T>()`)
 
 All VSCode IntelliSense errors in `simulationVisualizer.cpp` and `mapVisualizer.cpp` are **false positives** — the IDE cannot resolve `#include <SFML/Graphics.hpp>` because vcpkg include paths aren't configured in VSCode's `c_cpp_properties.json`. The actual build succeeds.
