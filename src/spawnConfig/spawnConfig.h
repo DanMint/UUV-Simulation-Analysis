@@ -92,7 +92,7 @@ public:
 
     // ─── Unit management ────────────────────────────────────────────
 
-bool addUnit(const std::string& type, int row, int col);
+    bool addUnit(const std::string& type, int row, int col);
     bool addUnit(const std::string& type, int row, int col, const std::string& vehicleType);
     bool addUnit(const std::string& type, int row, int col, const std::string& vehicleType, bool isCritical);
     bool removeUnit(int row, int col);
