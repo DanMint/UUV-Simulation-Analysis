@@ -127,6 +127,19 @@ void SimulationVisualizer::drawTrails(sf::RenderWindow& window) const {
 void SimulationVisualizer::drawAgents(sf::RenderWindow& window, sf::Font* font) const {
     float half = m_cellSize * 0.4f;
 
+    auto drawLabel = [&](float cx, float cy, const std::string& text) {
+        if (!font) return;
+        unsigned int fs = static_cast<unsigned int>(half);
+        if (fs < 8) fs = 8;
+        sf::Text txt(*font, text, fs);
+        txt.setFillColor(sf::Color::White);
+        sf::FloatRect b = txt.getLocalBounds();
+        txt.setOrigin(sf::Vector2f(b.position.x + b.size.x / 2.f,
+                                   b.position.y + b.size.y / 2.f));
+        txt.setPosition(sf::Vector2f(cx, cy));
+        window.draw(txt);
+    };
+
     for (const auto& s : m_sim.getSeekers()) {
         if (!s.alive && !s.reachedTarget) continue;
         float cx = (s.col + 0.5f) * m_cellSize;
@@ -139,12 +152,7 @@ void SimulationVisualizer::drawAgents(sf::RenderWindow& window, sf::Font* font) 
         circle.setPosition(sf::Vector2f(cx - half, cy - half));
         window.draw(circle);
 
-        if (font) {
-            sf::Text txt(*font, std::to_string(s.id), static_cast<unsigned>(half));
-            txt.setFillColor(sf::Color::White);
-            txt.setPosition(sf::Vector2f(cx - half * 0.5f, cy - half * 0.5f));
-            window.draw(txt);
-        }
+        drawLabel(cx, cy, std::to_string(s.id));
     }
 
     for (const auto& t : m_sim.getTargets()) {
@@ -152,11 +160,12 @@ void SimulationVisualizer::drawAgents(sf::RenderWindow& window, sf::Font* font) 
         float cx = (t.col + 0.5f) * m_cellSize;
         float cy = (t.row + 0.5f) * m_cellSize;
 
-        sf::RectangleShape rect(sf::Vector2f(half * 1.6f, half * 1.6f));
+        float side = half * 1.6f;
+        sf::RectangleShape rect(sf::Vector2f(side, side));
         rect.setFillColor(TARGET_COLOR);
         rect.setOutlineThickness(2.f);
         rect.setOutlineColor(sf::Color::White);
-        rect.setOrigin(sf::Vector2f(half * 0.8f, half * 0.8f));
+        rect.setOrigin(sf::Vector2f(side / 2.f, side / 2.f));
         rect.setPosition(sf::Vector2f(cx, cy));
         window.draw(rect);
     }
@@ -199,12 +208,7 @@ void SimulationVisualizer::drawAgents(sf::RenderWindow& window, sf::Font* font) 
         circle.setPosition(sf::Vector2f(cx - half * 1.1f, cy - half * 1.1f));
         window.draw(circle);
 
-        if (font) {
-            sf::Text txt(*font, std::to_string(a.id), static_cast<unsigned>(half));
-            txt.setFillColor(sf::Color::White);
-            txt.setPosition(sf::Vector2f(cx - half * 0.5f, cy - half * 0.5f));
-            window.draw(txt);
-        }
+        drawLabel(cx, cy, std::to_string(a.id));
     }
 }
 
