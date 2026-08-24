@@ -401,24 +401,19 @@ SimResult SimulationVisualizer::run() {
     }
 
     auto updateTrails = [&]() {
-        const auto& seekers = m_sim.getSeekers();
-        m_seekerTrails.resize(seekers.size());
-        for (size_t i = 0; i < seekers.size(); i++) {
-            if (seekers[i].alive || seekers[i].reachedTarget) {
-                m_seekerTrails[i].push_back({seekers[i].row, seekers[i].col});
-                while (static_cast<int>(m_seekerTrails[i].size()) > MAX_TRAIL_POINTS)
-                    m_seekerTrails[i].erase(m_seekerTrails[i].begin());
+        auto updateOne = [&](auto& agents, auto& trails, bool includeReached) {
+            trails.resize(agents.size());
+            for (size_t i = 0; i < agents.size(); i++) {
+                bool active = agents[i].alive || (includeReached && agents[i].reachedTarget);
+                if (active) {
+                    trails[i].push_back({agents[i].row, agents[i].col});
+                    while (static_cast<int>(trails[i].size()) > MAX_TRAIL_POINTS)
+                        trails[i].erase(trails[i].begin());
+                }
             }
-        }
-        const auto& attackers = m_sim.getAttackers();
-        m_attackerTrails.resize(attackers.size());
-        for (size_t i = 0; i < attackers.size(); i++) {
-            if (attackers[i].alive) {
-                m_attackerTrails[i].push_back({attackers[i].row, attackers[i].col});
-                while (static_cast<int>(m_attackerTrails[i].size()) > MAX_TRAIL_POINTS)
-                    m_attackerTrails[i].erase(m_attackerTrails[i].begin());
-            }
-        }
+        };
+        updateOne(m_sim.getSeekers(), m_seekerTrails, true);
+        updateOne(m_sim.getAttackers(), m_attackerTrails, false);
     };
 
     updateTrails();
