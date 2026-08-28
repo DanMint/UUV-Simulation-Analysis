@@ -4,7 +4,7 @@
 Real version of simulate_chromosome(), wired to the actual C++ simulator.
 Same signature as the mock: takes a chromosome, returns
 (p_detected, p_killed, p_survived) as floats. fitness.py and ga.py need
-ZERO changes - only this file's guts differ from the mock.
+ZERO changes only this file's guts differ from the mock.
 
 To use after using the "GA mode (press Q) and after getting the "Results saved to runs...." 
 use: python3 GA/ga.py 
@@ -13,7 +13,7 @@ Remember the chromosome is first 10 is defender (Hydrophones) then remaing 10 ie
 
 """
 
-import json  #reads the json files its this py talking to json files - buuilds 
+import json  #reads the json files its this py talking to json files - builds 
 import subprocess #Python runs a seperate program 
 import glob #finds files matching name 
 import os #use only newest files
@@ -39,7 +39,7 @@ def _generate_candidate_positions(zone, count):
 
     positions = []
     for i in range(count):
-        # spread the `count` requested positions evenly across all cells
+        # spread the "count" requested positions evenly across all cells
         # in the zone, in row-major (left-to-right, top-to-bottom) order
         cell_index = round(i * total_cells / count) if count > 0 else 0
         cell_index = min(cell_index, total_cells - 1)
@@ -95,8 +95,7 @@ def simulate_chromosome(chromosome, num_runs=1):
         json.dump(scenario, f)
 
     """
-    Subprocess is essnlly re-runnign that sim in the form of [program, flag, filename] where this time we need to have the GA code re run the code and its changing and giving us the best possible chromosmes think "if i kept the defender at these coords and never changed it there prob isnt a difference BUT if we re run and change those each time then results could be better"
-    
+    Subprocess is essnlly re-running that sim in the form of [program, flag, filename] where this time we need to have the GA code re run the code and its changing and giving us the best possible chromosomes think "if i kept the defender at these coords and never changed it there prob isnt a difference BUT if we re run and change those each time then results could be better"
     
     Also since we have the whole "Press Q for GA mode" thats what this is doing in said region give new values 
     
@@ -112,8 +111,8 @@ def simulate_chromosome(chromosome, num_runs=1):
     )
 
     """
-    Find the most recently written result in runs/ --- this is wher glob and os are key 
-    as glob grabs EVERY file in folder then we need to specify which is newest whcih is where we need to use os whcih says get ONLY LOOK AT NEWEST IE LAST MODIFIDED in the form of getmtime
+    Find the most recently written result in runs/ --- this is where glob and os are key 
+    as glob grabs EVERY file in folder then we need to specify which is newest which is where we need to use os which says get ONLY LOOK AT NEWEST IE LAST MODIFIDED in the form of getmtime
     """
     result_files = sorted(glob.glob("runs/*.json"), key=os.path.getmtime)
     if not result_files:
