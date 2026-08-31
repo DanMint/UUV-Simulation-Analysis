@@ -8,6 +8,7 @@
 
 #include "mapCreation.h"
 #include "spawnConfig.h"
+#include "guiControl.h"
 
 /**
  * MapVisualizer (SFML 3)
@@ -59,12 +60,13 @@
  */
 class MapVisualizer {
 public:
-    MapVisualizer(const MapCreation& map, int windowSize = 700);
+    MapVisualizer(MapCreation& map, int windowSize = 700,
+                  GuiControlState* guiControl = nullptr);
 
     SpawnConfig run(const std::string& savePath = "spawn_config.json");
 
 private:
-    const MapCreation& m_map;
+    MapCreation& m_map;
 
     int   m_windowSize;
     int   m_panelHeight;
@@ -91,6 +93,7 @@ private:
 
     // ── GA-prep mode ─────────────────────────────────────────────────
     bool m_gaPrepMode;
+    GuiControlState* m_guiControl;
 
     // ── Zone count input state ───────────────────────────────────────
     std::string m_zoneInputState;

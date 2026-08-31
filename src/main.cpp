@@ -3,10 +3,13 @@
 #include "mapVisualizer.h"
 #include "simulation.h"
 #include <iostream>
+#include <memory>
 #include <string>
 #include <sstream>
 #include <cstdlib>
 #include <stdexcept>
+
+void runGuiControlPanel(GuiControlState& state);
 
 
 namespace {
@@ -74,8 +77,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    GuiControlState guiControl;
+    auto shutdownGui = [&]() { guiControl.exitRequested.store(true); };
+
     try {
-        MapCreation* mapPtr = nullptr;
+        std::unique_ptr<MapCreation> mapPtr;
         SpawnConfig config;
         std::string shpPath = "";
         std::string firstArg = argv[1];
@@ -99,8 +105,7 @@ int main(int argc, char* argv[]) {
 
             // Build a MapCreation from the cached grid in the config
             const MapInfo& info = config.getMapInfo();
-            static MapCreation scenarioMap = MapCreation::fromCache("grid_cache.txt");
-            mapPtr = &scenarioMap;
+            mapPtr = std::make_unique<MapCreation>(MapCreation::fromCache("grid_cache.txt"));
             shpPath = info.shpPath;
             needSpawnTool = false;
         }
@@ -110,8 +115,7 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             std::cout << "Loading grid from cache...\n";
-            static MapCreation cachedMap = MapCreation::fromCache(argv[2]);
-            mapPtr = &cachedMap;
+            mapPtr = std::make_unique<MapCreation>(MapCreation::fromCache(argv[2]));
             shpPath = "(from cache)";
         }
         else {
@@ -120,14 +124,11 @@ int main(int argc, char* argv[]) {
             std::cout << "Loading shapefile: " << firstArg << "\n";
             std::cout << "Grid resolution: " << cellsInARow << "x" << cellsInARow << "\n\n";
 
-            // shpMap lives until the program ends
-            static MapCreation shpMap(firstArg, cellsInARow);
-            mapPtr = &shpMap;
-            shpMap.saveCache("grid_cache.txt");
+            mapPtr = std::make_unique<MapCreation>(firstArg, cellsInARow);
+            mapPtr->saveCache("grid_cache.txt");
         }
 
-        MapCreation& map = *mapPtr;
-        map.printStats();
+        mapPtr->printStats();
 
         // ── Spawn tool (if not loading a scenario) ───────────────────
 
@@ -135,8 +136,26 @@ int main(int argc, char* argv[]) {
             std::cout << "Opening spawn tool...\n";
             std::cout << "Place your units, then press Enter to run simulation.\n\n";
 
-            MapVisualizer visualizer(map);
-            config = visualizer.run("");
+            while (true) {
+                MapVisualizer visualizerWithGui(*mapPtr, 700, &guiControl);
+                config = visualizerWithGui.run("");
+
+                if (!guiControl.mapReloadRequested.exchange(false)) {
+                    break;
+                }
+
+                const int cellsInARow = mapPtr->getCellsN();
+                shpPath = guiControl.selectedMapPath;
+                std::cout << "Loading selected map: " << shpPath << "\n";
+                mapPtr = std::make_unique<MapCreation>(shpPath, cellsInARow);
+                mapPtr->saveCache("grid_cache.txt");
+                mapPtr->printStats();
+                config.clear();
+            }
+            if (config.totalUnits() == 0 &&
+                !config.hasAttackerZones() && !config.hasDefenderZones()) {
+                shutdownGui();
+            }
 
             if (config.totalUnits() == 0 &&
                 !config.hasAttackerZones() && !config.hasDefenderZones()) {
@@ -146,25 +165,27 @@ int main(int argc, char* argv[]) {
 
             // Stamp units onto grid. The grid cares about the broad category;
             // the concrete type is used later by category-specific behavior.
-            stampConfiguredUnits(map, config);
+            stampConfiguredUnits(*mapPtr, config);
 
             // Attach map data and save scenario
             MapInfo info;
             info.shpPath      = shpPath;
-            info.cellsInARow       = map.getCellsN();
-            info.canvasWidth   = map.getCanvasWidth();
-            info.canvasHeight  = map.getCanvasHeight();
-            info.minDepth     = map.getMinDepth();
-            info.maxDepth     = map.getMaxDepth();
-            info.waterCount   = map.getWaterCount();
-            info.landCount    = map.getLandCount();
-            config.setMapData(info, map.getGrid());
+            info.cellsInARow       = mapPtr->getCellsN();
+            info.canvasWidth   = mapPtr->getCanvasWidth();
+            info.canvasHeight  = mapPtr->getCanvasHeight();
+            info.minDepth     = mapPtr->getMinDepth();
+            info.maxDepth     = mapPtr->getMaxDepth();
+            info.waterCount   = mapPtr->getWaterCount();
+            info.landCount    = mapPtr->getLandCount();
+            config.setMapData(info, mapPtr->getGrid());
             config.saveJSON("scenario.json");
         }
         else {
             // Stamp units from the loaded scenario onto the grid.
-            stampConfiguredUnits(map, config);
+            stampConfiguredUnits(*mapPtr, config);
         }
+
+        MapCreation& map = *mapPtr;
 
         config.printSummary();
         map.printGrid();
@@ -186,35 +207,26 @@ int main(int argc, char* argv[]) {
 
             // Create empty runs/ so downstream visualize.py doesn't crash
             std::system("mkdir -p runs");
+            shutdownGui();
             return 0;
         }
 
         if (config.countCategory("seeker") == 0) {
             std::cout << "No seekers placed. Cannot run simulation.\n";
+            shutdownGui();
             return 0;
         }
         if (config.countCategory("target") == 0) {
             std::cout << "No targets placed. Cannot run simulation.\n";
+            shutdownGui();
             return 0;
         }
 
         // ── Iteration setup ──────────────────────────────────────────
 
-        int numIterations = 1;
-        double noiseIncrement = 0.0;
+        int numIterations = guiControl.iterationCount.load();
+        double noiseIncrement = guiControl.noiseIncrement.load();
         double startingNoise = config.getMaxNoiseLevel();
-
-        std::cout << "\n── Iteration Configuration ──\n";
-        std::cout << "Starting noise level: " << startingNoise << "\n";
-        std::cout << "Number of iterations (1 = single run): ";
-        std::cin >> numIterations;
-        if (numIterations < 1) numIterations = 1;
-
-        if (numIterations > 1) {
-            std::cout << "Noise increment per iteration: ";
-            std::cin >> noiseIncrement;
-            if (noiseIncrement < 0.0) noiseIncrement = 0.0;
-        }
 
         // Create runs/ directory
         std::string runsDir = "runs";
@@ -272,7 +284,10 @@ int main(int argc, char* argv[]) {
             std::cout << "════════════════════════════════════════════\n\n";
         }
 
+        shutdownGui();
+
     } catch (const std::exception& e) {
+        shutdownGui();
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }

@@ -51,7 +51,8 @@ const sf::Color MapVisualizer::DEF_ZONE_DRAG   = sf::Color(20,  180, 160, 30);
 //  CONSTRUCTOR
 // ════════════════════════════════════════════════════════════════════════════════
 
-MapVisualizer::MapVisualizer(const MapCreation& map, int windowSize)
+MapVisualizer::MapVisualizer(MapCreation& map, int windowSize,
+                             GuiControlState* guiControl)
     : m_map(map),
       m_windowSize(windowSize),
       m_panelHeight(40),
@@ -62,6 +63,7 @@ MapVisualizer::MapVisualizer(const MapCreation& map, int windowSize)
       m_zoneDragStartRow(-1),  m_zoneDragStartCol(-1),
       m_zoneDragCurrentRow(-1), m_zoneDragCurrentCol(-1),
       m_gaPrepMode(false),
+    m_guiControl(guiControl),
       m_zoneInputState(""),
       m_pendingZone{0, 0, 0, 0},
       m_pendingFirstCount(0),
@@ -639,11 +641,17 @@ void MapVisualizer::updateTitle(sf::RenderWindow& window) const {
 
 SpawnConfig MapVisualizer::run(const std::string& savePath) {
     // ── Window ────────────────────────────────────────────────────────────────
+    const unsigned int controlPanelWidth = m_guiControl != nullptr ? 380u : 0u;
     sf::RenderWindow window(
-        sf::VideoMode(sf::Vector2u(static_cast<unsigned int>(m_windowSize),
+        sf::VideoMode(sf::Vector2u(static_cast<unsigned int>(m_windowSize) + controlPanelWidth,
                                    static_cast<unsigned int>(m_windowSize + m_panelHeight))),
         "UUV Spawn Tool",
         sf::Style::Close);
+    const sf::Vector2u desktopSize = sf::VideoMode::getDesktopMode().size;
+    const sf::Vector2u windowSize = window.getSize();
+    window.setPosition(sf::Vector2i(
+        static_cast<int>((desktopSize.x - windowSize.x) / 2),
+        static_cast<int>((desktopSize.y - windowSize.y) / 2)));
     window.setFramerateLimit(30);
 
     // ── Font ──────────────────────────────────────────────────────────────────
@@ -673,14 +681,70 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                   << "Shift+Z/X=clear zones Enter=save Esc=cancel\n";
 
     int hoverRow = -1, hoverCol = -1;
+    std::unique_ptr<GuiControlPanel> guiPanel;
+    if (m_guiControl != nullptr) {
+        m_guiControl->startingNoise.store(m_config.getMaxNoiseLevel());
+        guiPanel = std::make_unique<GuiControlPanel>(window, *m_guiControl);
+        guiPanel->setAgents(m_config.getUnits());
+    }
 
     // ── Event loop ────────────────────────────────────────────────────────────
     while (window.isOpen()) {
+        if (m_guiControl != nullptr) {
+            const auto category = m_guiControl->category.load();
+            const auto type = m_guiControl->type.load();
+            const auto categoryName = [&]() {
+                if (category == GuiAgentCategory::Seeker) return std::string("seeker");
+                if (category == GuiAgentCategory::Target) return std::string("target");
+                if (category == GuiAgentCategory::Detector) return std::string("detector");
+                if (category == GuiAgentCategory::Interceptor) return std::string("interceptor");
+                return std::string();
+            }();
+            const auto typeName = [&]() {
+                if (type == GuiAgentType::Basic) return std::string("basic");
+                if (type == GuiAgentType::Fast) return std::string("fast");
+                if (type == GuiAgentType::Evader) return std::string("evader");
+                if (type == GuiAgentType::Medium) return std::string("medium");
+                if (type == GuiAgentType::Advanced) return std::string("advanced");
+                return std::string();
+            }();
+            if (!categoryName.empty() && !typeName.empty()) {
+                m_currentCategory = categoryName;
+                m_currentUnitType = typeName;
+                m_zoneDrawMode.clear();
+            }
+            if (m_guiControl->resetRequested.exchange(false)) {
+                m_config.clear();
+                m_map.clearAllUnits();
+                guiPanel->setAgents(m_config.getUnits());
+            }
+            if (m_guiControl->exitRequested.load()) {
+                window.close();
+                return SpawnConfig();
+            }
+            if (m_guiControl->mapReloadRequested.load()) {
+                window.close();
+                return SpawnConfig();
+            }
+            if (m_guiControl->startRequested.exchange(false)) {
+                if (m_config.totalUnits() > 0 || m_config.hasAttackerZones() || m_config.hasDefenderZones()) {
+                    m_config.setMaxNoiseLevel(m_guiControl->startingNoise.load());
+                    if (!savePath.empty()) m_config.saveJSON(savePath);
+                    window.close();
+                    return m_config;
+                }
+            }
+        }
+
         while (auto event = window.pollEvent()) {
 
             if (event->is<sf::Event::Closed>()) {
                 window.close();
                 return SpawnConfig();
+            }
+
+            if (guiPanel != nullptr && guiPanel->handleEvent(*event)) {
+                continue;
             }
 
             // ── Keyboard ─────────────────────────────────────────────────────
@@ -1094,6 +1158,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                                                  clickRow,
                                                  clickCol);
                             }
+                            if (guiPanel != nullptr) {
+                                guiPanel->setAgents(m_config.getUnits());
+                            }
                         }
 
                         updateTitle(window);
@@ -1125,6 +1192,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
                     else {
                         // Remove unit (existing behaviour)
                         m_config.removeUnit(clickRow, clickCol);
+                        if (guiPanel != nullptr) {
+                            guiPanel->setAgents(m_config.getUnits());
+                        }
                         updateTitle(window);
                     }
                 }
@@ -1178,6 +1248,9 @@ SpawnConfig MapVisualizer::run(const std::string& savePath) {
         drawUnits(window, fontPtr);
         drawHover(window, hoverRow, hoverCol);
         drawStatusBar(window, fontPtr);
+        if (guiPanel != nullptr) {
+            guiPanel->draw();
+        }
         window.display();
     }
 

@@ -13,6 +13,7 @@ set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
 
 add_executable(uuv_sim
     src/main.cpp
+    src/guiControl.cpp
     src/mapCreation/mapCreation.cpp
     src/spawnConfig/spawnConfig.cpp
     src/mapVisualizer/mapVisualizer.cpp
@@ -38,6 +39,10 @@ add_executable(uuv_sim
     src/agents/seekerAgents/fast/fastSeekerAgent.cpp
     src/agents/seekerAgents/evader/evaderSeekerAgent.cpp
 )
+
+find_package(TGUI 1 CONFIG REQUIRED)
+target_link_libraries(uuv_sim PRIVATE TGUI::TGUI)
+target_compile_features(uuv_sim PRIVATE cxx_std_17)
 
 add_executable(test_target_assignment
     tests/test_target_assignment.cpp
@@ -67,6 +72,7 @@ add_executable(test_target_assignment
 )
 
 target_include_directories(uuv_sim PRIVATE
+    src
     src/agents
 
     src/agents/targetAgents
